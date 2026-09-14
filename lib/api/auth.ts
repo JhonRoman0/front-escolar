@@ -25,6 +25,8 @@ export interface UsuarioResponse {
   fechaNaci: string | null
   urlFoto: string | null
   pkUrlFoto: string | null
+  intentosFallidos: number | null
+  fechaBloqueo: string | null
   nombreRol: string | null
   roles: RolResponse[]
 }
@@ -64,10 +66,21 @@ export const authApi = {
     return apiFetch<LoginResponse>("/auth/login", {
       method: "POST",
       body: JSON.stringify(data),
+      skipLogout: true,
     })
   },
 
   async me(): Promise<UsuarioResponse> {
     return apiFetch<UsuarioResponse>("/auth/me")
+  },
+
+  // Chequeo de sesión (cookie httpOnly): nunca redirige a login automáticamente
+  // para no romper rutas públicas como el portal.
+  async meSesion(): Promise<UsuarioResponse> {
+    return apiFetch<UsuarioResponse>("/auth/me", { skipLogout: true })
+  },
+
+  async logout(): Promise<void> {
+    return apiFetch<void>("/auth/logout", { method: "POST", skipLogout: true })
   },
 }

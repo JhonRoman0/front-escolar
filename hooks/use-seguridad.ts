@@ -101,6 +101,14 @@ export function useEliminarUsuario() {
   })
 }
 
+export function useDesbloquearUsuario() {
+  const invalidar = useInvalidarMutacion(KEYS.usuarios)
+  return useMutation({
+    mutationFn: (id: number) => usuariosApi.desbloquear(id),
+    onSuccess: invalidar,
+  })
+}
+
 export function useSubirFotoUsuario() {
   const invalidar = useInvalidarMutacion(KEYS.usuarios)
   return useMutation({

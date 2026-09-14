@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react"
 import { toast } from "sonner"
-import { FileDown, Pencil, Plus } from "lucide-react"
+import { Lock, LockOpen, FileDown, Pencil, Plus } from "lucide-react"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/table"
 
 import { TablaPaginacion } from "@/components/shared/paginacion-tabla"
-import { useEliminarUsuario, useUsuarios, useRoles } from "@/hooks/use-seguridad"
+import { useEliminarUsuario, useDesbloquearUsuario, useUsuarios, useRoles } from "@/hooks/use-seguridad"
 import { usePuede } from "@/hooks/use-permisos"
 import type { UsuarioResponse } from "@/lib/api/seguridad"
 import { reportesApi } from "@/lib/api/reportes"
@@ -33,6 +33,16 @@ import UsuarioFormDialog from "./usuario-form-dialog"
 
 const TAMANIO_PAGINA = 10
 
+const MINUTOS_BLOQUEO = 30
+
+function estaBloqueado(usuario: UsuarioResponse): boolean {
+  if (!usuario.fechaBloqueo) return false
+  const finBloqueo = new Date(usuario.fechaBloqueo)
+  if (Number.isNaN(finBloqueo.getTime())) return false
+  finBloqueo.setMinutes(finBloqueo.getMinutes() + MINUTOS_BLOQUEO)
+  return new Date() < finBloqueo
+}
+
 export default function UsuariosTab() {
   const [page, setPage] = useState(0)
   const { data, isLoading, isError, refetch } = useUsuarios(
@@ -40,6 +50,7 @@ export default function UsuariosTab() {
     TAMANIO_PAGINA
   )
   const eliminar = useEliminarUsuario()
+  const desbloquear = useDesbloquearUsuario()
   const puedeCrear = usePuede("USUARIOS", "CREAR")
   const puedeActualizar = usePuede("USUARIOS", "ACTUALIZAR")
   const puedeEliminar = usePuede("USUARIOS", "ELIMINAR")
@@ -88,6 +99,15 @@ export default function UsuariosTab() {
     }
   }
 
+  async function handleDesbloquear(usuario: UsuarioResponse) {
+    try {
+      await desbloquear.mutateAsync(usuario.idUsuario)
+      toast.success(`Usuario "${usuario.nombre} ${usuario.apellidoPat}" desbloqueado`)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Error al desbloquear")
+    }
+  }
+
   return (
     <Card>
       <CardContent className="space-y-4 p-4">
@@ -133,16 +153,17 @@ export default function UsuariosTab() {
               <TableHead>Roles</TableHead>
               <TableHead>Correo</TableHead>
               <TableHead>Estado</TableHead>
+              <TableHead>Bloqueado</TableHead>
               <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <FilasCargando columnas={6} />
+              <FilasCargando columnas={7} />
             ) : isError ? (
-              <MensajeSinDatos columnas={6} mensaje="No se pudo cargar. Recarga la pantalla." />
+              <MensajeSinDatos columnas={7} mensaje="No se pudo cargar. Recarga la pantalla." />
             ) : !data?.content.length ? (
-              <MensajeSinDatos columnas={6} mensaje="Aún no hay usuarios." />
+              <MensajeSinDatos columnas={7} mensaje="Aún no hay usuarios." />
             ) : (
               data.content.map((usuario) => {
                 const nombreCompleto = `${usuario.nombre} ${usuario.apellidoPat} ${usuario.apellidoMat}`.trim()
@@ -185,8 +206,29 @@ export default function UsuariosTab() {
                     <TableCell>
                       <EstadoBadge acceso={usuario.acceso} />
                     </TableCell>
+                    <TableCell>
+                      {estaBloqueado(usuario) ? (
+                        <Badge variant="warning">
+                          <Lock />
+                          Bloqueado
+                        </Badge>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
+                        {estaBloqueado(usuario) && puedeActualizar && (
+                          <Button
+                            variant="outline"
+                            size="icon-sm"
+                            aria-label={`Desbloquear ${nombreCompleto}`}
+                            onClick={() => handleDesbloquear(usuario)}
+                            disabled={desbloquear.isPending}
+                          >
+                            <LockOpen />
+                          </Button>
+                        )}
                         {puedeActualizar && (
                           <Button
                             variant="outline"

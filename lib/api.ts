@@ -1,4 +1,3 @@
-const TOKEN_KEY = "escolar_token"
 const ES_ADMIN_KEY = "escolar_es_admin"
 const PERMISOS_KEY = "escolar_permisos"
 
@@ -49,21 +48,6 @@ export class ApiError extends Error {
   }
 }
 
-export function getToken(): string | null {
-  if (typeof window === "undefined") return null
-  return localStorage.getItem(TOKEN_KEY)
-}
-
-export function setToken(token: string): void {
-  localStorage.setItem(TOKEN_KEY, token)
-}
-
-export function clearToken(): void {
-  localStorage.removeItem(TOKEN_KEY)
-  localStorage.removeItem(ES_ADMIN_KEY)
-  localStorage.removeItem(PERMISOS_KEY)
-}
-
 export function getEsAdmin(): boolean {
   if (typeof window === "undefined") return false
   return localStorage.getItem(ES_ADMIN_KEY) === "true"
@@ -88,6 +72,21 @@ export function setPermisos<T>(permisos: T): void {
   localStorage.setItem(PERMISOS_KEY, JSON.stringify(permisos))
 }
 
+// La sesión ahora vive en una cookie httpOnly (escolar_token) que manda el navegador.
+// Aquí solo se limpian datos no sensibles de sesión.
+export function cerrarSesionLocal(): void {
+  localStorage.removeItem(ES_ADMIN_KEY)
+  localStorage.removeItem(PERMISOS_KEY)
+}
+
+async function notificarLogout(apiUrl: string): Promise<void> {
+  try {
+    await fetch(`${apiUrl}/auth/logout`, { method: "POST", credentials: "include" })
+  } catch {
+    // Silencioso: el usuario ya va a login; la cookie expira sola.
+  }
+}
+
 type FetchOptions = RequestInit & {
   responseType?: "json" | "text" | "blob"
   skipLogout?: boolean
@@ -104,13 +103,13 @@ export async function apiFetch<T>(
   }
 
   const isFormData = options.body instanceof FormData
-  const token = getToken()
 
   const response = await fetch(`${API_URL}${endpoint}`, {
     ...options,
+    credentials: "include",
     headers: {
+      "X-Requested-With": "XMLHttpRequest",
       ...(!isFormData && options.body && { "Content-Type": "application/json" }),
-      ...(token && { Authorization: `Bearer ${token}` }),
       ...(API_URL.includes("ngrok-free") && { "ngrok-skip-browser-warning": "true" }),
       ...options.headers,
     },
@@ -118,7 +117,8 @@ export async function apiFetch<T>(
 
   if (response.status === 401) {
     if (!options.skipLogout) {
-      clearToken()
+      void notificarLogout(API_URL)
+      cerrarSesionLocal()
       if (typeof window !== "undefined") {
         window.location.replace("/login")
       }

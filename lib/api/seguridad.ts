@@ -148,6 +148,8 @@ export interface UsuarioResponse {
   fechaNaci: string
   urlFoto: string | null
   pkUrlFoto: string | null
+  intentosFallidos: number | null
+  fechaBloqueo: string | null
   roles: RolResponse[]
 }
 
@@ -192,6 +194,9 @@ export const usuariosApi = {
   },
   async eliminar(id: number): Promise<void> {
     return apiFetch<void>(`/usuarios/${id}`, { method: "DELETE" })
+  },
+  async desbloquear(id: number): Promise<void> {
+    return apiFetch<void>(`/usuarios/${id}/desbloquear`, { method: "POST" })
   },
   async subirFoto(id: number, file: File): Promise<UsuarioResponse> {
     const formData = new FormData()

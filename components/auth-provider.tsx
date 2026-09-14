@@ -5,7 +5,7 @@ import { useRouter, usePathname } from "next/navigation"
 import { Loader2 } from "lucide-react"
 
 import { authApi, type LoginRequest, type LoginResponse, type PermisosRolResponse, type UsuarioResponse } from "@/lib/api/auth"
-import { getToken, setToken, clearToken, getEsAdmin, setEsAdmin, getPermisos, setPermisos } from "@/lib/api"
+import { cerrarSesionLocal, getEsAdmin, setEsAdmin, getPermisos, setPermisos } from "@/lib/api"
 
 const RUTA_LOGIN = "/login"
 const RUTAS_PUBLICAS = ["/login", "/sin-acceso"]
@@ -36,16 +36,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let cancelado = false
 
     async function verificarSesion() {
-      if (!getToken()) {
-        if (!cancelado) setCargando(false)
-        return
-      }
-
       setEsAdminState(getEsAdmin())
       setPermisosState(getPermisos<PermisosRolResponse>())
 
       try {
-        const usuario = await authApi.me()
+        const usuario = await authApi.meSesion()
         if (!cancelado) {
           setUsuario(usuario)
           // Refrescar nombreRol en permisos desde /auth/me
@@ -58,7 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       } catch {
         if (!cancelado) {
-          clearToken()
+          cerrarSesionLocal()
           setUsuario(null)
         }
       } finally {
@@ -90,7 +85,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function login(data: LoginRequest): Promise<LoginResponse> {
     const resp = await authApi.login(data)
-    setToken(resp.token)
     setEsAdmin(resp.esAdmin)
     setPermisos(resp.permisos)
     setEsAdminState(resp.esAdmin)
@@ -101,7 +95,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   function logout() {
-    clearToken()
+    void authApi.logout().catch(() => {})
+    cerrarSesionLocal()
     setUsuario(null)
     setPermisosState(null)
     setEsAdminState(false)
