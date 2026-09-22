@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useNiveles, useGradosPorNivel, useSeccionesPorGrado } from "@/hooks/use-academico"
 import {
   Select,
@@ -10,9 +10,16 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 
+export interface SeccionInfo {
+  idGradoSeccion: number
+  nombreSeccion: string
+  turno: string
+}
+
 interface GradoSeccionCascadaProps {
   value: number | null
   onChange: (idGradoSeccion: number | null) => void
+  onSeccionInfo?: (info: SeccionInfo | null) => void
   className?: string
   disabled?: boolean
   allowedAnios?: Set<number>
@@ -24,6 +31,7 @@ interface GradoSeccionCascadaProps {
 export function GradoSeccionCascada({
   value,
   onChange,
+  onSeccionInfo,
   className,
   disabled,
   allowedAnios,
@@ -44,6 +52,17 @@ export function GradoSeccionCascada({
   const gradoSel = grados.find((g) => g.idGrado === idGrado)
   const esInicial = !!gradoSel && secciones.length === 0 && gradoSel.idGradoSeccionDefault != null
 
+  useEffect(() => {
+    if (value && secciones.length > 0) {
+      const sec = secciones.find((s) => s.idGradoSeccion === value)
+      if (sec) {
+        onSeccionInfo?.({ idGradoSeccion: sec.idGradoSeccion, nombreSeccion: sec.nombre, turno: sec.turno })
+      }
+    } else if (esInicial && gradoSel) {
+      onSeccionInfo?.({ idGradoSeccion: gradoSel.idGradoSeccionDefault!, nombreSeccion: "Única", turno: gradoSel.turno })
+    }
+  }, [value, secciones, esInicial, gradoSel, onSeccionInfo])
+
   function cambiarNivel(v: string | null) {
     const nuevo = v ? Number(v) : null
     setIdNivel(nuevo)
@@ -57,8 +76,14 @@ export function GradoSeccionCascada({
     const grado = grados.find((g) => g.idGrado === nuevo)
     if (grado && grado.idGradoSeccionDefault != null && grado.secciones.length === 0) {
       onChange(grado.idGradoSeccionDefault)
+      onSeccionInfo?.({
+        idGradoSeccion: grado.idGradoSeccionDefault,
+        nombreSeccion: "Única",
+        turno: grado.turno,
+      })
     } else {
       onChange(null)
+      onSeccionInfo?.(null)
     }
   }
 
@@ -133,7 +158,16 @@ export function GradoSeccionCascada({
         ) : (
           <Select
             value={value ? String(value) : ""}
-            onValueChange={(v) => onChange(v ? Number(v) : null)}
+            onValueChange={(v) => {
+              const id = v ? Number(v) : null
+              onChange(id)
+              if (id) {
+                const sec = secciones.find((s) => s.idGradoSeccion === id)
+                onSeccionInfo?.(sec ? { idGradoSeccion: sec.idGradoSeccion, nombreSeccion: sec.nombre, turno: sec.turno } : null)
+              } else {
+                onSeccionInfo?.(null)
+              }
+            }}
             disabled={disabled || !idGrado}
           >
             <SelectTrigger>

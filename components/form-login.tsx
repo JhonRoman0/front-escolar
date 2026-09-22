@@ -50,7 +50,7 @@ export function LoginForm() {
     } catch (error) {
       if (error instanceof ApiError && error.status === 423) {
         toast.error(
-          "Tu cuenta está bloqueada temporalmente por intentos fallidos. Intenta de nuevo más tarde."
+          "Tu cuenta está bloqueada. Contacta al administrador."
         )
       } else if (error instanceof ApiError && error.status === 401) {
         const nuevosFallos = fallos + 1
@@ -63,7 +63,7 @@ export function LoginForm() {
           )
         } else {
           toast.error(
-            "Credenciales incorrectas. Tu cuenta quedó bloqueada temporalmente."
+            "Credenciales incorrectas. Tu cuenta quedó bloqueada. Contacta al administrador."
           )
         }
       } else {

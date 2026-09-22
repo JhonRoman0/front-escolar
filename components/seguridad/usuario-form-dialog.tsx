@@ -67,8 +67,9 @@ export default function UsuarioFormDialog({
       apellidoMat: usuario?.apellidoMat ?? "",
       documentoIdentidad: usuario?.documentoIdentidad ?? "",
       gmail: usuario?.gmail ?? "",
+      celular: "",
       fechaNaci: usuario?.fechaNaci ?? "",
-      acceso: usuario?.acceso ?? 1,
+      accesoId: usuario?.accesoId ?? 1,
       rolIds: usuario?.roles.map((r) => r.idRol) ?? [],
       contraseña: "",
     },
@@ -81,11 +82,12 @@ export default function UsuarioFormDialog({
       apellidoMat: values.apellidoMat,
       documentoIdentidad: values.documentoIdentidad || null,
       gmail: values.gmail || null,
+      celular: values.celular || null,
       fechaNaci: values.fechaNaci,
       rolIds: values.rolIds,
     }
     if (esEdicion) {
-      data.acceso = values.acceso
+      data.accesoId = values.accesoId
     }
     if (values.contraseña) {
       data.contraseña = values.contraseña
@@ -259,7 +261,7 @@ export default function UsuarioFormDialog({
             />
           </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <Controller
               control={form.control}
               name="documentoIdentidad"
@@ -267,7 +269,7 @@ export default function UsuarioFormDialog({
                 <Field>
                   <FieldLabel>Documento de identidad</FieldLabel>
                   <FieldContent>
-                    <Input placeholder="Opcional" {...field} />
+                    <Input placeholder="8 dígitos" maxLength={8} {...field} />
                     <FieldError
                       errors={[form.formState.errors.documentoIdentidad]}
                     />
@@ -284,6 +286,19 @@ export default function UsuarioFormDialog({
                   <FieldContent>
                     <Input type="email" placeholder="usuario@correo.com" {...field} />
                     <FieldError errors={[form.formState.errors.gmail]} />
+                  </FieldContent>
+                </Field>
+              )}
+            />
+            <Controller
+              control={form.control}
+              name="celular"
+              render={({ field }) => (
+                <Field>
+                  <FieldLabel>Celular</FieldLabel>
+                  <FieldContent>
+                    <Input placeholder="9 dígitos" maxLength={9} {...field} />
+                    <FieldError errors={[form.formState.errors.celular]} />
                   </FieldContent>
                 </Field>
               )}
@@ -368,7 +383,7 @@ export default function UsuarioFormDialog({
           {esEdicion && (
             <Controller
               control={form.control}
-              name="acceso"
+              name="accesoId"
               render={({ field }) => (
                 <Field>
                   <FieldLabel>Estado</FieldLabel>

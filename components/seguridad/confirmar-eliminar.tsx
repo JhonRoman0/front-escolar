@@ -19,6 +19,7 @@ interface ConfirmarEliminarProps {
   descripcion: string
   onConfirm: () => Promise<void>
   className?: string
+  disabled?: boolean
 }
 
 export function ConfirmarEliminar({
@@ -26,6 +27,7 @@ export function ConfirmarEliminar({
   descripcion,
   onConfirm,
   className,
+  disabled,
 }: ConfirmarEliminarProps) {
   const [open, setOpen] = useState(false)
   const [cargando, setCargando] = useState(false)
@@ -43,7 +45,7 @@ export function ConfirmarEliminar({
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={disabled ? undefined : setOpen}>
       <DialogTrigger
         render={
           <Button
@@ -51,6 +53,7 @@ export function ConfirmarEliminar({
             size="icon-sm"
             className={className}
             aria-label={`Eliminar ${titulo}`}
+            disabled={disabled}
           />
         }
       >

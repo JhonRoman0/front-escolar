@@ -35,7 +35,8 @@ export interface MatriculaResponse {
   solicitudMatricula: number
   fechaPago: string | null
   montoPago: number | null
-  acceso: number
+  observaciones: string | null
+  accesoId: number | null
   historial: HistorialResponse[]
 }
 
@@ -45,7 +46,8 @@ export interface MatriculaRequest {
   solicitudMatricula: number
   fechaPago?: string | null
   montoPago?: number | null
-  acceso?: number | null
+  observaciones?: string | null
+  accesoId?: number | null
 }
 
 // ── API ──────────────────────────────────────────────────────────────────
@@ -88,5 +90,41 @@ export const matriculasApi = {
   },
   async eliminar(id: number): Promise<void> {
     return apiFetch<void>(`/matriculas/${id}`, { method: "DELETE" })
+  },
+  async aprobar(
+    id: number,
+    observaciones?: string
+  ): Promise<MatriculaResponse> {
+    const params = new URLSearchParams()
+    if (observaciones) params.set("observaciones", observaciones)
+    return apiFetch<MatriculaResponse>(
+      `/matriculas/${id}/aprobar${params.toString() ? `?${params.toString()}` : ""}`,
+      { method: "POST" }
+    )
+  },
+  async rechazar(
+    id: number,
+    observaciones?: string
+  ): Promise<MatriculaResponse> {
+    const params = new URLSearchParams()
+    if (observaciones) params.set("observaciones", observaciones)
+    return apiFetch<MatriculaResponse>(
+      `/matriculas/${id}/rechazar${params.toString() ? `?${params.toString()}` : ""}`,
+      { method: "POST" }
+    )
+  },
+  async matricular(
+    id: number,
+    fechaPago: string,
+    montoPago: number
+  ): Promise<MatriculaResponse> {
+    const params = new URLSearchParams({
+      fechaPago,
+      montoPago: String(montoPago),
+    })
+    return apiFetch<MatriculaResponse>(
+      `/matriculas/${id}/matricular?${params.toString()}`,
+      { method: "POST" }
+    )
   },
 }

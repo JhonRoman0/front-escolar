@@ -8,7 +8,7 @@ export interface CompetenciaResponse {
   idCurso: number
   curso: string
   orden: number
-  acceso: number
+  accesoId: number | null
 }
 
 // ── Nota SIAGIE ───────────────────────────────────────────────────────────

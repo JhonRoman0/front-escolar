@@ -43,7 +43,7 @@ export default function AccesosTab() {
   const [pendiente, setPendiente] = useState<number | null>(null)
 
   const rolesActivos = useMemo(
-    () => roles.filter((r) => r.acceso === 1),
+    () => roles.filter((r) => r.accesoId === 1),
     [roles]
   )
   const rolEfectivo =
@@ -196,11 +196,11 @@ export default function AccesosTab() {
         ) : (
           <div className="space-y-4">
             {modulos
-              .filter((m) => m.acceso !== 2)
+              .filter((m) => m.accesoId !== 2)
               .map((modulo) => {
                 const Icono = iconoModulo(modulo.icono)
                 const permisosModulo = modulo.permisos.filter(
-                  (p) => p.acceso !== 2
+                  (p) => p.accesoId !== 2
                 )
                 const concedidos = permisosModulo.filter((p) =>
                   concedido.has(p.idPermiso)

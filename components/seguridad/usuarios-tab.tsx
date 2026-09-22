@@ -204,7 +204,7 @@ export default function UsuariosTab() {
                     </TableCell>
                     <TableCell>{usuario.gmail || "—"}</TableCell>
                     <TableCell>
-                      <EstadoBadge acceso={usuario.acceso} />
+                      <EstadoBadge accesoId={usuario.accesoId} />
                     </TableCell>
                     <TableCell>
                       {estaBloqueado(usuario) ? (

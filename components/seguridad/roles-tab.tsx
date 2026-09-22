@@ -32,24 +32,26 @@ import { cn } from "@/lib/utils"
 import { ConfirmarEliminar } from "./confirmar-eliminar"
 import { CampoAcceso, CargandoTarjetas } from "./shared"
 
-const COLORES_ROL = [
-  {
-    bg: "bg-[#D1FAE5] dark:bg-emerald-900/40",
-    text: "text-[#065F46] dark:text-emerald-300",
-  },
-  {
-    bg: "bg-[#FEF3C7] dark:bg-amber-900/40",
-    text: "text-[#92400E] dark:text-amber-300",
-  },
-  {
-    bg: "bg-[#DC2626]/10 dark:bg-rose-900/40",
-    text: "text-[#DC2626] dark:text-rose-300",
-  },
-  {
-    bg: "bg-[#F5F3FF] dark:bg-violet-900/40",
-    text: "text-[#8427FE] dark:text-violet-300",
-  },
+const COLORES_FALLBACK = [
+  { bg: "bg-[#D1FAE5]", text: "text-[#065F46]", darkBg: "dark:bg-emerald-900/40", darkText: "dark:text-emerald-300" },
+  { bg: "bg-[#FEF3C7]", text: "text-[#92400E]", darkBg: "dark:bg-amber-900/40", darkText: "dark:text-amber-300" },
+  { bg: "bg-[#DC2626]/10", text: "text-[#DC2626]", darkBg: "dark:bg-rose-900/40", darkText: "dark:text-rose-300" },
+  { bg: "bg-[#F5F3FF]", text: "text-[#8427FE]", darkBg: "dark:bg-violet-900/40", darkText: "dark:text-violet-300" },
 ]
+
+function getRolColor(color: string | null, index: number) {
+  if (color) {
+    return {
+      bg: "",
+      text: "",
+      darkBg: "",
+      darkText: "",
+      inline: { backgroundColor: `${color}20`, color },
+    }
+  }
+  const fallback = COLORES_FALLBACK[index % COLORES_FALLBACK.length]
+  return { ...fallback, inline: null }
+}
 
 export default function RolesTab() {
   const { data, isLoading, isError, refetch } = useRoles()
@@ -61,7 +63,7 @@ export default function RolesTab() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editando, setEditando] = useState<RolResponse | null>(null)
 
-  const rolesActivos = data?.filter((r) => r.acceso === 1) ?? []
+  const rolesActivos = data?.filter((r) => r.accesoId === 1) ?? []
 
   async function handleEliminar(rol: RolResponse) {
     try {
@@ -109,16 +111,25 @@ export default function RolesTab() {
           ) : (
             <div className="flex flex-wrap gap-x-12 gap-y-6">
               {rolesActivos.map((rol, i) => {
-                const color = COLORES_ROL[i % COLORES_ROL.length]
+                const color = getRolColor(rol.color, i)
                 return (
                   <div
                     key={rol.idRol}
                     className={cn(
                       "group relative flex h-[105px] w-[210px] shrink-0 items-center justify-center rounded-2xl px-4 py-3 transition-shadow hover:shadow-md",
-                      color.bg
+                      color.inline ? "" : color.bg,
+                      color.inline ? "" : color.darkBg
                     )}
+                    style={color.inline ?? undefined}
                   >
-                    <span className={cn("text-[16px] font-normal", color.text)}>
+                    <span
+                      className={cn(
+                        "text-[16px] font-normal",
+                        color.inline ? "" : color.text,
+                        color.inline ? "" : color.darkText
+                      )}
+                      style={color.inline ? { color: color.inline.color } : undefined}
+                    >
                       {rol.nombre}
                     </span>
                     {(puedeActualizar || puedeEliminar) && (
@@ -184,12 +195,16 @@ function RolFormDialog({
 
   const form = useForm<RolValues>({
     resolver: zodResolver(rolSchema),
-    defaultValues: { nombre: "", acceso: 1 },
+    defaultValues: { nombre: "", color: "", accesoId: 1 },
   })
 
   useEffect(() => {
     if (open) {
-      form.reset({ nombre: rol?.nombre ?? "", acceso: rol?.acceso ?? 1 })
+      form.reset({
+        nombre: rol?.nombre ?? "",
+        color: rol?.color ?? "",
+        accesoId: rol?.accesoId ?? 1,
+      })
     }
   }, [open, rol, form])
 
@@ -228,10 +243,36 @@ function RolFormDialog({
               </Field>
             )}
           />
+          <Controller
+            control={form.control}
+            name="color"
+            render={({ field }) => (
+              <Field>
+                <FieldLabel>Color del rol</FieldLabel>
+                <FieldContent>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="color"
+                      value={field.value || "#3B82F6"}
+                      onChange={(e) => field.onChange(e.target.value)}
+                      className="h-10 w-14 cursor-pointer rounded border-0 p-0"
+                    />
+                    <Input
+                      placeholder="#FF5733"
+                      value={field.value ?? ""}
+                      onChange={(e) => field.onChange(e.target.value)}
+                      className="flex-1"
+                    />
+                  </div>
+                  <FieldError errors={[form.formState.errors.color]} />
+                </FieldContent>
+              </Field>
+            )}
+          />
           {esEdicion && (
             <Controller
               control={form.control}
-              name="acceso"
+              name="accesoId"
               render={({ field }) => (
                 <Field>
                   <FieldLabel>Estado</FieldLabel>
