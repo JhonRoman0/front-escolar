@@ -5,14 +5,14 @@ export interface PermisoResponse {
   codigo: string
   nombre: string
   acciones: string[]
-  acceso: number
+  accesoId: number | null
 }
 
 export interface ModuloResponse {
   idModulo: number
   modulo: string
   icono: string | null
-  acceso: number
+  accesoId: number | null
   permisos: PermisoResponse[]
 }
 

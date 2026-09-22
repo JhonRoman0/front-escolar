@@ -1,27 +1,25 @@
 import { Badge } from "@/components/ui/badge"
 
-export function EstadoBadge({ acceso }: { acceso: number }) {
-  if (acceso === 2) {
-    return (
-      <Badge variant="destructive" className="capitalize">
-        Eliminado
-      </Badge>
-    )
+function badgeAcceso(accesoId: number | null | undefined) {
+  if (accesoId === 2) {
+    return <Badge variant="destructive">Eliminado</Badge>
   }
-  if (acceso === 0) {
+  if (accesoId === 3) {
     return <Badge variant="outline">Inactivo</Badge>
   }
   return <Badge variant="success">Activo</Badge>
 }
 
-export function EstadoBadgeMenu({ acceso }: { acceso: number }) {
-  if (acceso === 0) return <Badge variant="outline">Inactivo</Badge>
-  if (acceso === 2) return <Badge variant="destructive">Eliminado</Badge>
-  return <Badge variant="success">Activo</Badge>
+export function EstadoBadge({ accesoId }: { accesoId?: number | null }) {
+  return badgeAcceso(accesoId)
+}
+
+export function EstadoBadgeMenu({ accesoId }: { accesoId?: number | null }) {
+  return badgeAcceso(accesoId)
 }
 
 export const NOMBRE_ACCESO: Record<number, string> = {
-  0: "Inactivo",
   1: "Activo",
   2: "Eliminado",
+  3: "Inactivo",
 }

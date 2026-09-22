@@ -10,7 +10,12 @@ import { cerrarSesionLocal, getEsAdmin, setEsAdmin, getPermisos, setPermisos } f
 const RUTA_LOGIN = "/login"
 const RUTAS_PUBLICAS = ["/login", "/sin-acceso"]
 function esRutaPublica(pathname: string) {
-  return RUTAS_PUBLICAS.includes(pathname) || pathname.startsWith("/portal")
+  return (
+    RUTAS_PUBLICAS.includes(pathname) ||
+    pathname.startsWith("/portal") ||
+    pathname === "/recuperar-contrasena" ||
+    pathname.startsWith("/restablecer-contrasena")
+  )
 }
 
 interface AuthContextValue {

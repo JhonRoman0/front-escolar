@@ -10,7 +10,7 @@ export interface LoginRequest {
 export interface RolResponse {
   idRol: number
   nombre: string
-  acceso: number
+  accesoId: number | null
 }
 
 export interface UsuarioResponse {
@@ -20,7 +20,7 @@ export interface UsuarioResponse {
   apellidoMat: string
   codigo: string
   documentoIdentidad: string | null
-  acceso: number
+  accesoId: number | null
   gmail: string | null
   fechaNaci: string | null
   urlFoto: string | null
@@ -82,5 +82,25 @@ export const authApi = {
 
   async logout(): Promise<void> {
     return apiFetch<void>("/auth/logout", { method: "POST", skipLogout: true })
+  },
+
+  async forgotPassword(gmail: string): Promise<{ mensaje: string }> {
+    return apiFetch<{ mensaje: string }>("/auth/forgot-password", {
+      method: "POST",
+      body: JSON.stringify({ gmail }),
+      skipLogout: true,
+    })
+  },
+
+  async resetPassword(
+    gmail: string,
+    codigo: string,
+    nuevaContrasena: string
+  ): Promise<{ mensaje: string }> {
+    return apiFetch<{ mensaje: string }>("/auth/reset-password", {
+      method: "POST",
+      body: JSON.stringify({ gmail, codigo, nuevaContrasena }),
+      skipLogout: true,
+    })
   },
 }

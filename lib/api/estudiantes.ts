@@ -17,7 +17,7 @@ export interface ApoderadoResponse {
   documentoIdentidad: string | null
   fechaNaci: string | null
   urlFoto: string | null
-  acceso: number
+  accesoId: number | null
 }
 
 export interface ApoderadoRequest {
@@ -46,7 +46,7 @@ export interface AlumnoResponse {
   direccion: string | null
   documentoIdentidad: string | null
   urlFoto: string | null
-  acceso: number
+  accesoId: number | null
   apoderados: ApoderadoResponse[]
 }
 
@@ -58,7 +58,7 @@ export interface AlumnoRequest {
   direccion?: string | null
   documentoIdentidad?: string | null
   apoderados?: ApoderadoRequest[] | null
-  acceso?: number | null
+  accesoId?: number | null
 }
 
 // ── API ──────────────────────────────────────────────────────────────────

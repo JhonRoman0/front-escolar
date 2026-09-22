@@ -1,4 +1,5 @@
 import Image from "next/image"
+import Link from "next/link"
 
 import { LoginForm } from "@/components/form-login"
 import { ThemeToggle } from "@/components/theme-toggle"
@@ -40,14 +41,12 @@ export default function LoginPage() {
 
           {/* Pie informativo */}
           <div className="text-center text-[17px]">
-            <p>
-              <span className="font-medium text-[#7D7D7F]">
-                ¿Olvidaste tu contraseña?{" "}
-              </span>
-              <span className="font-bold text-black">
-                Contacta a un administrador
-              </span>
-            </p>
+            <Link
+              href="/recuperar-contrasena"
+              className="font-semibold text-[#3A62D4] hover:underline"
+            >
+              ¿Olvidaste tu contraseña?
+            </Link>
           </div>
         </div>
       </div>
