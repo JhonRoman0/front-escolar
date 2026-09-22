@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
@@ -22,6 +23,7 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>
 
 export function RecuperarContrasenaForm() {
+  const router = useRouter()
   const [enviando, setEnviando] = useState(false)
   const [enviado, setEnviado] = useState(false)
 
@@ -54,6 +56,9 @@ export function RecuperarContrasenaForm() {
           Revisa tu bandeja de entrada. Se envió un código de 6 dígitos para
           restablecer tu contraseña.
         </p>
+        <Button onClick={() => router.push("/restablecer-contrasena")} className="mt-4">
+          Ingresar código
+        </Button>
       </div>
     )
   }
