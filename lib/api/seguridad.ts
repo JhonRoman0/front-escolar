@@ -13,12 +13,14 @@ import type { Paginated } from "@/lib/api"
 export interface RolResponse {
   idRol: number
   nombre: string
-  acceso: number
+  color: string | null
+  accesoId: number | null
 }
 
 export interface RolRequest {
   nombre: string
-  acceso?: number | null
+  color?: string | null
+  accesoId?: number | null
 }
 
 export const rolesApi = {
@@ -45,7 +47,7 @@ export const rolesApi = {
 // ── Permisos ─────────────────────────────────────────────────────────────
 
 export interface PermisoConModulo extends PermisoResponse {
-  modulo: Pick<ModuloResponse, "idModulo" | "modulo" | "icono" | "acceso">
+  modulo: Pick<ModuloResponse, "idModulo" | "modulo" | "icono" | "accesoId">
 }
 
 export const permisosApi = {
@@ -60,7 +62,7 @@ export interface AccionResponse {
   idAccion: number
   codigo: string
   nombre: string
-  acceso: number
+  accesoId: number | null
 }
 
 export const accionesApi = {
@@ -97,14 +99,14 @@ export interface RolPermisoResponse {
   rol: RolResponse
   permiso: PermisoResponse
   acciones: string[]
-  acceso: number
+  accesoId: number | null
 }
 
 export interface RolPermisoRequest {
   idRol: number
   idPermiso: number
   acciones?: string[]
-  acceso?: number | null
+  accesoId?: number | null
 }
 
 export const rolesPermisoApi = {
@@ -143,7 +145,7 @@ export interface UsuarioResponse {
   apellidoMat: string
   codigo: string
   documentoIdentidad: string | null
-  acceso: number
+  accesoId: number | null
   gmail: string | null
   fechaNaci: string
   urlFoto: string | null
@@ -160,8 +162,9 @@ export interface UsuarioRequest {
   documentoIdentidad?: string | null
   contraseña?: string
   gmail?: string | null
+  celular?: string | null
   fechaNaci: string
-  acceso?: number | null
+  accesoId?: number | null
   urlFoto?: string | null
   pkUrlFoto?: string | null
   rolIds: number[]

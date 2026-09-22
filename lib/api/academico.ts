@@ -18,12 +18,12 @@ export interface DocenteResponse {
   gmail: string | null
   fechaNaci: string
   urlFoto: string | null
-  acceso: number
+  accesoId: number | null
   tipoContrato: string | null
   fechaContratacion: string | null
   especialidad: string | null
   gradoAcademico: string | null
-  roles: { idRol: number; nombre: string; acceso: number }[]
+  roles: { idRol: number; nombre: string; accesoId: number | null }[]
 }
 
 export interface DocenteRequest {
@@ -38,7 +38,7 @@ export interface DocenteRequest {
   fechaContratacion?: string | null
   especialidad?: string | null
   gradoAcademico?: string | null
-  acceso?: number | null
+  accesoId?: number | null
 }
 
 // ── Curso ────────────────────────────────────────────────────────────────
@@ -46,12 +46,12 @@ export interface DocenteRequest {
 export interface CursoResponse {
   idCurso: number
   nombre: string
-  acceso: number
+  accesoId: number | null
 }
 
 export interface CursoRequest {
   nombre: string
-  acceso?: number | null
+  accesoId?: number | null
 }
 
 // ── Turno ────────────────────────────────────────────────────────────────
@@ -63,7 +63,7 @@ export interface TurnoResponse {
   horaEntradaLimite: string
   horaFaltaLimite: string
   horaSalida: string
-  acceso: number
+  accesoId: number | null
 }
 
 export interface TurnoRequest {
@@ -72,7 +72,7 @@ export interface TurnoRequest {
   horaEntradaLimite: string
   horaFaltaLimite: string
   horaSalida: string
-  acceso?: number | null
+  accesoId?: number | null
 }
 
 // ── Grado ────────────────────────────────────────────────────────────────
@@ -88,7 +88,7 @@ export interface GradoResponse {
   nombre: string
   idNivel: number
   nivel: string
-  acceso: number
+  accesoId: number | null
   idAnio: number
   anio: string
   idTurno: number
@@ -103,7 +103,7 @@ export interface GradoRequest {
   idAnio: number
   idTurno: number
   secciones?: string[]
-  acceso?: number | null
+  accesoId?: number | null
 }
 
 // ── Nivel (filtro cascada) ──────────────────────────────────────────────
@@ -129,13 +129,19 @@ export interface AnioEscolarResponse {
   idAnio: number
   anio: string
   estado: number
-  acceso: number
+  fechaInicio: string | null
+  fechaFin: string | null
+  bloqueoHorariosPorFecha: boolean | null
+  accesoId: number | null
 }
 
 export interface AnioEscolarRequest {
   anio: string
   estado?: number | null
-  acceso?: number | null
+  fechaInicio?: string | null
+  fechaFin?: string | null
+  bloqueoHorariosPorFecha?: boolean | null
+  accesoId?: number | null
 }
 
 // ── Aula ─────────────────────────────────────────────────────────────────
@@ -143,12 +149,51 @@ export interface AnioEscolarRequest {
 export interface AulaResponse {
   idAula: number
   nombre: string
-  acceso: number
+  capacidad: number | null
+  accesoId: number | null
 }
 
 export interface AulaRequest {
   nombre: string
-  acceso?: number | null
+  capacidad?: number | null
+  accesoId?: number | null
+}
+
+// ── Suspensión de Docente ────────────────────────────────────────────────
+
+export interface SuspensionResponse {
+  idSuspension: number
+  idDocente: number
+  docente: string
+  idSustituto: number | null
+  sustituto: string | null
+  motivo: string
+  motivoDetalle: string | null
+  fechaInicio: string
+  fechaFin: string | null
+  accesoId: number | null
+}
+
+export interface SuspensionRequest {
+  idDocente: number
+  idSustituto?: number | null
+  motivo: string
+  motivoDetalle?: string | null
+  fechaInicio: string
+  fechaFin?: string | null
+}
+
+// ── Cambios de Docente ───────────────────────────────────────────────────
+
+export interface CambioDocenteResponse {
+  idCambio: number
+  idAsignacion: number
+  docenteAnterior: string
+  docenteNuevo: string
+  motivo: string
+  motivoDetalle: string | null
+  fechaCambio: string
+  usuarioRegistro: string
 }
 
 // ── Asignación ───────────────────────────────────────────────────────────
@@ -181,7 +226,7 @@ export interface AsignacionResponse {
   turno: string
   idAnio: number
   anio: string
-  acceso: number
+  accesoId: number | null
   horarios: HorarioResponse[]
 }
 
@@ -191,7 +236,7 @@ export interface AsignacionRequest {
   idGradoSeccion: number
   idAnio: number
   horarios?: HorarioRequest[] | null
-  acceso?: number | null
+  accesoId?: number | null
 }
 
 export interface HorasDocenteResponse {
@@ -253,5 +298,106 @@ export const asignacionesApi = {
     return apiFetch<HorasDocenteResponse>(
       `/asignaciones/docente/${idDocente}/horas${query}`
     )
+  },
+}
+
+// ── Suspensiones de Docente ──────────────────────────────────────────────
+
+export const suspensionesApi = {
+  async listar(): Promise<SuspensionResponse[]> {
+    return apiFetch<SuspensionResponse[]>("/suspensiones")
+  },
+  async porId(id: number): Promise<SuspensionResponse> {
+    return apiFetch<SuspensionResponse>(`/suspensiones/${id}`)
+  },
+  async porDocente(idDocente: number): Promise<SuspensionResponse[]> {
+    return apiFetch<SuspensionResponse[]>(`/suspensiones/docente/${idDocente}`)
+  },
+  async crear(data: SuspensionRequest): Promise<SuspensionResponse> {
+    return apiFetch<SuspensionResponse>("/suspensiones", {
+      method: "POST",
+      body: JSON.stringify(data),
+    })
+  },
+  async finalizar(id: number): Promise<SuspensionResponse> {
+    return apiFetch<SuspensionResponse>(`/suspensiones/${id}/finalizar`, {
+      method: "PUT",
+    })
+  },
+  async eliminar(id: number): Promise<void> {
+    return apiFetch<void>(`/suspensiones/${id}`, { method: "DELETE" })
+  },
+}
+
+// ── Cambios de Docente (solo lectura) ────────────────────────────────────
+
+export const cambiosDocenteApi = {
+  async listar(): Promise<CambioDocenteResponse[]> {
+    return apiFetch<CambioDocenteResponse[]>("/cambios-docente")
+  },
+  async porId(id: number): Promise<CambioDocenteResponse> {
+    return apiFetch<CambioDocenteResponse>(`/cambios-docente/${id}`)
+  },
+  async porDocente(idDocente: number): Promise<CambioDocenteResponse[]> {
+    return apiFetch<CambioDocenteResponse[]>(
+      `/cambios-docente/docente/${idDocente}`
+    )
+  },
+}
+
+// ── Recreos ──────────────────────────────────────────────────────────────
+
+export interface RecreoResponse {
+  idRecreo: number
+  idNivel: number
+  nivel: string
+  idGradoSeccion: number | null
+  gradoSeccion: string | null
+  diaSemana: number
+  horaInicio: string
+  horaFin: string
+  accesoId: number | null
+}
+
+export interface RecreoRequest {
+  idNivel: number
+  idGradoSeccion?: number | null
+  diaSemana: number
+  horaInicio: string
+  horaFin: string
+}
+
+export const recreosApi = {
+  async listar(): Promise<RecreoResponse[]> {
+    return apiFetch<RecreoResponse[]>("/recreos")
+  },
+  async porId(id: number): Promise<RecreoResponse> {
+    return apiFetch<RecreoResponse>(`/recreos/${id}`)
+  },
+  async porNivel(idNivel: number): Promise<RecreoResponse[]> {
+    return apiFetch<RecreoResponse[]>(`/recreos/nivel/${idNivel}`)
+  },
+  async porNivelYDia(
+    idNivel: number,
+    dia: number
+  ): Promise<RecreoResponse[]> {
+    return apiFetch<RecreoResponse[]>(
+      `/recreos/nivel/${idNivel}/dia/${dia}`
+    )
+  },
+  async crear(data: RecreoRequest): Promise<RecreoResponse> {
+    return apiFetch<RecreoResponse>("/recreos", {
+      method: "POST",
+      body: JSON.stringify(data),
+    })
+  },
+  async actualizar(id: number, data: RecreoRequest): Promise<RecreoResponse> {
+    return apiFetch<RecreoResponse>(`/recreos/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    })
+  },
+  async eliminar(id: number): Promise<void> {
+    return apiFetch<void>(`/recreos/${id}`, { method: "DELETE" })
   },
 }

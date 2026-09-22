@@ -31,7 +31,7 @@ export function CampoAcceso({ value, onChange }: CampoAccesoProps) {
       </SelectTrigger>
       <SelectContent>
         <SelectItem value="1">Activo</SelectItem>
-        <SelectItem value="0">Inactivo</SelectItem>
+        <SelectItem value="3">Inactivo</SelectItem>
       </SelectContent>
     </Select>
   )
