@@ -81,7 +81,7 @@ export function JustificacionesTab() {
       <CardContent className="space-y-4 p-4">
         <HeaderTabla
           titulo="Motivos de justificación"
-          descripcion="Catálogo que se usa al justificar ingresos tardíos o asistencias pasadas."
+          descripcion="Motivos disponibles al justificar ingresos tardíos o inasistencias."
           puedeCrear={puedeCrear}
           onNuevo={() => {
             setEditando(null)

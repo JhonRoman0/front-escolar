@@ -102,14 +102,14 @@ export function PasoAlumno({ value, onChange, onNext }: PasoAlumnoProps) {
             form.setValue("nombre", r.nombres ?? "", { shouldValidate: true })
             form.setValue("apellidoPat", r.apellidoPaterno ?? "", { shouldValidate: true })
             form.setValue("apellidoMat", r.apellidoMaterno ?? "", { shouldValidate: true })
-            const origen = r.origen === "CACHE" || r.origen === "RENIEC" ? "RENIEC" : r.origen
-            toast.success(`Datos cargados desde ${origen}`)
+            const mensaje = r.origen === "RENIEC" || r.origen === "CACHE" ? "Datos completados desde RENIEC" : "Datos completados automáticamente"
+            toast.success(mensaje)
             return
           } catch (reniecError) {
             if (reniecError instanceof ApiError && reniecError.status === 404) {
               setAlumnoSel(null)
               form.setValue("documentoIdentidad", dni)
-              toast.info("DNI no encontrado en RENIEC: completa los datos manualmente")
+              toast.info("No encontramos ese DNI en RENIEC. Completa los datos.")
               return
             }
             toast.error(reniecError instanceof Error ? reniecError.message : "No se pudo consultar RENIEC")
@@ -118,7 +118,7 @@ export function PasoAlumno({ value, onChange, onNext }: PasoAlumnoProps) {
         }
         setAlumnoSel(null)
         form.setValue("documentoIdentidad", dni)
-        toast.info("No existe un alumno con ese DNI. Completa los datos.")
+        toast.info("No encontramos ese DNI. Completa los datos del alumno.")
       } else {
         const msg = error instanceof Error ? error.message : ""
         toast.error(msg || "No se pudo buscar el alumno")

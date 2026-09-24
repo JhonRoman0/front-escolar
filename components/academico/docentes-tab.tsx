@@ -48,7 +48,7 @@ import type {
   DocenteResponse,
 } from "@/lib/api/academico"
 import { docenteSchema, type DocenteValues } from "@/lib/schemas/academico"
-import { BuscarDniButton } from "@/components/shared/buscar-dni-button"
+import { CampoDni } from "@/components/shared/campo-dni"
 import { usePuede } from "@/hooks/use-permisos"
 import { reportesApi } from "@/lib/api/reportes"
 import { generarPdfDocentes } from "@/lib/reportes/generar-pdf"
@@ -126,7 +126,7 @@ export default function DocentesTab() {
           <div className="space-y-0.5">
             <h2 className="text-[20px] font-semibold tracking-tight">Docentes</h2>
             <p className="text-[14px] leading-5 text-muted-foreground">
-              Cada docente crea su usuario de acceso (código D2026####).
+              Gestión de docentes y su información de contacto.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -383,8 +383,8 @@ function DocenteFormDialog({
       form.setValue("nombre", r.nombres ?? "", { shouldValidate: true })
       form.setValue("apellidoPat", r.apellidoPaterno ?? "", { shouldValidate: true })
       form.setValue("apellidoMat", r.apellidoMaterno ?? "", { shouldValidate: true })
-      const origen = r.origen === "LOCAL" ? "Registro local" : "RENIEC"
-      toast.success(`Datos cargados (${origen})`)
+      const mensaje = r.origen === "RENIEC" || r.origen === "CACHE" ? "Datos completados desde RENIEC" : "Datos completados automáticamente"
+      toast.success(mensaje)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo consultar el DNI")
     }
@@ -478,24 +478,25 @@ function DocenteFormDialog({
             </div>
 
             <FieldSet>
-              <FieldLegend className="text-sm font-semibold">Identidad</FieldLegend>
-              <FieldDescription className="text-xs">Ingresa el DNI primero y usa Buscar para autocompletar desde RENIEC/BD.</FieldDescription>
+              <FieldLegend>Datos personales</FieldLegend>
               <div className="flex flex-col gap-4">
                 <Controller
                   control={form.control}
                   name="documentoIdentidad"
                   render={({ field }) => (
-                    <Field>
-                      <FieldLabel>DNI — Documento de identidad</FieldLabel>
-                      <FieldContent>
-                        <div className="flex gap-2">
-                          <Input placeholder="8 dígitos" maxLength={8} autoFocus {...field} className="flex-1" />
-                          <BuscarDniButton dni={field.value} cargando={consultarDni.isPending} onBuscar={handleBuscarDni} />
-                        </div>
-                        <FieldDescription className="text-xs">8 dígitos exactos. Busca en BD local o RENIEC.</FieldDescription>
-                        <FieldError errors={[form.formState.errors.documentoIdentidad]} />
-                      </FieldContent>
-                    </Field>
+                    <CampoDni
+                      value={field.value}
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                      name={field.name}
+                      inputRef={field.ref}
+                      cargando={consultarDni.isPending}
+                      onBuscar={handleBuscarDni}
+                      error={form.formState.errors.documentoIdentidad}
+                      autoFocus
+                      label="DNI"
+                      placeholder="12345678"
+                    />
                   )}
                 />
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -556,7 +557,7 @@ function DocenteFormDialog({
             </FieldSet>
 
             <FieldSet>
-              <FieldLegend className="text-sm font-semibold">Contacto</FieldLegend>
+              <FieldLegend>Contacto</FieldLegend>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-1">
                 <Controller
                   control={form.control}
@@ -576,7 +577,7 @@ function DocenteFormDialog({
             </FieldSet>
 
             <FieldSet>
-              <FieldLegend className="text-sm font-semibold">Datos laborales</FieldLegend>
+              <FieldLegend>Datos laborales</FieldLegend>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <Controller
                   control={form.control}

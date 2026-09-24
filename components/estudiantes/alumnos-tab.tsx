@@ -159,7 +159,7 @@ export function AlumnosTab() {
           <div className="relative min-w-[200px] flex-1 max-w-[358px]">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Buscar por alumno, codigo o DNI"
+              placeholder="Buscar por alumno, código o DNI"
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
               className="h-8 rounded-[8px] border-[0.80px] border-[#A9A9AA] bg-white pl-9 text-[13px] placeholder:text-[12px]"
@@ -267,7 +267,7 @@ export function AlumnosTab() {
             <TableHeader>
               <TableRow className="bg-[#F8F9FA] hover:bg-[#F8F9FA]">
                 <TableHead className="whitespace-nowrap text-[12px] font-semibold text-[#495057]">Alumno</TableHead>
-                <TableHead className="whitespace-nowrap text-[12px] font-semibold text-[#495057]">Codigo</TableHead>
+                <TableHead className="whitespace-nowrap text-[12px] font-semibold text-[#495057]">Código</TableHead>
                 <TableHead className="whitespace-nowrap text-[12px] font-semibold text-[#495057]">DNI</TableHead>
                 <TableHead className="whitespace-nowrap text-[12px] font-semibold text-[#495057]">Apoderado</TableHead>
                 <TableHead className="whitespace-nowrap text-[12px] font-semibold text-[#495057]">Nivel</TableHead>

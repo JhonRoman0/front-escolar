@@ -175,14 +175,14 @@ export function PasoApoderado({ value, onChange, onBack, onNext }: PasoApoderado
             formPrincipal.setValue("nombre", r.nombres ?? "", { shouldValidate: true })
             formPrincipal.setValue("apellidoPat", r.apellidoPaterno ?? "", { shouldValidate: true })
             formPrincipal.setValue("apellidoMat", r.apellidoMaterno ?? "", { shouldValidate: true })
-            const origen = r.origen === "CACHE" || r.origen === "RENIEC" ? "RENIEC" : r.origen
-            toast.success(`Datos cargados desde ${origen}`)
+            const mensaje = r.origen === "RENIEC" || r.origen === "CACHE" ? "Datos completados desde RENIEC" : "Datos completados automáticamente"
+            toast.success(mensaje)
             return
           } catch (reniecError) {
             if (reniecError instanceof ApiError && reniecError.status === 404) {
               setApoderadoSel(null)
               formPrincipal.setValue("documentoIdentidad", dni)
-              toast.info("DNI no encontrado en RENIEC: completa los datos manualmente")
+              toast.info("No encontramos ese DNI en RENIEC. Completa los datos.")
               return
             }
             toast.error(reniecError instanceof Error ? reniecError.message : "No se pudo consultar RENIEC")
@@ -191,7 +191,7 @@ export function PasoApoderado({ value, onChange, onBack, onNext }: PasoApoderado
         }
         setApoderadoSel(null)
         formPrincipal.setValue("documentoIdentidad", dni)
-        toast.info("No existe un apoderado con ese DNI. Completa los datos.")
+        toast.info("No encontramos ese DNI. Completa los datos del apoderado.")
       } else {
         const msg = error instanceof Error ? error.message : ""
         toast.error(msg || "No se pudo buscar el apoderado")
@@ -230,14 +230,14 @@ export function PasoApoderado({ value, onChange, onBack, onNext }: PasoApoderado
             formSecundario.setValue("nombre", r.nombres ?? "", { shouldValidate: true })
             formSecundario.setValue("apellidoPat", r.apellidoPaterno ?? "", { shouldValidate: true })
             formSecundario.setValue("apellidoMat", r.apellidoMaterno ?? "", { shouldValidate: true })
-            const origen = r.origen === "CACHE" || r.origen === "RENIEC" ? "RENIEC" : r.origen
-            toast.success(`Datos cargados desde ${origen}`)
+            const mensaje = r.origen === "RENIEC" || r.origen === "CACHE" ? "Datos completados desde RENIEC" : "Datos completados automáticamente"
+            toast.success(mensaje)
             return
           } catch (reniecError) {
             if (reniecError instanceof ApiError && reniecError.status === 404) {
               setApoderadoSecSel(null)
               formSecundario.setValue("documentoIdentidad", dni)
-              toast.info("DNI no encontrado en RENIEC: completa los datos manualmente")
+              toast.info("No encontramos ese DNI en RENIEC. Completa los datos.")
               return
             }
             toast.error(reniecError instanceof Error ? reniecError.message : "No se pudo consultar RENIEC")
@@ -246,7 +246,7 @@ export function PasoApoderado({ value, onChange, onBack, onNext }: PasoApoderado
         }
         setApoderadoSecSel(null)
         formSecundario.setValue("documentoIdentidad", dni)
-        toast.info("No existe un apoderado con ese DNI. Completa los datos.")
+        toast.info("No encontramos ese DNI. Completa los datos del apoderado secundario.")
       } else {
         const msg = error instanceof Error ? error.message : ""
         toast.error(msg || "No se pudo buscar el apoderado")

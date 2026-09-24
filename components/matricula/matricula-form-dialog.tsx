@@ -44,6 +44,7 @@ import {
 import { PasoAlumno, type PasoAlumnoData } from "./paso-alumno"
 import { PasoApoderado, type PasoApoderadoData } from "./paso-apoderado"
 import { PasoMatricula, type PasoMatriculaValues } from "./paso-matricula"
+import { Stepper } from "@/components/shared/stepper"
 
 const SOLICITUDES = [
   { value: "1", label: "Pendiente" },
@@ -136,7 +137,7 @@ export function MatriculaFormDialog({
     } catch (error) {
       const message = error instanceof Error ? error.message : ""
       if (message.includes("no encontrado")) {
-        toast.error("No existe un alumno con ese DNI. Regístralo con el botón.")
+        toast.error("No encontramos un alumno con ese DNI.")
       } else {
         toast.error(message || "No se pudo buscar el alumno")
       }
@@ -535,33 +536,7 @@ function WizardCreacion({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-center gap-2">
-        {stepLabels.map((label, i) => (
-          <div key={label} className="flex items-center gap-2">
-            <div
-              className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-medium ${
-                i + 1 <= paso
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground"
-              }`}
-            >
-              {i + 1}
-            </div>
-            <span
-              className={`text-sm ${
-                i + 1 === paso
-                  ? "font-medium text-foreground"
-                  : "text-muted-foreground"
-              }`}
-            >
-              {label}
-            </span>
-            {i < stepLabels.length - 1 && (
-              <div className="mx-1 h-px w-6 bg-border" />
-            )}
-          </div>
-        ))}
-      </div>
+      <Stepper steps={stepLabels} paso={paso} />
 
       {paso === 1 && (
         <PasoAlumno

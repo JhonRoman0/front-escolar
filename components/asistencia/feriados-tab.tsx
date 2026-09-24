@@ -88,7 +88,7 @@ export function FeriadosTab() {
       <CardContent className="space-y-4 p-4">
         <HeaderTabla
           titulo="Días feriados"
-          descripcion="Fechas sin clases; el back no registra asistencia en esos días."
+          descripcion="Fechas sin clases; ese día no se registra asistencia."
           puedeCrear={puedeCrear}
           onNuevo={() => {
             setEditando(null)

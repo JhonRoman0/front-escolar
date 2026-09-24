@@ -33,7 +33,7 @@ import {
   usuarioSchema,
   type UsuarioValues,
 } from "@/lib/schemas/seguridad"
-import { BuscarDniButton } from "@/components/shared/buscar-dni-button"
+import { CampoDni } from "@/components/shared/campo-dni"
 import { CampoAcceso } from "./shared"
 
 interface UsuarioFormDialogProps {
@@ -129,8 +129,8 @@ export default function UsuarioFormDialog({
       form.setValue("nombre", r.nombres ?? "", { shouldValidate: true })
       form.setValue("apellidoPat", r.apellidoPaterno ?? "", { shouldValidate: true })
       form.setValue("apellidoMat", r.apellidoMaterno ?? "", { shouldValidate: true })
-      const origen = r.origen === "LOCAL" ? "Registro local" : "RENIEC"
-      toast.success(`Datos cargados (${origen})`)
+      const mensaje = r.origen === "RENIEC" || r.origen === "CACHE" ? "Datos completados desde RENIEC" : "Datos completados automáticamente"
+      toast.success(mensaje)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo consultar el DNI")
     }
@@ -216,26 +216,26 @@ export default function UsuarioFormDialog({
               {esEdicion && usuario && !usuario.urlFoto && <span className="text-xs text-muted-foreground">Sin foto</span>}
             </div>
 
-            {/* Identidad — DNI primero para flujo RENIEC */}
             <FieldSet>
-              <FieldLegend className="text-sm font-semibold">Identidad</FieldLegend>
-              <FieldDescription className="text-xs">Ingresa el DNI primero y usa Buscar para autocompletar desde RENIEC/BD.</FieldDescription>
+              <FieldLegend>Identidad</FieldLegend>
               <div className="flex flex-col gap-4">
                 <Controller
                   control={form.control}
                   name="documentoIdentidad"
                   render={({ field }) => (
-                    <Field>
-                      <FieldLabel>DNI — Documento de identidad *</FieldLabel>
-                      <FieldContent>
-                        <div className="flex gap-2">
-                          <Input placeholder="8 dígitos" maxLength={8} autoFocus {...field} className="flex-1" />
-                          <BuscarDniButton dni={field.value} cargando={consultarDni.isPending} onBuscar={handleBuscarDni} />
-                        </div>
-                        <FieldDescription className="text-xs">8 dígitos exactos. Busca en BD local o RENIEC.</FieldDescription>
-                        <FieldError errors={[form.formState.errors.documentoIdentidad]} />
-                      </FieldContent>
-                    </Field>
+                    <CampoDni
+                      value={field.value}
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                      name={field.name}
+                      inputRef={field.ref}
+                      cargando={consultarDni.isPending}
+                      onBuscar={handleBuscarDni}
+                      error={form.formState.errors.documentoIdentidad}
+                      autoFocus
+                      label="DNI *"
+                      placeholder="12345678"
+                    />
                   )}
                 />
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -295,9 +295,8 @@ export default function UsuarioFormDialog({
               </div>
             </FieldSet>
 
-            {/* Contacto */}
             <FieldSet>
-              <FieldLegend className="text-sm font-semibold">Contacto</FieldLegend>
+              <FieldLegend>Contacto</FieldLegend>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Controller
                   control={form.control}
@@ -330,9 +329,8 @@ export default function UsuarioFormDialog({
               </div>
             </FieldSet>
 
-            {/* Acceso */}
             <FieldSet>
-              <FieldLegend className="text-sm font-semibold">Acceso</FieldLegend>
+              <FieldLegend>Acceso</FieldLegend>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Controller
                   control={form.control}
@@ -369,10 +367,9 @@ export default function UsuarioFormDialog({
               </div>
             </FieldSet>
 
-            {/* Roles — mejor diseño conservando estructura */}
             <FieldSet>
-              <FieldLegend className="text-sm font-semibold">Roles *</FieldLegend>
-              <FieldDescription className="text-xs">El código de acceso se genera según el primer rol. Mínimo 1.</FieldDescription>
+              <FieldLegend>Roles *</FieldLegend>
+              <FieldDescription className="text-xs">Selecciona al menos un rol. El código de acceso se genera automáticamente.</FieldDescription>
               <FieldContent>
                 <Controller
                   control={form.control}

@@ -592,7 +592,7 @@ function HorasDocenteCard() {
           <div className="space-y-0.5">
             <h2 className="text-[18px] font-semibold tracking-tight">Horas de clase por docente</h2>
             <p className="text-[14px] leading-5 text-muted-foreground">
-              Total de horas semanales y mensuales (semana × 4.33).
+              Resumen de carga horaria semanal y mensual.
             </p>
           </div>
           <div className="w-full sm:w-64">

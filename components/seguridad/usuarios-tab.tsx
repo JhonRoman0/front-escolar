@@ -114,7 +114,7 @@ export default function UsuariosTab() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="space-y-0.5">
             <h2 className="text-[20px] font-semibold tracking-tight">Usuarios</h2>
-            <p className="text-[14px] leading-5 text-muted-foreground">El código de acceso se genera automáticamente según el primer rol.</p>
+            <p className="text-[14px] leading-5 text-muted-foreground">Administra usuarios, roles y niveles de acceso.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {puedeExportar && (

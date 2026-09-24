@@ -17,10 +17,11 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field"
+import { Field, FieldContent, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
-import { BuscarDniButton } from "@/components/shared/buscar-dni-button"
+import { CampoDni } from "@/components/shared/campo-dni"
+import { Stepper } from "@/components/shared/stepper"
 
 import { CampoAcceso } from "@/components/shared/table-helpers"
 import {
@@ -50,9 +51,7 @@ interface AlumnoFormDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   alumno?: AlumnoResponse | null
-  /** Se invoca tras crear un alumno (útil para auto-seleccionarlo desde Matrícula). */
   onCreado?: (alumno: AlumnoResponse) => void
-  /** Pre-rellena campos al crear (p. ej. documentoIdentidad desde Matrícula). */
   initialValues?: Partial<Pick<AlumnoValues, "documentoIdentidad">>
 }
 
@@ -101,6 +100,7 @@ export function AlumnoFormDialog({
     Record<number, File>
   >({})
   const inputFotoRef = useRef<HTMLInputElement>(null)
+  const [paso, setPaso] = useState(1)
 
   const apoderadosActuales = alumno?.apoderados ?? []
 
@@ -220,11 +220,17 @@ export function AlumnoFormDialog({
       form.setValue("nombre", r.nombres ?? "", { shouldValidate: true })
       form.setValue("apellidoPat", r.apellidoPaterno ?? "", { shouldValidate: true })
       form.setValue("apellidoMat", r.apellidoMaterno ?? "", { shouldValidate: true })
-      const origen = r.origen === "LOCAL" ? "Registro local" : "RENIEC"
-      toast.success(`Datos cargados (${origen})`)
+      const mensaje = r.origen === "RENIEC" || r.origen === "CACHE" ? "Datos completados desde RENIEC" : "Datos completados automáticamente"
+      toast.success(mensaje)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo consultar el DNI")
     }
+  }
+
+  async function handleSiguientePaso() {
+    const camposPaso1: (keyof AlumnoValues)[] = ["documentoIdentidad", "nombre", "apellidoPat", "apellidoMat", "fechaNacimiento", "direccion"]
+    const valido = await form.trigger(camposPaso1)
+    if (valido) setPaso(2)
   }
 
   async function subirFotosPendientesApoderados(respuesta: AlumnoResponse) {
@@ -326,275 +332,289 @@ export function AlumnoFormDialog({
           <DialogTitle className="text-lg font-semibold tracking-tight">
             {esEdicion ? "Editar alumno" : "Nuevo alumno"}
           </DialogTitle>
+          <p className="text-sm text-muted-foreground">
+            {paso === 1 ? "Paso 1 de 2 — Datos del alumno" : "Paso 2 de 2 — Apoderados"}
+          </p>
         </DialogHeader>
+        <Stepper steps={["Datos del alumno", "Apoderados"]} paso={paso} />
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5" noValidate>
-          <FieldGroup>
-            <div className="flex items-center gap-4 rounded-lg border bg-muted/20 p-3">
-              <Avatar className="size-16 rounded-full">
-                {preview ? (
-                  <AvatarImage src={preview} alt="Foto del alumno" />
-                ) : (
-                  <AvatarFallback className="rounded-full text-lg">{iniciales || "A"}</AvatarFallback>
-                )}
-              </Avatar>
-              <div className="flex flex-wrap gap-2">
-                <input ref={inputFotoRef} type="file" accept="image/*" className="hidden" onChange={handleArchivo} />
-                <Button type="button" variant="outline" size="sm" onClick={() => inputFotoRef.current?.click()}>
-                  <Camera data-icon="inline-start" />
-                  {fotoNueva || preview ? "Cambiar foto" : "Subir foto"}
-                </Button>
-                {(fotoNueva || (esEdicion && alumno?.urlFoto)) && (
-                  <Button type="button" variant="ghost" size="sm" onClick={handleQuitarFoto} disabled={eliminarFoto.isPending}>
-                    <Trash2 className="text-destructive" data-icon="inline-start" />
-                    Quitar
-                  </Button>
-                )}
-              </div>
-            </div>
-
-            <FieldSet>
-              <FieldLegend className="text-sm font-semibold">Identidad del alumno</FieldLegend>
-              <FieldDescription className="text-xs">Ingresa el DNI primero y usa Buscar para autocompletar desde RENIEC/BD.</FieldDescription>
-              <div className="flex flex-col gap-4">
-                <Controller
-                  control={form.control}
-                  name="documentoIdentidad"
-                  render={({ field }) => (
-                    <Field>
-                      <FieldLabel>DNI — Documento de identidad</FieldLabel>
-                      <FieldContent>
-                        <div className="flex gap-2">
-                          <Input
-                            placeholder="8 dígitos"
-                            maxLength={8}
-                            autoFocus
-                            value={field.value ?? ""}
-                            onChange={field.onChange}
-                            onBlur={field.onBlur}
-                            name={field.name}
-                            ref={field.ref}
-                            className="flex-1"
-                          />
-                          <BuscarDniButton dni={field.value ?? ""} cargando={consultarDni.isPending} onBuscar={handleBuscarDni} />
-                        </div>
-                        <FieldDescription className="text-xs">8 dígitos exactos. Busca en BD local o RENIEC.</FieldDescription>
-                        <FieldError errors={[form.formState.errors.documentoIdentidad]} />
-                      </FieldContent>
-                    </Field>
+          {paso === 1 && (
+            <FieldGroup>
+              <div className="flex items-center gap-4 rounded-lg border bg-muted/20 p-3">
+                <Avatar className="size-16 rounded-full">
+                  {preview ? (
+                    <AvatarImage src={preview} alt="Foto del alumno" />
+                  ) : (
+                    <AvatarFallback className="rounded-full text-lg">{iniciales || "A"}</AvatarFallback>
                   )}
-                />
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                </Avatar>
+                <div className="flex flex-wrap gap-2">
+                  <input ref={inputFotoRef} type="file" accept="image/*" className="hidden" onChange={handleArchivo} />
+                  <Button type="button" variant="outline" size="sm" onClick={() => inputFotoRef.current?.click()}>
+                    <Camera data-icon="inline-start" />
+                    {fotoNueva || preview ? "Cambiar foto" : "Subir foto"}
+                  </Button>
+                  {(fotoNueva || (esEdicion && alumno?.urlFoto)) && (
+                    <Button type="button" variant="ghost" size="sm" onClick={handleQuitarFoto} disabled={eliminarFoto.isPending}>
+                      <Trash2 className="text-destructive" data-icon="inline-start" />
+                      Quitar
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              <FieldSet>
+                <FieldLegend>Datos personales</FieldLegend>
+                <div className="flex flex-col gap-4">
                   <Controller
                     control={form.control}
-                    name="nombre"
+                    name="documentoIdentidad"
                     render={({ field }) => (
-                      <Field>
-                        <FieldLabel>Nombres *</FieldLabel>
-                        <FieldContent>
-                          <Input placeholder="Luis" {...field} />
-                          <FieldError errors={[form.formState.errors.nombre]} />
-                        </FieldContent>
-                      </Field>
+                      <CampoDni
+                        value={field.value ?? ""}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        name={field.name}
+                        inputRef={field.ref}
+                        cargando={consultarDni.isPending}
+                        onBuscar={handleBuscarDni}
+                        error={form.formState.errors.documentoIdentidad}
+                        autoFocus
+                        label="DNI"
+                        placeholder="12345678"
+                      />
                     )}
                   />
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                    <Controller
+                      control={form.control}
+                      name="nombre"
+                      render={({ field }) => (
+                        <Field>
+                          <FieldLabel>Nombres *</FieldLabel>
+                          <FieldContent>
+                            <Input placeholder="Luis" {...field} />
+                            <FieldError errors={[form.formState.errors.nombre]} />
+                          </FieldContent>
+                        </Field>
+                      )}
+                    />
+                    <Controller
+                      control={form.control}
+                      name="apellidoPat"
+                      render={({ field }) => (
+                        <Field>
+                          <FieldLabel>Ap. paterno *</FieldLabel>
+                          <FieldContent>
+                            <Input placeholder="García" {...field} />
+                            <FieldError errors={[form.formState.errors.apellidoPat]} />
+                          </FieldContent>
+                        </Field>
+                      )}
+                    />
+                    <Controller
+                      control={form.control}
+                      name="apellidoMat"
+                      render={({ field }) => (
+                        <Field>
+                          <FieldLabel>Ap. materno *</FieldLabel>
+                          <FieldContent>
+                            <Input placeholder="Torres" {...field} />
+                            <FieldError errors={[form.formState.errors.apellidoMat]} />
+                          </FieldContent>
+                        </Field>
+                      )}
+                    />
+                  </div>
                   <Controller
                     control={form.control}
-                    name="apellidoPat"
+                    name="fechaNacimiento"
                     render={({ field }) => (
-                      <Field>
-                        <FieldLabel>Ap. paterno *</FieldLabel>
+                      <Field className="sm:max-w-[240px]">
+                        <FieldLabel>Fecha de nacimiento *</FieldLabel>
                         <FieldContent>
-                          <Input placeholder="García" {...field} />
-                          <FieldError errors={[form.formState.errors.apellidoPat]} />
-                        </FieldContent>
-                      </Field>
-                    )}
-                  />
-                  <Controller
-                    control={form.control}
-                    name="apellidoMat"
-                    render={({ field }) => (
-                      <Field>
-                        <FieldLabel>Ap. materno *</FieldLabel>
-                        <FieldContent>
-                          <Input placeholder="Torres" {...field} />
-                          <FieldError errors={[form.formState.errors.apellidoMat]} />
+                          <Input type="date" {...field} />
+                          <FieldError errors={[form.formState.errors.fechaNacimiento]} />
                         </FieldContent>
                       </Field>
                     )}
                   />
                 </div>
+              </FieldSet>
+
+              <FieldSet>
+                <FieldLegend>Contacto</FieldLegend>
                 <Controller
                   control={form.control}
-                  name="fechaNacimiento"
-                  render={({ field }) => (
-                    <Field className="sm:max-w-[240px]">
-                      <FieldLabel>Fecha de nacimiento *</FieldLabel>
-                      <FieldContent>
-                        <Input type="date" {...field} />
-                        <FieldError errors={[form.formState.errors.fechaNacimiento]} />
-                      </FieldContent>
-                    </Field>
-                  )}
-                />
-              </div>
-            </FieldSet>
-
-            <FieldSet>
-              <FieldLegend className="text-sm font-semibold">Contacto</FieldLegend>
-              <Controller
-                control={form.control}
-                name="direccion"
-            render={({ field }) => (
-              <Field>
-                <FieldLabel>Dirección</FieldLabel>
-                <FieldContent>
-                  <Input
-                    placeholder="Av. Los Pinos 123"
-                    value={field.value ?? ""}
-                    onChange={field.onChange}
-                    onBlur={field.onBlur}
-                    name={field.name}
-                    ref={field.ref}
-                  />
-                  <FieldError errors={[form.formState.errors.direccion]} />
-                </FieldContent>
-              </Field>
-            )}
-          />
-            </FieldSet>
-
-            <FieldSet>
-              <FieldLegend className="text-sm font-semibold">Apoderados</FieldLegend>
-              <FieldDescription className="text-xs">Principal obligatorio. Secundario opcional. DNI primero para reutilizar.</FieldDescription>
-          {esEdicion ? (
-            <div className="rounded-lg border p-3">
-              <div className="flex items-center justify-between gap-2">
-                <div>
-                  <p className="text-sm font-medium">Apoderados</p>
-                  <p className="text-xs text-muted-foreground">
-                    {apoderadosActuales.length
-                      ? apoderadosActuales
-                          .map(
-                            (a) =>
-                              `${a.nombre} ${a.apellidoPat} ${a.apellidoMat}`.trim()
-                          )
-                          .join(" · ")
-                      : "Sin apoderados registrados"}
-                  </p>
-                </div>
-                <Switch
-                  checked={modificarApoderados}
-                  onCheckedChange={(checked) => {
-                    if (checked) precargarApoderados()
-                    else {
-                      form.setValue("apoderados", undefined)
-                      form.setValue("_quitarApoderados", false)
-                      setSlotSecundario(false)
-                      setModificarApoderados(false)
-                    }
-                  }}
-                  aria-label="Modificar apoderados"
-                />
-              </div>
-              {!modificarApoderados && (
-                <p className="mt-2 text-xs text-muted-foreground">
-                  Si no modificas los apoderados, se conservan los actuales.
-                </p>
-              )}
-            </div>
-          ) : null}
-
-          {hayApoderados && (
-            <div className="space-y-4">
-              <ApoderadoSlot
-                form={form}
-                index="0"
-                titulo="Apoderado principal"
-                fotoPendiente={fotosApoderadoNuevo[0] ?? null}
-                onFotoPendiente={guardarFotoPendiente}
-                onQuitarFotoPendiente={quitarFotoPendiente}
-              />
-              {slotSecundario && (
-                <ApoderadoSlot
-                  form={form}
-                  index="1"
-                  titulo="Apoderado secundario"
-                  fotoPendiente={fotosApoderadoNuevo[1] ?? null}
-                  onFotoPendiente={guardarFotoPendiente}
-                  onQuitarFotoPendiente={quitarFotoPendiente}
-                />
-              )}
-
-              {errorGlobalApoderados && (
-                <p className="text-sm text-destructive">
-                  {errorGlobalApoderados}
-                </p>
-              )}
-
-              <div className="flex flex-wrap gap-2">
-                {!slotSecundario && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={agregarSecundario}
-                  >
-                    <Plus />
-                    Agregar apoderado secundario
-                  </Button>
-                )}
-                {slotSecundario && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={quitarSecundario}
-                  >
-                    <X />
-                    Quitar secundario
-                  </Button>
-                )}
-                {esEdicion && apoderadosActuales.length > 0 && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={quitarTodos}
-                  >
-                    <Trash2 className="text-destructive" />
-                    Quitar todos
-                  </Button>
-                )}
-              </div>
-            </div>
-          )}
-
-          {esEdicion && (
-            <Controller
-              control={form.control}
-              name="accesoId"
+                  name="direccion"
               render={({ field }) => (
                 <Field>
-                  <FieldLabel>Estado</FieldLabel>
+                  <FieldLabel>Dirección</FieldLabel>
                   <FieldContent>
-                    <CampoAcceso value={field.value} onChange={field.onChange} />
+                    <Input
+                      placeholder="Av. Los Pinos 123"
+                      value={field.value ?? ""}
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                      name={field.name}
+                      ref={field.ref}
+                    />
+                    <FieldError errors={[form.formState.errors.direccion]} />
                   </FieldContent>
                 </Field>
               )}
             />
+              </FieldSet>
+            </FieldGroup>
           )}
-            </FieldSet>
-          </FieldGroup>
+
+          {paso === 2 && (
+            <FieldGroup>
+              <FieldSet>
+                <FieldLegend>Apoderados</FieldLegend>
+                <p className="text-xs text-muted-foreground">El apoderado principal es obligatorio. Si el DNI ya está registrado, se vinculará automáticamente.</p>
+            {esEdicion ? (
+              <div className="rounded-lg border p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-medium">Apoderados registrados</p>
+                    <p className="text-xs text-muted-foreground">
+                      {apoderadosActuales.length
+                        ? apoderadosActuales
+                            .map(
+                              (a) =>
+                                `${a.nombre} ${a.apellidoPat} ${a.apellidoMat}`.trim()
+                            )
+                            .join(" · ")
+                        : "Sin apoderados registrados"}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={modificarApoderados}
+                    onCheckedChange={(checked) => {
+                      if (checked) precargarApoderados()
+                      else {
+                        form.setValue("apoderados", undefined)
+                        form.setValue("_quitarApoderados", false)
+                        setSlotSecundario(false)
+                        setModificarApoderados(false)
+                      }
+                    }}
+                    aria-label="Modificar apoderados"
+                  />
+                </div>
+                {!modificarApoderados && (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Mantener desactivado conserva los apoderados actuales sin cambios.
+                  </p>
+                )}
+              </div>
+            ) : null}
+
+            {hayApoderados && (
+              <div className="space-y-4">
+                <ApoderadoSlot
+                  form={form}
+                  index="0"
+                  titulo="Apoderado principal"
+                  fotoPendiente={fotosApoderadoNuevo[0] ?? null}
+                  onFotoPendiente={guardarFotoPendiente}
+                  onQuitarFotoPendiente={quitarFotoPendiente}
+                />
+                {slotSecundario && (
+                  <ApoderadoSlot
+                    form={form}
+                    index="1"
+                    titulo="Apoderado secundario"
+                    fotoPendiente={fotosApoderadoNuevo[1] ?? null}
+                    onFotoPendiente={guardarFotoPendiente}
+                    onQuitarFotoPendiente={quitarFotoPendiente}
+                  />
+                )}
+
+                {errorGlobalApoderados && (
+                  <p className="text-sm text-destructive">
+                    {errorGlobalApoderados}
+                  </p>
+                )}
+
+                <div className="flex flex-wrap gap-2">
+                  {!slotSecundario && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={agregarSecundario}
+                    >
+                      <Plus />
+                      Agregar apoderado secundario
+                    </Button>
+                  )}
+                  {slotSecundario && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={quitarSecundario}
+                    >
+                      <X />
+                      Quitar secundario
+                    </Button>
+                  )}
+                  {esEdicion && apoderadosActuales.length > 0 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={quitarTodos}
+                    >
+                      <Trash2 className="text-destructive" />
+                      Quitar todos
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {esEdicion && (
+              <Controller
+                control={form.control}
+                name="accesoId"
+                render={({ field }) => (
+                  <Field>
+                    <FieldLabel>Estado</FieldLabel>
+                    <FieldContent>
+                      <CampoAcceso value={field.value} onChange={field.onChange} />
+                    </FieldContent>
+                  </Field>
+                )}
+              />
+            )}
+              </FieldSet>
+            </FieldGroup>
+          )}
 
           <DialogFooter>
-            <DialogTrigger render={<Button variant="outline" />}>
-              Cancelar
-            </DialogTrigger>
-            <Button type="submit" disabled={enviando}>
-              {enviando && <Loader2 className="animate-spin" />}
-              {esEdicion ? "Guardar cambios" : "Crear alumno"}
-            </Button>
+            {paso === 1 ? (
+              <>
+                <DialogTrigger render={<Button variant="outline" />}>
+                  Cancelar
+                </DialogTrigger>
+                <Button type="button" onClick={handleSiguientePaso}>
+                  Siguiente
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button type="button" variant="outline" onClick={() => setPaso(1)}>
+                  Atrás
+                </Button>
+                <Button type="submit" disabled={enviando}>
+                  {enviando && <Loader2 className="animate-spin" />}
+                  {esEdicion ? "Guardar cambios" : "Crear alumno"}
+                </Button>
+              </>
+            )}
           </DialogFooter>
         </form>
       </DialogContent>
@@ -636,7 +656,7 @@ function ApoderadoSlot({
       try {
         const result = await subirFoto.mutateAsync({ idUsuario, file })
         form.setValue(path("_urlFoto"), result.urlFoto ?? undefined)
-        toast.success("Foto del apoderado actualizada")
+        toast.success("Foto actualizada")
       } catch (error) {
         toast.error(
           error instanceof Error ? error.message : "No se pudo subir la foto"
@@ -647,7 +667,7 @@ function ApoderadoSlot({
     } else {
       form.setValue(path("_urlFoto"), URL.createObjectURL(file))
       onFotoPendiente(Number(index), file)
-      toast.info("La foto del apoderado se subirá al guardar el alumno")
+      toast.info("Foto guardada. Se subirá al crear el alumno.")
     }
   }
 
@@ -656,7 +676,7 @@ function ApoderadoSlot({
       try {
         await eliminarFoto.mutateAsync(idUsuario)
         form.setValue(path("_urlFoto"), undefined)
-        toast.success("Foto del apoderado eliminada")
+        toast.success("Foto eliminada")
       } catch (error) {
         toast.error(
           error instanceof Error ? error.message : "No se pudo eliminar la foto"
@@ -675,11 +695,10 @@ function ApoderadoSlot({
       const apoderado = await consulta.mutateAsync(dni)
       rellenarReutilizable(apoderado)
       toast.success(
-        `Se reutilizará: ${apoderado.nombre} ${apoderado.apellidoPat} ${apoderado.apellidoMat}`.trim()
+        `Se vinculará a: ${apoderado.nombre} ${apoderado.apellidoPat} ${apoderado.apellidoMat}`.trim()
       )
     } catch (error) {
       if (error instanceof ApiError && error.status === 404) {
-        // Fallback RENIEC si es DNI de 8 dígitos
         if (/^\d{8}$/.test(dni)) {
           try {
             const r = await reniec.mutateAsync(dni)
@@ -689,13 +708,13 @@ function ApoderadoSlot({
             form.setValue(path("apellidoMat"), r.apellidoMaterno ?? "", { shouldValidate: true })
             form.setValue(path("documentoIdentidad"), r.dni ?? dni, { shouldValidate: true })
             onQuitarFotoPendiente(Number(index))
-            const origen = r.origen === "CACHE" || r.origen === "RENIEC" ? "RENIEC" : r.origen
-            toast.success(`Datos cargados desde ${origen}`)
+            const mensaje = r.origen === "RENIEC" || r.origen === "CACHE" ? "Datos completados desde RENIEC" : "Datos completados automáticamente"
+            toast.success(mensaje)
             return
           } catch (reniecError) {
             if (reniecError instanceof ApiError && reniecError.status === 404) {
               form.setValue(path("_modo"), "crear")
-              toast.info("DNI no encontrado en RENIEC: completa los datos manualmente")
+              toast.info("No encontramos ese DNI en RENIEC. Completa los datos.")
               return
             }
             toast.error(reniecError instanceof Error ? reniecError.message : "No se pudo consultar RENIEC")
@@ -703,7 +722,7 @@ function ApoderadoSlot({
           }
         }
         form.setValue(path("_modo"), "crear")
-        toast.info("El documento no está registrado: completa los datos del apoderado")
+        toast.info("No encontramos ese documento. Completa los datos del apoderado.")
       } else {
         toast.error(
           error instanceof Error ? error.message : "No se pudo verificar el documento"
@@ -748,7 +767,7 @@ function ApoderadoSlot({
             <p className="text-sm font-medium">{titulo}</p>
             {modo === "reutilizar" && (
               <Badge variant="secondary" className="text-xs">
-                Se reutilizará el registrado
+                Se vinculará al apoderado ya registrado
               </Badge>
             )}
           </div>
@@ -786,7 +805,7 @@ function ApoderadoSlot({
       </div>
       {fotoPendiente && (
         <p className="text-xs text-muted-foreground">
-          Foto seleccionada: se subirá al guardar el alumno.
+          Foto seleccionada. Se subirá al guardar.
         </p>
       )}
 
@@ -799,7 +818,7 @@ function ApoderadoSlot({
             <FieldContent>
               <div className="flex gap-2">
                 <Input
-                  placeholder="Ingresa el DNI o documento"
+                  placeholder="12345678"
                   value={field.value ?? ""}
                   onChange={field.onChange}
                   onBlur={() => consultarDocumento(field.value ?? "")}
@@ -826,7 +845,7 @@ function ApoderadoSlot({
                 errors={[errors?.documentoIdentidad]}
               />
               <p className="text-xs text-muted-foreground">
-                Si el documento ya existe, se reutiliza el apoderado registrado (sin contraseña).
+                Si el DNI ya está registrado, se vinculará automáticamente sin pedir contraseña.
               </p>
             </FieldContent>
           </Field>
