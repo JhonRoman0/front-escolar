@@ -2,7 +2,7 @@ import { z } from "zod"
 
 import { fechaHoyISO } from "@/lib/fechas"
 
-const accesoId = z.number().int().min(1, "Selecciona un estado").max(3)
+const accesoId = z.number().int().min(1).optional()
 const fecha = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha requerida (aaaa-mm-dd)")
@@ -65,3 +65,9 @@ export const diaFeriadoSchema = z.object({
   accesoId: accesoId.optional(),
 })
 export type DiaFeriadoValues = z.infer<typeof diaFeriadoSchema>
+
+// ≡ JustificarRequest (PUT /asistencias/{id}/justificar, idJustificacion @NotNull)
+export const justificarRequestSchema = z.object({
+  idJustificacion: z.number().int().positive("Selecciona un motivo"),
+})
+export type JustificarRequestValues = z.infer<typeof justificarRequestSchema>

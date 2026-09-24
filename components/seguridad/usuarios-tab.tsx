@@ -110,42 +110,37 @@ export default function UsuariosTab() {
 
   return (
     <Card>
-      <CardContent className="space-y-4 p-4">
+      <CardContent className="flex flex-col gap-4 p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-[20px] font-semibold">Usuarios</h2>
-            <p className="text-[16px] text-[#7D7D7F]">
-              El código de acceso se genera automáticamente según el primer rol.
-            </p>
+          <div className="space-y-0.5">
+            <h2 className="text-[20px] font-semibold tracking-tight">Usuarios</h2>
+            <p className="text-[14px] leading-5 text-muted-foreground">El código de acceso se genera automáticamente según el primer rol.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {puedeExportar && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setReporteOpen(true)}
-              >
-                <FileDown />
+              <Button variant="outline" size="sm" onClick={() => setReporteOpen(true)}>
+                <FileDown data-icon="inline-start" />
                 Generar reporte
               </Button>
             )}
             {puedeCrear && (
               <Button
-                className="bg-[#274CB4] text-white hover:bg-[#274CB4]/80"
+                className="bg-[#274CB4] text-white hover:bg-[#274CB4]/85"
                 onClick={() => {
                   setEditando(null)
                   setDialogSeq((s) => s + 1)
                   setDialogOpen(true)
                 }}
               >
-                <Plus />
+                <Plus data-icon="inline-start" />
                 Nuevo usuario
               </Button>
             )}
           </div>
         </div>
 
-        <Table>
+        <div className="overflow-x-auto rounded-lg border">
+          <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Usuario</TableHead>
@@ -257,7 +252,8 @@ export default function UsuariosTab() {
               })
             )}
           </TableBody>
-        </Table>
+            </Table>
+        </div>
 
         {isError && (
           <Button variant="outline" size="sm" onClick={() => refetch()}>
@@ -265,9 +261,7 @@ export default function UsuariosTab() {
           </Button>
         )}
 
-        {!!data?.totalPages && data.totalPages > 1 && (
-          <TablaPaginacion data={data} onPage={setPage} />
-        )}
+        {!!data?.totalPages && data.totalPages > 1 && <TablaPaginacion data={data} onPage={setPage} />}
 
         <UsuarioFormDialog
           key={`${editando ? `edit-${editando.idUsuario}` : "create"}-${dialogSeq}`}
@@ -293,7 +287,7 @@ export default function UsuariosTab() {
           ]}
           onDescargar={handleDescargarReporte}
         />
-      </CardContent>
+        </CardContent>
     </Card>
   )
 }

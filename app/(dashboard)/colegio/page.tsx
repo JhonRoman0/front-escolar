@@ -184,15 +184,13 @@ export default function ColegioPage() {
   const portadaVisible = portadaActual()
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Colegio</h1>
-        <p className="text-sm text-muted-foreground">
-          Información institucional que se muestra en el portal público.
-        </p>
+    <div className="flex flex-col gap-4">
+      <div className="space-y-1">
+        <h1 className="text-[20px] font-bold tracking-tight text-foreground">Colegio</h1>
+        <p className="text-[12px] font-medium leading-5 text-muted-foreground">Información institucional que se muestra en el portal público.</p>
       </div>
 
-      <div className="rounded-lg border bg-white p-6 shadow-sm dark:bg-background">
+      <div className="rounded-[20px] border-[0.80px] border-[#D9DBE9] bg-white p-6 shadow-sm dark:bg-background">
         {/* Imágenes */}
         <div className="mb-6 grid grid-cols-1 gap-6 md:grid-cols-2">
           {/* Foto del colegio */}

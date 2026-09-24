@@ -9,7 +9,7 @@ export const matriculaSchema = z
     idGradoSeccion: z
       .number()
       .int()
-      .min(0, "Debe seleccionar un grado - sección"),
+      .min(1, "Debe seleccionar un grado - sección"),
     solicitudMatricula: z.number().int().min(1).max(3),
     fechaPago: z.string().optional(),
     montoPago: z.number().min(0, "El monto no puede ser negativo").optional(),

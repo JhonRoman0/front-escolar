@@ -18,10 +18,10 @@ const KEYS = {
 
 // ── Queries ──────────────────────────────────────────────────────────────
 
-export function useAlumnos(page: number, size = 10) {
+export function useAlumnos(page: number, size = 10, filtros?: import("@/lib/api/estudiantes").AlumnosFiltros) {
   return useQuery({
-    queryKey: [...KEYS.alumnos, page, size],
-    queryFn: () => alumnosApi.listar(page, size),
+    queryKey: [...KEYS.alumnos, page, size, filtros],
+    queryFn: () => alumnosApi.listar(page, size, filtros),
     placeholderData: keepPreviousData,
   })
 }

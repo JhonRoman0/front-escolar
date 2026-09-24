@@ -44,20 +44,30 @@ import {
 import { usePuede } from "@/hooks/use-permisos"
 import type { SuspensionRequest } from "@/lib/api/academico"
 
-const suspensionSchema = z.object({
-  idDocente: z.number().int().min(1, "Selecciona un docente"),
-  idSustituto: z.number().int().optional(),
-  motivo: z.string().min(1, "El motivo es requerido").max(100),
-  motivoDetalle: z.string().max(300).optional(),
-  fechaInicio: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha requerida (aaaa-mm-dd)"),
-  fechaFin: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha requerida (aaaa-mm-dd)")
-    .optional()
-    .or(z.literal("")),
-})
+const suspensionSchema = z
+  .object({
+    idDocente: z.number().int().min(1, "Selecciona un docente"),
+    idSustituto: z.number().int().min(1, "ID de sustituto inválido").optional(),
+    motivo: z.string().min(1, "El motivo es requerido").max(100),
+    motivoDetalle: z.string().max(300).optional(),
+    fechaInicio: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha requerida (aaaa-mm-dd)"),
+    fechaFin: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha requerida (aaaa-mm-dd)")
+      .optional()
+      .or(z.literal("")),
+  })
+  .superRefine((data, ctx) => {
+    if (data.fechaFin && data.fechaFin > "" && data.fechaFin < data.fechaInicio) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["fechaFin"],
+        message: "La fecha de fin no puede ser anterior a la fecha de inicio",
+      })
+    }
+  })
 
 type SuspensionFormValues = z.infer<typeof suspensionSchema>
 

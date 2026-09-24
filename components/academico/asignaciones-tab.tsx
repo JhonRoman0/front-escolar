@@ -17,11 +17,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Field, FieldContent, FieldError, FieldLabel } from "@/components/ui/field"
+import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldSet } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -109,28 +110,30 @@ export default function AsignacionesTab() {
       <HorasDocenteCard />
 
       <Card>
-        <CardContent className="space-y-4 p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-semibold">Asignaciones</h2>
-              <p className="text-sm text-muted-foreground">
+        <CardContent className="flex flex-col gap-4 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="space-y-0.5">
+              <h2 className="text-[20px] font-semibold tracking-tight">Asignaciones</h2>
+              <p className="text-[14px] leading-5 text-muted-foreground">
                 Cursos asignados a docentes con su horario semanal.
               </p>
             </div>
             {puedeCrear && (
               <Button
+                className="bg-[#274CB4] text-white hover:bg-[#274CB4]/85"
                 onClick={() => {
                   setEditando(null)
                   setDialogOpen(true)
                 }}
               >
-                <Plus />
+                <Plus data-icon="inline-start" />
                 Nueva asignación
               </Button>
             )}
           </div>
 
-          <Table>
+          <div className="overflow-x-auto rounded-lg border">
+            <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Curso</TableHead>
@@ -198,7 +201,8 @@ export default function AsignacionesTab() {
                 ))
               )}
             </TableBody>
-          </Table>
+            </Table>
+          </div>
 
           {isError && (
             <Button variant="outline" size="sm" onClick={() => refetch()}>
@@ -325,12 +329,14 @@ function AsignacionFormDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle className="text-lg font-semibold tracking-tight">
             {esEdicion ? "Editar asignación" : "Nueva asignación"}
           </DialogTitle>
         </DialogHeader>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" noValidate>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5" noValidate>
+          <FieldGroup>
+            <FieldSet>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Controller
               control={form.control}
               name="idCurso"
@@ -344,16 +350,17 @@ function AsignacionFormDialog({
                     >
                       <SelectTrigger className="w-full">
                         <SelectValue>
-                          {cursos.find((c) => c.idCurso === field.value)?.nombre ??
-                            "Selecciona"}
+                          {cursos.find((c) => c.idCurso === field.value)?.nombre ?? "Selecciona"}
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
-                        {cursos.map((c) => (
-                          <SelectItem key={c.idCurso} value={String(c.idCurso)}>
-                            {c.nombre}
-                          </SelectItem>
-                        ))}
+                        <SelectGroup>
+                          {cursos.map((c) => (
+                            <SelectItem key={c.idCurso} value={String(c.idCurso)}>
+                              {c.nombre}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
                       </SelectContent>
                     </Select>
                     <FieldError errors={[form.formState.errors.idCurso]} />
@@ -380,11 +387,13 @@ function AsignacionFormDialog({
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
-                        {docentes.map((d) => (
-                          <SelectItem key={d.idDocente} value={String(d.idDocente)}>
-                            {d.nombre} {d.apellidoPat} {d.apellidoMat}
-                          </SelectItem>
-                        ))}
+                        <SelectGroup>
+                          {docentes.map((d) => (
+                            <SelectItem key={d.idDocente} value={String(d.idDocente)}>
+                              {d.nombre} {d.apellidoPat} {d.apellidoMat}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
                       </SelectContent>
                     </Select>
                     <FieldError errors={[form.formState.errors.idDocente]} />
@@ -406,9 +415,7 @@ function AsignacionFormDialog({
                       defaultIdNivel={gradoActual?.idNivel ?? null}
                       defaultIdGrado={gradoActual?.idGrado ?? null}
                     />
-                    <FieldError
-                      errors={[form.formState.errors.idGradoSeccion]}
-                    />
+                    <FieldError errors={[form.formState.errors.idGradoSeccion]} />
                   </FieldContent>
                 </Field>
               )}
@@ -426,16 +433,17 @@ function AsignacionFormDialog({
                     >
                       <SelectTrigger className="w-full">
                         <SelectValue>
-                          {anios.find((a) => a.idAnio === field.value)?.anio ??
-                            "Selecciona"}
+                          {anios.find((a) => a.idAnio === field.value)?.anio ?? "Selecciona"}
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
-                        {anios.map((a) => (
-                          <SelectItem key={a.idAnio} value={String(a.idAnio)}>
-                            {a.anio}
-                          </SelectItem>
-                        ))}
+                        <SelectGroup>
+                          {anios.map((a) => (
+                            <SelectItem key={a.idAnio} value={String(a.idAnio)}>
+                              {a.anio}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
                       </SelectContent>
                     </Select>
                     <FieldError errors={[form.formState.errors.idAnio]} />
@@ -443,136 +451,124 @@ function AsignacionFormDialog({
                 </Field>
               )}
             />
-          </div>
+              </div>
+            </FieldSet>
 
-          <Field>
-            <FieldLabel>Horarios</FieldLabel>
-            <FieldContent>
-              <div className="space-y-3">
-                {horarios.map((horario, index) => (
-                  <div
-                    key={index}
-                    className="grid grid-cols-1 gap-2 rounded-lg border p-3 sm:grid-cols-5"
-                  >
-                    <div className="sm:col-span-2">
-                      <Select
-                        value={horario.idAula ? String(horario.idAula) : ""}
-                        onValueChange={(v) =>
-                          setHorario(index, { idAula: Number(v) })
-                        }
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue>
-                            {aulas.find((a) => a.idAula === horario.idAula)
-                              ?.nombre ?? "Aula"}
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          {aulas.map((a) => (
-                            <SelectItem key={a.idAula} value={String(a.idAula)}>
-                              {a.nombre}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Select
-                        value={String(horario.diaSemana)}
-                        onValueChange={(v) =>
-                          setHorario(index, { diaSemana: Number(v) })
-                        }
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue>{DIAS[horario.diaSemana]}</SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          {DIAS.slice(1).map((d, i) => (
-                            <SelectItem key={i + 1} value={String(i + 1)}>
-                              {d}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <Input
-                      type="time"
-                      aria-label="Hora de inicio"
-                      value={horario.horaInicio}
-                      onChange={(e) =>
-                        setHorario(index, { horaInicio: e.target.value })
-                      }
-                    />
-                    <div className="flex gap-2">
+            <Field>
+              <FieldLabel>Horarios</FieldLabel>
+              <FieldDescription className="text-xs">Cada horario: aula + día + inicio/fin. Mínimo 1.</FieldDescription>
+              <FieldContent>
+                <div className="flex flex-col gap-3">
+                  {horarios.map((horario, index) => (
+                    <div key={index} className="grid grid-cols-1 gap-2 rounded-lg border bg-muted/20 p-3 sm:grid-cols-5">
+                      <div className="sm:col-span-2">
+                        <Select
+                          value={horario.idAula ? String(horario.idAula) : ""}
+                          onValueChange={(v) => setHorario(index, { idAula: Number(v) })}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue>
+                              {aulas.find((a) => a.idAula === horario.idAula)?.nombre ?? "Aula"}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectGroup>
+                              {aulas.map((a) => (
+                                <SelectItem key={a.idAula} value={String(a.idAula)}>
+                                  {a.nombre}
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Select
+                          value={String(horario.diaSemana)}
+                          onValueChange={(v) => setHorario(index, { diaSemana: Number(v) })}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue>{DIAS[horario.diaSemana]}</SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectGroup>
+                              {DIAS.slice(1).map((d, i) => (
+                                <SelectItem key={i + 1} value={String(i + 1)}>
+                                  {d}
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
+                      </div>
                       <Input
                         type="time"
-                        aria-label="Hora de fin"
-                        value={horario.horaFin}
-                        onChange={(e) =>
-                          setHorario(index, { horaFin: e.target.value })
-                        }
+                        aria-label="Hora de inicio"
+                        value={horario.horaInicio}
+                        onChange={(e) => setHorario(index, { horaInicio: e.target.value })}
                       />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        disabled={horarios.length === 1}
-                        onClick={() => quitarHorario(index)}
-                        aria-label={`Quitar horario ${index + 1}`}
-                      >
-                        <X />
-                      </Button>
+                      <div className="flex gap-2">
+                        <Input
+                          type="time"
+                          aria-label="Hora de fin"
+                          value={horario.horaFin}
+                          onChange={(e) => setHorario(index, { horaFin: e.target.value })}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          disabled={horarios.length === 1}
+                          onClick={() => quitarHorario(index)}
+                          aria-label={`Quitar horario ${index + 1}`}
+                        >
+                          <X data-icon="inline-start" />
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                ))}
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={agregarHorario}
-                >
-                  <Plus />
-                  Agregar horario
-                </Button>
-                <FieldError errors={[form.formState.errors.horarios]} />
-              </div>
-            </FieldContent>
-          </Field>
+                  ))}
+                  <Button type="button" variant="outline" size="sm" onClick={agregarHorario}>
+                    <Plus data-icon="inline-start" />
+                    Agregar horario
+                  </Button>
+                  <FieldError errors={[form.formState.errors.horarios]} />
+                </div>
+              </FieldContent>
+            </Field>
 
-          {esEdicion && (
-            <Controller
-              control={form.control}
-              name="accesoId"
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel>Estado</FieldLabel>
-                  <FieldContent>
-                    <Select
-                      value={String(field.value ?? 1)}
-                      onValueChange={(v) => field.onChange(Number(v))}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue>
-                          {field.value === 1 ? "Activo" : "Inactivo"}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="1">Activo</SelectItem>
-                        <SelectItem value="0">Inactivo</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </FieldContent>
-                </Field>
-              )}
-            />
-          )}
+            {esEdicion && (
+              <Controller
+                control={form.control}
+                name="accesoId"
+                render={({ field }) => (
+                  <Field>
+                    <FieldLabel>Estado</FieldLabel>
+                    <FieldContent>
+                      <Select
+                        value={String(field.value ?? 1)}
+                        onValueChange={(v) => field.onChange(Number(v))}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue>{field.value === 1 ? "Activo" : "Inactivo"}</SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectGroup>
+                            <SelectItem value="1">Activo</SelectItem>
+                            <SelectItem value="0">Inactivo</SelectItem>
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
+                    </FieldContent>
+                  </Field>
+                )}
+              />
+            )}
+          </FieldGroup>
 
           <DialogFooter>
-            <DialogTrigger render={<Button variant="outline" />}>
-              Cancelar
-            </DialogTrigger>
+            <DialogTrigger render={<Button variant="outline" />}>Cancelar</DialogTrigger>
             <Button type="submit" disabled={enviando}>
-              {enviando && <Loader2 className="animate-spin" />}
+              {enviando && <Loader2 className="animate-spin" data-icon="inline-start" />}
               {esEdicion ? "Guardar cambios" : "Crear asignación"}
             </Button>
           </DialogFooter>
@@ -591,11 +587,11 @@ function HorasDocenteCard() {
 
   return (
     <Card>
-      <CardContent className="space-y-4 p-4">
+      <CardContent className="flex flex-col gap-4 p-4">
         <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <h2 className="text-lg font-semibold">Horas de clase por docente</h2>
-            <p className="text-sm text-muted-foreground">
+          <div className="space-y-0.5">
+            <h2 className="text-[18px] font-semibold tracking-tight">Horas de clase por docente</h2>
+            <p className="text-[14px] leading-5 text-muted-foreground">
               Total de horas semanales y mensuales (semana × 4.33).
             </p>
           </div>
@@ -606,18 +602,19 @@ function HorasDocenteCard() {
             >
               <SelectTrigger className="w-full">
                 <SelectValue>
-                  {docentes.find((d) => d.idDocente === idDocente)
-                    ?.nombre
+                  {docentes.find((d) => d.idDocente === idDocente)?.nombre
                     ? `${docentes.find((d) => d.idDocente === idDocente)?.nombre} ${docentes.find((d) => d.idDocente === idDocente)?.apellidoPat}`
                     : "Selecciona un docente"}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                {docentes.map((d) => (
-                  <SelectItem key={d.idDocente} value={String(d.idDocente)}>
-                    {d.nombre} {d.apellidoPat} {d.apellidoMat}
-                  </SelectItem>
-                ))}
+                <SelectGroup>
+                  {docentes.map((d) => (
+                    <SelectItem key={d.idDocente} value={String(d.idDocente)}>
+                      {d.nombre} {d.apellidoPat} {d.apellidoMat}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
               </SelectContent>
             </Select>
           </div>

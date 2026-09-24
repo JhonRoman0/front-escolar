@@ -30,6 +30,7 @@ import {
   useValidarAutorizacion,
 } from "@/hooks/use-evaluacion"
 import { usePuede } from "@/hooks/use-permisos"
+import { autorizacionRequestSchema } from "@/lib/schemas/evaluacion"
 
 export function formatearExpiracion(iso: string): string {
   const fecha = new Date(iso)
@@ -74,7 +75,12 @@ export function AutorizacionDialog({
 
   async function handleGenerar() {
     const id = Number(idDestinatario)
-    if (!id || !nombreDestinatario) {
+    const parsed = autorizacionRequestSchema.safeParse({ idUsuarioDestinatario: id })
+    if (!parsed.success) {
+      toast.error(parsed.error.issues[0]?.message ?? "Selecciona un destinatario válido.")
+      return
+    }
+    if (!nombreDestinatario) {
       toast.error("Elige a quién va asignado el código.")
       return
     }

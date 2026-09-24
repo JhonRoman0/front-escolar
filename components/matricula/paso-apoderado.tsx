@@ -15,6 +15,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch"
 
 import { useApoderadoPorDocumento } from "@/hooks/use-estudiantes"
+import { useConsultarDni } from "@/hooks/use-reniec"
+import { MENSAJE_CONTRASENA_SEGURA, REGEX_CONTRASENA_SEGURA } from "@/lib/schemas/comun"
+import { ApiError } from "@/lib/api"
 import type { ApoderadoResponse } from "@/lib/api/estudiantes"
 
 export interface ApoderadoSlotData {
@@ -54,7 +57,21 @@ const apoderadoSlotSchema = z
     apellidoPat: z.string().trim().min(1, "El apellido paterno es obligatorio").max(50),
     apellidoMat: z.string().trim().min(1, "El apellido materno es obligatorio").max(50),
     gmail: z.string().email("Correo inválido").max(60).optional().or(z.literal("")),
-    contraseña: z.string().min(6, "Mínimo 6 caracteres").max(100).optional().or(z.literal("")),
+    contraseña: z
+      .string()
+      .max(100)
+      .optional()
+      .or(z.literal(""))
+      .superRefine((val, ctx) => {
+        if (!val) return
+        if (val.length < 8) {
+          ctx.addIssue({ code: "custom", message: "La contraseña debe tener al menos 8 caracteres" })
+          return
+        }
+        if (!REGEX_CONTRASENA_SEGURA.test(val)) {
+          ctx.addIssue({ code: "custom", message: MENSAJE_CONTRASENA_SEGURA })
+        }
+      }),
     fechaNaci: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha requerida (aaaa-mm-dd)"),
     documentoIdentidad: z.string().max(20).optional().or(z.literal("")).nullable(),
     celular: z.string().max(20).optional().or(z.literal("")),
@@ -86,6 +103,7 @@ interface PasoApoderadoProps {
 
 export function PasoApoderado({ value, onChange, onBack, onNext }: PasoApoderadoProps) {
   const buscarApoderado = useApoderadoPorDocumento()
+  const reniec = useConsultarDni()
   const [busqueda, setBusqueda] = useState(value?.principal?.documentoIdentidad ?? "")
   const [apoderadoSel, setApoderadoSel] = useState<ApoderadoResponse | null>(
     value?.principal?.existe ? (value.principal.apoderado ?? null) : null
@@ -145,12 +163,37 @@ export function PasoApoderado({ value, onChange, onBack, onNext }: PasoApoderado
         `Apoderado encontrado: ${apoderado.nombre} ${apoderado.apellidoPat} ${apoderado.apellidoMat}`
       )
     } catch (error) {
-      const msg = error instanceof Error ? error.message : ""
-      if (msg.includes("no encontrado")) {
+      const isNotFound =
+        (error instanceof ApiError && error.status === 404) ||
+        (error instanceof Error && error.message.toLowerCase().includes("no encontrado"))
+      if (isNotFound) {
+        if (/^\d{8}$/.test(dni)) {
+          try {
+            const r = await reniec.mutateAsync(dni)
+            setApoderadoSel(null)
+            formPrincipal.setValue("documentoIdentidad", r.dni ?? dni)
+            formPrincipal.setValue("nombre", r.nombres ?? "", { shouldValidate: true })
+            formPrincipal.setValue("apellidoPat", r.apellidoPaterno ?? "", { shouldValidate: true })
+            formPrincipal.setValue("apellidoMat", r.apellidoMaterno ?? "", { shouldValidate: true })
+            const origen = r.origen === "CACHE" || r.origen === "RENIEC" ? "RENIEC" : r.origen
+            toast.success(`Datos cargados desde ${origen}`)
+            return
+          } catch (reniecError) {
+            if (reniecError instanceof ApiError && reniecError.status === 404) {
+              setApoderadoSel(null)
+              formPrincipal.setValue("documentoIdentidad", dni)
+              toast.info("DNI no encontrado en RENIEC: completa los datos manualmente")
+              return
+            }
+            toast.error(reniecError instanceof Error ? reniecError.message : "No se pudo consultar RENIEC")
+            return
+          }
+        }
         setApoderadoSel(null)
         formPrincipal.setValue("documentoIdentidad", dni)
         toast.info("No existe un apoderado con ese DNI. Completa los datos.")
       } else {
+        const msg = error instanceof Error ? error.message : ""
         toast.error(msg || "No se pudo buscar el apoderado")
       }
     }
@@ -175,12 +218,37 @@ export function PasoApoderado({ value, onChange, onBack, onNext }: PasoApoderado
         `Apoderado secundario encontrado: ${apoderado.nombre} ${apoderado.apellidoPat}`
       )
     } catch (error) {
-      const msg = error instanceof Error ? error.message : ""
-      if (msg.includes("no encontrado")) {
+      const isNotFound =
+        (error instanceof ApiError && error.status === 404) ||
+        (error instanceof Error && error.message.toLowerCase().includes("no encontrado"))
+      if (isNotFound) {
+        if (/^\d{8}$/.test(dni)) {
+          try {
+            const r = await reniec.mutateAsync(dni)
+            setApoderadoSecSel(null)
+            formSecundario.setValue("documentoIdentidad", r.dni ?? dni)
+            formSecundario.setValue("nombre", r.nombres ?? "", { shouldValidate: true })
+            formSecundario.setValue("apellidoPat", r.apellidoPaterno ?? "", { shouldValidate: true })
+            formSecundario.setValue("apellidoMat", r.apellidoMaterno ?? "", { shouldValidate: true })
+            const origen = r.origen === "CACHE" || r.origen === "RENIEC" ? "RENIEC" : r.origen
+            toast.success(`Datos cargados desde ${origen}`)
+            return
+          } catch (reniecError) {
+            if (reniecError instanceof ApiError && reniecError.status === 404) {
+              setApoderadoSecSel(null)
+              formSecundario.setValue("documentoIdentidad", dni)
+              toast.info("DNI no encontrado en RENIEC: completa los datos manualmente")
+              return
+            }
+            toast.error(reniecError instanceof Error ? reniecError.message : "No se pudo consultar RENIEC")
+            return
+          }
+        }
         setApoderadoSecSel(null)
         formSecundario.setValue("documentoIdentidad", dni)
         toast.info("No existe un apoderado con ese DNI. Completa los datos.")
       } else {
+        const msg = error instanceof Error ? error.message : ""
         toast.error(msg || "No se pudo buscar el apoderado")
       }
     }
@@ -439,7 +507,7 @@ export function PasoApoderado({ value, onChange, onBack, onNext }: PasoApoderado
                   <FieldContent>
                     <Input
                       type="password"
-                      placeholder="Mínimo 6 caracteres"
+                      placeholder="Mín 8: mayúscula, número y símbolo"
                       {...field}
                     />
                     <FieldError errors={[formPrincipal.formState.errors.contraseña]} />
@@ -675,7 +743,7 @@ export function PasoApoderado({ value, onChange, onBack, onNext }: PasoApoderado
                       <FieldContent>
                         <Input
                           type="password"
-                          placeholder="Mínimo 6 caracteres"
+                          placeholder="Mín 8: mayúscula, número y símbolo"
                           {...field}
                         />
                         <FieldError errors={[formSecundario.formState.errors.contraseña]} />

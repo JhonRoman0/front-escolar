@@ -57,8 +57,6 @@ export function AsistenciaToolbar({
   filtroEstado,
   onFiltroEstadoChange,
 }: AsistenciaToolbarProps) {
-  const mostrarFiltrosExtra = rango === "hoy"
-
   return (
     <div className="flex flex-col gap-3">
       {/* FILA 1: rango + fecha + buscador */}
@@ -101,39 +99,29 @@ export function AsistenciaToolbar({
         </div>
       </div>
 
-      {/* FILA 2: filtros extra (solo en vista Hoy) */}
-      {mostrarFiltrosExtra && (
-        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-          <div className="w-full sm:w-auto sm:flex-1 sm:min-w-[320px]">
-            <GradoSeccionCascada
-              value={idGradoSeccionFiltro}
-              onChange={onIdGradoSeccionChange}
-            />
-          </div>
-
-          {/* Estado */}
-          <Select
-            value={filtroEstado ?? TODOS}
-            onValueChange={(value) =>
-              onFiltroEstadoChange(value === TODOS ? null : value)
-            }
-          >
-            <SelectTrigger className="w-full sm:w-[180px]">
-              <SelectValue placeholder="Estado">
-                {filtroEstado ?? "Todos los estados"}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={TODOS}>Todos los estados</SelectItem>
-              {estadosDisponibles.map((e) => (
-                <SelectItem key={e.idEstado} value={e.nombre}>
-                  {e.nombre}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+      {/* FILA 2: filtros cascada + estado — ahora para hoy/semana/mes (vacío hasta que llegue para admin) */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="w-full sm:w-auto sm:flex-1 sm:min-w-[320px]">
+          <GradoSeccionCascada value={idGradoSeccionFiltro} onChange={onIdGradoSeccionChange} />
         </div>
-      )}
+        {/* Estado */}
+        <Select
+          value={filtroEstado ?? TODOS}
+          onValueChange={(value) => onFiltroEstadoChange(value === TODOS ? null : value)}
+        >
+          <SelectTrigger className="w-full sm:w-[180px]">
+            <SelectValue placeholder="Estado">{filtroEstado ?? "Todos los estados"}</SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={TODOS}>Todos los estados</SelectItem>
+            {estadosDisponibles.map((e) => (
+              <SelectItem key={e.idEstado} value={e.nombre}>
+                {e.nombre}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
     </div>
   )
 }

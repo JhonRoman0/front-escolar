@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button"
 import { Field, FieldContent, FieldError, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { authApi } from "@/lib/api/auth"
+import { contrasenaSegura } from "@/lib/schemas/comun"
 
 const schema = z
   .object({
@@ -21,9 +22,7 @@ const schema = z
       .min(6, "El código debe tener 6 dígitos")
       .max(6, "El código debe tener 6 dígitos")
       .regex(/^\d+$/, "El código debe ser numérico"),
-    nuevaContrasena: z
-      .string()
-      .min(6, "La contraseña debe tener al menos 6 caracteres"),
+    nuevaContrasena: contrasenaSegura,
     confirmar: z.string().min(1, "Confirma la contraseña"),
   })
   .refine((data) => data.nuevaContrasena === data.confirmar, {
@@ -130,7 +129,7 @@ export function RestablecerContrasenaForm() {
             <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               type={mostrarContrasena ? "text" : "password"}
-              placeholder="Mínimo 6 caracteres"
+              placeholder="Mín 8: mayúscula, número y símbolo"
               className="pl-10 pr-10"
               {...form.register("nuevaContrasena")}
             />

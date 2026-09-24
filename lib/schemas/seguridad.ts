@@ -1,5 +1,7 @@
 import * as z from "zod"
 
+import { contrasenaSeguraOpcional } from "@/lib/schemas/comun"
+
 const accesoId = z.number().int().min(1, "Selecciona un estado").max(3)
 
 export const accionSchema = z.object({
@@ -75,10 +77,6 @@ export const usuarioSchema = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha requerida (aaaa-mm-dd)"),
   accesoId: accesoId.optional(),
   rolIds: z.array(z.number()).min(1, "Asigna al menos un rol"),
-  contraseña: z
-    .string()
-    .min(6, "La contraseña debe tener al menos 6 caracteres")
-    .optional()
-    .or(z.literal("")),
+  contraseña: contrasenaSeguraOpcional,
 })
 export type UsuarioValues = z.infer<typeof usuarioSchema>

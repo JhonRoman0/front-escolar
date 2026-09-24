@@ -8,6 +8,7 @@ import { useCrud } from "@/hooks/use-crud"
 import { useInvalidarMutacion } from "@/hooks/use-invalidar"
 import {
   asistenciasApi,
+  type AsistenciaFiltros,
   type AsistenciaRequest,
   type JustificarAsistenciaRequest,
   type RangoEstadisticas,
@@ -30,27 +31,38 @@ const KEYS = {
 
 // ── Queries ──────────────────────────────────────────────────────────────
 
-export function useAsistenciasHoy() {
+export function useAsistenciasHoy(params?: { page?: number; size?: number; fecha?: string } & AsistenciaFiltros) {
   return useQuery({
-    queryKey: [...KEYS.asistencias, "hoy"],
-    queryFn: asistenciasApi.hoy,
+    queryKey: [...KEYS.asistencias, "hoy", params],
+    queryFn: () => asistenciasApi.hoy(params),
+    placeholderData: keepPreviousData,
     staleTime: 1000 * 30,
   })
 }
 
-export function useAsistenciaSemana(fecha: string | null, page = 0, size = 10) {
+export function useAsistenciaSemana(
+  fecha: string | null,
+  page = 0,
+  size = 10,
+  filtros?: AsistenciaFiltros
+) {
   return useQuery({
-    queryKey: [...KEYS.asistencias, "semana", fecha, page, size],
-    queryFn: () => asistenciasApi.semana(fecha as string, page, size),
+    queryKey: [...KEYS.asistencias, "semana", fecha, page, size, filtros],
+    queryFn: () => asistenciasApi.semana(fecha as string, page, size, filtros),
     enabled: !!fecha,
     placeholderData: keepPreviousData,
   })
 }
 
-export function useAsistenciaMes(fecha: string | null, page = 0, size = 10) {
+export function useAsistenciaMes(
+  fecha: string | null,
+  page = 0,
+  size = 10,
+  filtros?: AsistenciaFiltros
+) {
   return useQuery({
-    queryKey: [...KEYS.asistencias, "mes", fecha, page, size],
-    queryFn: () => asistenciasApi.mes(fecha as string, page, size),
+    queryKey: [...KEYS.asistencias, "mes", fecha, page, size, filtros],
+    queryFn: () => asistenciasApi.mes(fecha as string, page, size, filtros),
     enabled: !!fecha,
     placeholderData: keepPreviousData,
   })

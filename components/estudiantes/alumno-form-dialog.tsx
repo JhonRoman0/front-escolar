@@ -17,9 +17,10 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Field, FieldContent, FieldError, FieldLabel } from "@/components/ui/field"
+import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
+import { BuscarDniButton } from "@/components/shared/buscar-dni-button"
 
 import { CampoAcceso } from "@/components/shared/table-helpers"
 import {
@@ -30,6 +31,7 @@ import {
   useSubirFotoAlumno,
   useSubirFotoApoderado,
 } from "@/hooks/use-estudiantes"
+import { useConsultarDni } from "@/hooks/use-reniec"
 import { ApiError } from "@/lib/api"
 import type {
   AlumnoRequest,
@@ -86,6 +88,7 @@ export function AlumnoFormDialog({
   const subirFoto = useSubirFotoAlumno()
   const eliminarFoto = useEliminarFotoAlumno()
   const subirFotoApoderado = useSubirFotoApoderado()
+  const consultarDni = useConsultarDni()
   const esEdicion = !!alumno
 
   const [fotoNueva, setFotoNueva] = useState<File | null>(null)
@@ -206,6 +209,24 @@ export function AlumnoFormDialog({
     }
   }
 
+  async function handleBuscarDni() {
+    const dni = form.getValues("documentoIdentidad")?.trim()
+    if (!dni || !/^\d{8}$/.test(dni)) {
+      toast.error("Ingresa un DNI de 8 dígitos")
+      return
+    }
+    try {
+      const r = await consultarDni.mutateAsync(dni)
+      form.setValue("nombre", r.nombres ?? "", { shouldValidate: true })
+      form.setValue("apellidoPat", r.apellidoPaterno ?? "", { shouldValidate: true })
+      form.setValue("apellidoMat", r.apellidoMaterno ?? "", { shouldValidate: true })
+      const origen = r.origen === "LOCAL" ? "Registro local" : "RENIEC"
+      toast.success(`Datos cargados (${origen})`)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo consultar el DNI")
+    }
+  }
+
   async function subirFotosPendientesApoderados(respuesta: AlumnoResponse) {
     const indices = Object.keys(fotosApoderadoNuevo).map(Number)
     if (!indices.length) return
@@ -300,144 +321,130 @@ export function AlumnoFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle className="text-lg font-semibold tracking-tight">
             {esEdicion ? "Editar alumno" : "Nuevo alumno"}
           </DialogTitle>
         </DialogHeader>
-        <form
-          onSubmit={form.handleSubmit(onSubmit)}
-          className="space-y-4"
-          noValidate
-        >
-          <div className="flex items-center gap-4">
-            <Avatar className="h-16 w-16 rounded-full">
-              {preview ? (
-                <AvatarImage src={preview} alt="Foto del alumno" />
-              ) : (
-                <AvatarFallback className="rounded-full text-lg">
-                  {iniciales || "A"}
-                </AvatarFallback>
-              )}
-            </Avatar>
-            <div className="flex flex-wrap gap-2">
-              <input
-                ref={inputFotoRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleArchivo}
-              />
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => inputFotoRef.current?.click()}
-              >
-                <Camera />
-                {fotoNueva || preview ? "Cambiar foto" : "Subir foto"}
-              </Button>
-              {(fotoNueva || (esEdicion && alumno?.urlFoto)) && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleQuitarFoto}
-                  disabled={eliminarFoto.isPending}
-                >
-                  <Trash2 className="text-destructive" />
-                  Quitar
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5" noValidate>
+          <FieldGroup>
+            <div className="flex items-center gap-4 rounded-lg border bg-muted/20 p-3">
+              <Avatar className="size-16 rounded-full">
+                {preview ? (
+                  <AvatarImage src={preview} alt="Foto del alumno" />
+                ) : (
+                  <AvatarFallback className="rounded-full text-lg">{iniciales || "A"}</AvatarFallback>
+                )}
+              </Avatar>
+              <div className="flex flex-wrap gap-2">
+                <input ref={inputFotoRef} type="file" accept="image/*" className="hidden" onChange={handleArchivo} />
+                <Button type="button" variant="outline" size="sm" onClick={() => inputFotoRef.current?.click()}>
+                  <Camera data-icon="inline-start" />
+                  {fotoNueva || preview ? "Cambiar foto" : "Subir foto"}
                 </Button>
-              )}
+                {(fotoNueva || (esEdicion && alumno?.urlFoto)) && (
+                  <Button type="button" variant="ghost" size="sm" onClick={handleQuitarFoto} disabled={eliminarFoto.isPending}>
+                    <Trash2 className="text-destructive" data-icon="inline-start" />
+                    Quitar
+                  </Button>
+                )}
+              </div>
             </div>
-          </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <Controller
-              control={form.control}
-              name="nombre"
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel>Nombres</FieldLabel>
-                  <FieldContent>
-                    <Input placeholder="Luis" {...field} />
-                    <FieldError errors={[form.formState.errors.nombre]} />
-                  </FieldContent>
-                </Field>
-              )}
-            />
-            <Controller
-              control={form.control}
-              name="apellidoPat"
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel>Ap. paterno</FieldLabel>
-                  <FieldContent>
-                    <Input placeholder="García" {...field} />
-                    <FieldError errors={[form.formState.errors.apellidoPat]} />
-                  </FieldContent>
-                </Field>
-              )}
-            />
-            <Controller
-              control={form.control}
-              name="apellidoMat"
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel>Ap. materno</FieldLabel>
-                  <FieldContent>
-                    <Input placeholder="Torres" {...field} />
-                    <FieldError errors={[form.formState.errors.apellidoMat]} />
-                  </FieldContent>
-                </Field>
-              )}
-            />
-          </div>
+            <FieldSet>
+              <FieldLegend className="text-sm font-semibold">Identidad del alumno</FieldLegend>
+              <FieldDescription className="text-xs">Ingresa el DNI primero y usa Buscar para autocompletar desde RENIEC/BD.</FieldDescription>
+              <div className="flex flex-col gap-4">
+                <Controller
+                  control={form.control}
+                  name="documentoIdentidad"
+                  render={({ field }) => (
+                    <Field>
+                      <FieldLabel>DNI — Documento de identidad</FieldLabel>
+                      <FieldContent>
+                        <div className="flex gap-2">
+                          <Input
+                            placeholder="8 dígitos"
+                            maxLength={8}
+                            autoFocus
+                            value={field.value ?? ""}
+                            onChange={field.onChange}
+                            onBlur={field.onBlur}
+                            name={field.name}
+                            ref={field.ref}
+                            className="flex-1"
+                          />
+                          <BuscarDniButton dni={field.value ?? ""} cargando={consultarDni.isPending} onBuscar={handleBuscarDni} />
+                        </div>
+                        <FieldDescription className="text-xs">8 dígitos exactos. Busca en BD local o RENIEC.</FieldDescription>
+                        <FieldError errors={[form.formState.errors.documentoIdentidad]} />
+                      </FieldContent>
+                    </Field>
+                  )}
+                />
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                  <Controller
+                    control={form.control}
+                    name="nombre"
+                    render={({ field }) => (
+                      <Field>
+                        <FieldLabel>Nombres *</FieldLabel>
+                        <FieldContent>
+                          <Input placeholder="Luis" {...field} />
+                          <FieldError errors={[form.formState.errors.nombre]} />
+                        </FieldContent>
+                      </Field>
+                    )}
+                  />
+                  <Controller
+                    control={form.control}
+                    name="apellidoPat"
+                    render={({ field }) => (
+                      <Field>
+                        <FieldLabel>Ap. paterno *</FieldLabel>
+                        <FieldContent>
+                          <Input placeholder="García" {...field} />
+                          <FieldError errors={[form.formState.errors.apellidoPat]} />
+                        </FieldContent>
+                      </Field>
+                    )}
+                  />
+                  <Controller
+                    control={form.control}
+                    name="apellidoMat"
+                    render={({ field }) => (
+                      <Field>
+                        <FieldLabel>Ap. materno *</FieldLabel>
+                        <FieldContent>
+                          <Input placeholder="Torres" {...field} />
+                          <FieldError errors={[form.formState.errors.apellidoMat]} />
+                        </FieldContent>
+                      </Field>
+                    )}
+                  />
+                </div>
+                <Controller
+                  control={form.control}
+                  name="fechaNacimiento"
+                  render={({ field }) => (
+                    <Field className="sm:max-w-[240px]">
+                      <FieldLabel>Fecha de nacimiento *</FieldLabel>
+                      <FieldContent>
+                        <Input type="date" {...field} />
+                        <FieldError errors={[form.formState.errors.fechaNacimiento]} />
+                      </FieldContent>
+                    </Field>
+                  )}
+                />
+              </div>
+            </FieldSet>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Controller
-              control={form.control}
-              name="fechaNacimiento"
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel>Fecha de nacimiento</FieldLabel>
-                  <FieldContent>
-                    <Input type="date" {...field} />
-                    <FieldError
-                      errors={[form.formState.errors.fechaNacimiento]}
-                    />
-                  </FieldContent>
-                </Field>
-              )}
-            />
-            <Controller
-              control={form.control}
-              name="documentoIdentidad"
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel>Documento de identidad</FieldLabel>
-                  <FieldContent>
-                    <Input
-                      placeholder="Opcional"
-                      value={field.value ?? ""}
-                      onChange={field.onChange}
-                      onBlur={field.onBlur}
-                      name={field.name}
-                      ref={field.ref}
-                    />
-                    <FieldError
-                      errors={[form.formState.errors.documentoIdentidad]}
-                    />
-                  </FieldContent>
-                </Field>
-              )}
-            />
-          </div>
-
-          <Controller
-            control={form.control}
-            name="direccion"
+            <FieldSet>
+              <FieldLegend className="text-sm font-semibold">Contacto</FieldLegend>
+              <Controller
+                control={form.control}
+                name="direccion"
             render={({ field }) => (
               <Field>
                 <FieldLabel>Dirección</FieldLabel>
@@ -455,7 +462,11 @@ export function AlumnoFormDialog({
               </Field>
             )}
           />
+            </FieldSet>
 
+            <FieldSet>
+              <FieldLegend className="text-sm font-semibold">Apoderados</FieldLegend>
+              <FieldDescription className="text-xs">Principal obligatorio. Secundario opcional. DNI primero para reutilizar.</FieldDescription>
           {esEdicion ? (
             <div className="rounded-lg border p-3">
               <div className="flex items-center justify-between gap-2">
@@ -573,6 +584,8 @@ export function AlumnoFormDialog({
               )}
             />
           )}
+            </FieldSet>
+          </FieldGroup>
 
           <DialogFooter>
             <DialogTrigger render={<Button variant="outline" />}>
@@ -605,6 +618,7 @@ function ApoderadoSlot({
   onQuitarFotoPendiente: (index: number) => void
 }) {
   const consulta = useApoderadoPorDocumento()
+  const reniec = useConsultarDni()
   const subirFoto = useSubirFotoApoderado()
   const eliminarFoto = useEliminarFotoApoderado()
   const inputFotoRef = useRef<HTMLInputElement>(null)
@@ -665,6 +679,29 @@ function ApoderadoSlot({
       )
     } catch (error) {
       if (error instanceof ApiError && error.status === 404) {
+        // Fallback RENIEC si es DNI de 8 dígitos
+        if (/^\d{8}$/.test(dni)) {
+          try {
+            const r = await reniec.mutateAsync(dni)
+            form.setValue(path("_modo"), "crear")
+            form.setValue(path("nombre"), r.nombres ?? "", { shouldValidate: true })
+            form.setValue(path("apellidoPat"), r.apellidoPaterno ?? "", { shouldValidate: true })
+            form.setValue(path("apellidoMat"), r.apellidoMaterno ?? "", { shouldValidate: true })
+            form.setValue(path("documentoIdentidad"), r.dni ?? dni, { shouldValidate: true })
+            onQuitarFotoPendiente(Number(index))
+            const origen = r.origen === "CACHE" || r.origen === "RENIEC" ? "RENIEC" : r.origen
+            toast.success(`Datos cargados desde ${origen}`)
+            return
+          } catch (reniecError) {
+            if (reniecError instanceof ApiError && reniecError.status === 404) {
+              form.setValue(path("_modo"), "crear")
+              toast.info("DNI no encontrado en RENIEC: completa los datos manualmente")
+              return
+            }
+            toast.error(reniecError instanceof Error ? reniecError.message : "No se pudo consultar RENIEC")
+            return
+          }
+        }
         form.setValue(path("_modo"), "crear")
         toast.info("El documento no está registrado: completa los datos del apoderado")
       } else {
@@ -768,17 +805,17 @@ function ApoderadoSlot({
                   onBlur={() => consultarDocumento(field.value ?? "")}
                   name={field.name}
                   ref={field.ref}
-                  disabled={consulta.isPending}
+                  disabled={consulta.isPending || reniec.isPending}
                 />
                 <Button
                   type="button"
                   variant="outline"
                   size="icon"
                   aria-label="Consultar documento"
-                  disabled={consulta.isPending}
+                  disabled={consulta.isPending || reniec.isPending}
                   onClick={() => consultarDocumento(field.value ?? "")}
                 >
-                  {consulta.isPending ? (
+                  {consulta.isPending || reniec.isPending ? (
                     <Loader2 className="animate-spin" />
                   ) : (
                     <Search />

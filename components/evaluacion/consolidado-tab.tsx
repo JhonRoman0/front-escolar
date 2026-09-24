@@ -115,24 +115,17 @@ export default function ConsolidadoTab() {
   }
 
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardContent className="space-y-4 p-4">
+    <div className="flex flex-col gap-4">
+      <Card className="rounded-[20px] border-[0.80px] border-[#D9DBE9]">
+        <CardContent className="flex flex-col gap-4 p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-semibold">Consolidado por competencias</h2>
-              <p className="text-sm text-muted-foreground">
-                Vista estilo SIAGIE: calificaciones por competencia de cada alumno.
-              </p>
+            <div className="space-y-0.5">
+              <h2 className="text-[20px] font-semibold tracking-tight">Consolidado por competencias</h2>
+              <p className="text-[14px] leading-5 text-muted-foreground">Vista estilo SIAGIE: calificaciones por competencia de cada alumno.</p>
             </div>
             {puedeExportar && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleExportarSiagie}
-                disabled={idGradoSeccion == null || idGradoSeccion <= 0 || !idCurso}
-              >
-                <Download />
+              <Button variant="outline" size="sm" className="h-8 rounded-[8px] border-[#A9A9AA] text-[12px]" onClick={handleExportarSiagie} disabled={idGradoSeccion == null || idGradoSeccion <= 0 || !idCurso}>
+                <Download data-icon="inline-start" />
                 Exportar SIAGIE
               </Button>
             )}
@@ -197,22 +190,19 @@ export default function ConsolidadoTab() {
       </Card>
 
       {(idGradoSeccion != null && idGradoSeccion > 0 && idCurso > 0) && (
-        <Card>
-          <CardContent className="space-y-4 p-4">
-            <div className="overflow-x-auto rounded-lg border">
+        <Card className="rounded-[20px] border-[0.80px] border-[#D9DBE9]">
+          <CardContent className="flex flex-col gap-4 p-4">
+            <div className="overflow-x-auto rounded-[8px] border border-[#D9DBE9]">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead className="min-w-[200px]">Alumno</TableHead>
+                  <TableRow className="bg-[#F8F9FA] hover:bg-[#F8F9FA]">
+                    <TableHead className="min-w-[200px] whitespace-nowrap text-[12px] font-semibold text-[#495057]">Alumno</TableHead>
                     {cargandoConsolidado ? (
                       <TableHead>Cargando...</TableHead>
                     ) : consolidado.length > 0 ? (
                       competencias.map((c) => (
-                        <TableHead
-                          key={c.idCompetencia}
-                          className="min-w-[120px] text-center"
-                        >
-                          <div className="text-xs font-medium">{c.competencia}</div>
+                        <TableHead key={c.idCompetencia} className="min-w-[120px] text-center whitespace-nowrap text-[12px] font-semibold text-[#495057]">
+                          <div className="text-[12px] font-semibold">{c.competencia}</div>
                         </TableHead>
                       ))
                     ) : (

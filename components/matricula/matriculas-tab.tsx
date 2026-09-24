@@ -122,61 +122,54 @@ export function MatriculasTab() {
   }
 
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardContent className="space-y-4 p-4">
+    <div className="flex flex-col gap-4">
+      <Card className="rounded-[20px] border-[0.80px] border-[#D9DBE9]">
+        <CardContent className="flex flex-col gap-4 p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-semibold">Matrículas</h2>
-              <p className="text-sm text-muted-foreground">
-                Alumnos matriculados por año escolar y sección.
-              </p>
+            <div className="space-y-0.5">
+              <h2 className="text-[20px] font-semibold tracking-tight">Matrículas</h2>
+              <p className="text-[14px] leading-5 text-muted-foreground">Alumnos matriculados por año escolar y sección.</p>
             </div>
             <div className="flex flex-wrap items-center gap-3">
               <label className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Switch
-                  checked={mostrarInactivas}
-                  onCheckedChange={setMostrarInactivas}
-                />
+                <Switch checked={mostrarInactivas} onCheckedChange={setMostrarInactivas} />
                 Ver inactivas
               </label>
               {puedeExportar && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setReporteOpen(true)}
-                >
-                  <FileDown />
+                <Button variant="outline" size="sm" className="h-8 rounded-[8px] border-[#A9A9AA] text-[12px]" onClick={() => setReporteOpen(true)}>
+                  <FileDown data-icon="inline-start" />
                   Generar reporte
                 </Button>
               )}
               {puedeCrear && (
                 <Button
+                  className="h-8 rounded-[8px] bg-[#274CB4] text-white hover:bg-[#274CB4]/85 text-[12px] font-semibold"
                   onClick={() => {
                     setEditando(null)
                     setDialogOpen(true)
                   }}
                 >
-                  <Plus />
+                  <Plus data-icon="inline-start" />
                   Nueva matrícula
                 </Button>
               )}
             </div>
           </div>
 
-          <Table>
+          <div className="overflow-x-auto rounded-[8px] border border-[#D9DBE9]">
+            <Table>
             <TableHeader>
-              <TableRow>
-                <TableHead>Alumno</TableHead>
-                <TableHead>Apoderado</TableHead>
-                <TableHead>Grado - Sección</TableHead>
-                <TableHead>Turno</TableHead>
-                <TableHead>Año</TableHead>
-                <TableHead>Solicitud</TableHead>
-                <TableHead>Pago</TableHead>
-                <TableHead>Observaciones</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
+              <TableRow className="bg-[#F8F9FA] hover:bg-[#F8F9FA]">
+                <TableHead className="whitespace-nowrap text-[12px] font-semibold text-[#495057]">Alumno</TableHead>
+                <TableHead className="whitespace-nowrap text-[12px] font-semibold text-[#495057]">Apoderado</TableHead>
+                <TableHead className="whitespace-nowrap text-[12px] font-semibold text-[#495057]">Grado - Sección</TableHead>
+                <TableHead className="whitespace-nowrap text-[12px] font-semibold text-[#495057]">Turno</TableHead>
+                <TableHead className="whitespace-nowrap text-[12px] font-semibold text-[#495057]">Año</TableHead>
+                <TableHead className="whitespace-nowrap text-[12px] font-semibold text-[#495057]">Solicitud</TableHead>
+                <TableHead className="whitespace-nowrap text-[12px] font-semibold text-[#495057]">Pago</TableHead>
+                <TableHead className="whitespace-nowrap text-[12px] font-semibold text-[#495057]">Observaciones</TableHead>
+                <TableHead className="whitespace-nowrap text-[12px] font-semibold text-[#495057]">Estado</TableHead>
+                <TableHead className="whitespace-nowrap text-right text-[12px] font-semibold text-[#495057]">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -307,7 +300,8 @@ export function MatriculasTab() {
                 ))
               )}
             </TableBody>
-          </Table>
+            </Table>
+          </div>
 
           {isError && (
             <Button variant="outline" size="sm" onClick={() => refetch()}>
@@ -315,9 +309,7 @@ export function MatriculasTab() {
             </Button>
           )}
 
-          {!!data?.totalPages && data.totalPages > 1 && (
-            <TablaPaginacion data={data} onPage={setPage} />
-          )}
+          {!!data?.totalPages && data.totalPages > 1 && <TablaPaginacion data={data} onPage={setPage} />}
 
           <MatriculaFormDialog
             key={editando?.idMatricula ?? "nuevo"}

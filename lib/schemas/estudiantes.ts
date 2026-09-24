@@ -1,5 +1,7 @@
 import * as z from "zod"
 
+import { MENSAJE_CONTRASENA_SEGURA, REGEX_CONTRASENA_SEGURA } from "@/lib/schemas/comun"
+
 const accesoId = z.number().int().min(1, "Selecciona un estado").max(3)
 
 const fechaISO = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha requerida (aaaa-mm-dd)")
@@ -136,8 +138,12 @@ export const alumnoSchema = z.object({
     if (!a.fechaNaci) {
       ctx.addIssue({ code: "custom", path: ["apoderados", i, "fechaNaci"], message: "La fecha de nacimiento es obligatoria" })
     }
-    if (!a.contraseña || a.contraseña.length < 6) {
-      ctx.addIssue({ code: "custom", path: ["apoderados", i, "contraseña"], message: "La contraseña debe tener al menos 6 caracteres" })
+    if (!a.contraseña) {
+      ctx.addIssue({ code: "custom", path: ["apoderados", i, "contraseña"], message: "La contraseña es obligatoria" })
+    } else if (a.contraseña.length < 8) {
+      ctx.addIssue({ code: "custom", path: ["apoderados", i, "contraseña"], message: "La contraseña debe tener al menos 8 caracteres" })
+    } else if (!REGEX_CONTRASENA_SEGURA.test(a.contraseña)) {
+      ctx.addIssue({ code: "custom", path: ["apoderados", i, "contraseña"], message: MENSAJE_CONTRASENA_SEGURA })
     }
   })
 })

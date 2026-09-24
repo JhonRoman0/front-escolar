@@ -37,14 +37,24 @@ import {
 } from "@/hooks/use-portal"
 import { formatearFecha } from "@/lib/fechas"
 
-const schema = z.object({
-  titulo: z.string().min(2, "Título requerido"),
-  descripcion: z.string().optional(),
-  lugar: z.string().optional(),
-  fechaInicio: z.string().min(1, "Fecha requerida"),
-  fechaFin: z.string().optional(),
-  esPublico: z.number().optional(),
-})
+const schema = z
+  .object({
+    titulo: z.string().min(2, "Título requerido"),
+    descripcion: z.string().optional(),
+    lugar: z.string().optional(),
+    fechaInicio: z.string().min(1, "Fecha requerida"),
+    fechaFin: z.string().optional(),
+    esPublico: z.number().optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.fechaFin && data.fechaFin < data.fechaInicio) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["fechaFin"],
+        message: "La fecha de fin no puede ser anterior a la fecha de inicio",
+      })
+    }
+  })
 
 type FormData = z.infer<typeof schema>
 

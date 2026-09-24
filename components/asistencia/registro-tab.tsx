@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { QrCode, Keyboard, FileDown } from "lucide-react"
 import { toast } from "sonner"
 
@@ -45,6 +45,7 @@ export function RegistroTab() {
   const [busqueda, setBusqueda] = useState("")
   const [filtroEstado, setFiltroEstado] = useState<string | null>(null)
   const [idGradoSeccionFiltro, setIdGradoSeccionFiltro] = useState<number | null>(null)
+  const [pageHoy, setPageHoy] = useState(0)
   const [pageSemana, setPageSemana] = useState(0)
   const [pageMes, setPageMes] = useState(0)
 
@@ -55,17 +56,33 @@ export function RegistroTab() {
   const [justificarTarget, setJustificarTarget] =
     useState<AsistenciaDiaResponse | null>(null)
 
-  // ── Datos ──
-  const hoyQuery = useAsistenciasHoy()
+  // ── Datos ── (ahora todo paginado + filtros server)
+  const hoyQuery = useAsistenciasHoy({
+    page: pageHoy,
+    size: TAMANIO_PAGINA,
+    idGradoSeccion: idGradoSeccionFiltro ?? undefined,
+    estado: filtroEstado as never,
+    search: busqueda || undefined,
+  })
   const semanaQuery = useAsistenciaSemana(
     rango === "semana" ? fecha : null,
     pageSemana,
-    TAMANIO_PAGINA
+    TAMANIO_PAGINA,
+    {
+      idGradoSeccion: idGradoSeccionFiltro ?? undefined,
+      estado: filtroEstado as never,
+      search: busqueda || undefined,
+    }
   )
   const mesQuery = useAsistenciaMes(
     rango === "mes" ? fecha : null,
     pageMes,
-    TAMANIO_PAGINA
+    TAMANIO_PAGINA,
+    {
+      idGradoSeccion: idGradoSeccionFiltro ?? undefined,
+      estado: filtroEstado as never,
+      search: busqueda || undefined,
+    }
   )
   const estadisticasQuery = useEstadisticasAsistencia(rango, fecha)
   const estadosQuery = useEstadosAsistencia()
@@ -77,57 +94,22 @@ export function RegistroTab() {
 
   function cambiaRango(nuevo: RangoFecha) {
     setRango(nuevo)
+    setPageHoy(0)
     setPageSemana(0)
     setPageMes(0)
   }
 
-  // ── Filtrado client-side ──
-  const filtroGradoEffective = useMemo(() => {
-    if (idGradoSeccionFiltro) {
-      for (const g of gradosCatalogo) {
-        const s = g.secciones.find((sec) => sec.idGradoSeccion === idGradoSeccionFiltro)
-        if (s) return g.nombre
-      }
-    }
-    return null
-  }, [idGradoSeccionFiltro, gradosCatalogo])
+  // Reset page cuando cambian filtros server
+  useEffect(() => {
+    setPageHoy(0)
+    setPageSemana(0)
+    setPageMes(0)
+  }, [idGradoSeccionFiltro, filtroEstado, busqueda])
 
-  const filtroSeccionEffective = useMemo(() => {
-    if (idGradoSeccionFiltro) {
-      for (const g of gradosCatalogo) {
-        const s = g.secciones.find((sec) => sec.idGradoSeccion === idGradoSeccionFiltro)
-        if (s) return s.nombre
-      }
-    }
-    return null
-  }, [idGradoSeccionFiltro, gradosCatalogo])
-
-  const hoyFiltradas = useMemo(() => {
-    const q = busqueda.trim().toLowerCase()
-    return (hoyQuery.data ?? []).filter((a) => {
-      if (q && !a.alumno.toLowerCase().includes(q)) return false
-      if (filtroGradoEffective && a.grado !== filtroGradoEffective) return false
-      if (filtroSeccionEffective && a.seccion !== filtroSeccionEffective) return false
-      if (filtroEstado && a.estado !== filtroEstado) return false
-      return true
-    })
-  }, [hoyQuery.data, busqueda, filtroGradoEffective, filtroSeccionEffective, filtroEstado])
-
-  const semanaFiltradas = useMemo(() => {
-    const q = busqueda.trim().toLowerCase()
-    if (!q) return semanaQuery.data?.content ?? []
-    return (semanaQuery.data?.content ?? []).filter((a) =>
-      a.alumno.toLowerCase().includes(q)
-    )
-  }, [semanaQuery.data, busqueda])
-
-  const mesFiltradas = useMemo(() => {
-    const q = busqueda.trim().toLowerCase()
-    if (!q) return mesQuery.data?.content ?? []
-    return (mesQuery.data?.content ?? []).filter((a) =>
-      a.alumno.toLowerCase().includes(q)
-    )
-  }, [mesQuery.data, busqueda])
+  // Datos ya filtrados server-side
+  const hoyFiltradas = hoyQuery.data?.content ?? []
+  const semanaFiltradas = semanaQuery.data?.content ?? []
+  const mesFiltradas = mesQuery.data?.content ?? []
 
   const cargandoTabla =
     (rango === "hoy" && hoyQuery.isLoading) ||
@@ -233,14 +215,17 @@ export function RegistroTab() {
       )}
 
       {rango === "hoy" && (
-        <AsistenciaTablaHoy
-          asistencias={hoyFiltradas}
-          cargando={cargandoTabla}
-          puedeJustificar={puedeJustificar}
-          puedeEliminar={puedeEliminar}
-          onJustificar={setJustificarTarget}
-          onEliminar={handleEliminar}
-        />
+        <>
+          <AsistenciaTablaHoy
+            asistencias={hoyFiltradas}
+            cargando={cargandoTabla}
+            puedeJustificar={puedeJustificar}
+            puedeEliminar={puedeEliminar}
+            onJustificar={setJustificarTarget}
+            onEliminar={handleEliminar}
+          />
+          <TablaPaginacion data={hoyQuery.data} onPage={setPageHoy} />
+        </>
       )}
 
       {rango === "semana" && (

@@ -11,9 +11,13 @@ export default function SeguridadPage() {
   const puedeAccesos = usePuedeLeer("ROLES_PERMISOS")
 
   return (
-    <div className="space-y-4">
-      <Tabs defaultValue="accesos">
-        <TabsList variant="segmented" className="overflow-x-auto">
+    <div className="flex flex-col gap-4">
+      <div className="space-y-1">
+        <h1 className="text-[20px] font-bold tracking-tight text-foreground">Seguridad</h1>
+        <p className="text-[12px] font-medium leading-5 text-muted-foreground">Usuarios, roles y accesos por rol.</p>
+      </div>
+      <Tabs defaultValue="usuarios">
+        <TabsList variant="segmented" className="w-full justify-start overflow-x-auto">
           <TabsTrigger value="usuarios">Usuarios</TabsTrigger>
           <TabsTrigger value="roles">Roles</TabsTrigger>
           {puedeAccesos && <TabsTrigger value="accesos">Accesos</TabsTrigger>}

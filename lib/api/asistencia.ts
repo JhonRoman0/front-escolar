@@ -45,7 +45,7 @@ export interface AsistenciaResponse {
 
 // ── Tablas hoy / semana / mes ────────────────────────────────────────────
 
-// ≡ AsistenciaDiaResponse (GET /asistencias/hoy, List).
+// ≡ AsistenciaDiaResponse (GET /asistencias/hoy, ahora Page).
 // Sin registro hoy el back devuelve estado "Inasistencia" y hora/marcadoPor null.
 export interface AsistenciaDiaResponse {
   idAlumno: number
@@ -56,6 +56,16 @@ export interface AsistenciaDiaResponse {
   estado: EstadoAsistencia
   horaEntrada: string | null
   marcadoPor: string | null
+  // Enriquecido (6 filtros)
+  idNivel?: number | null
+  nivel?: string | null
+  idGrado?: number | null
+  idSeccion?: number | null
+  idTurno?: number | null
+  idGradoSeccion?: number | null
+  idAnio?: number | null
+  anio?: string | null
+  turno?: string | null
 }
 
 // ≡ MatrizSemanalResponse (GET /asistencias/semana?fecha=, Page).
@@ -66,6 +76,12 @@ export interface MatrizSemanalResponse {
   grado: string
   seccion: string
   estados: EstadoAsistencia[]
+  idGradoSeccion?: number | null
+  idNivel?: number | null
+  idGrado?: number | null
+  idSeccion?: number | null
+  idTurno?: number | null
+  idAnio?: number | null
 }
 
 // ≡ ResumenMensualResponse (GET /asistencias/mes?fecha=, Page).
@@ -78,6 +94,12 @@ export interface ResumenMensualResponse {
   diasAsistidos: number
   inasistencias: number
   porcentajeAsistencia: number
+  idGradoSeccion?: number | null
+  idNivel?: number | null
+  idGrado?: number | null
+  idSeccion?: number | null
+  idTurno?: number | null
+  idAnio?: number | null
 }
 
 // ── Estadísticas / catálogos ─────────────────────────────────────────────
@@ -107,6 +129,17 @@ export interface JustificarAsistenciaRequest {
   idJustificacion: number
 }
 
+export interface AsistenciaFiltros {
+  idNivel?: number | null
+  idGrado?: number | null
+  idSeccion?: number | null
+  idTurno?: number | null
+  idGradoSeccion?: number | null
+  idAnio?: number | null
+  search?: string | null
+  estado?: EstadoAsistencia | null
+}
+
 // ── API ──────────────────────────────────────────────────────────────────
 
 export const asistenciasApi = {
@@ -122,17 +155,55 @@ export const asistenciasApi = {
       body: JSON.stringify(data),
     })
   },
-  async hoy(): Promise<AsistenciaDiaResponse[]> {
-    return apiFetch<AsistenciaDiaResponse[]>("/asistencias/hoy")
+  async hoy(params?: { page?: number; size?: number } & AsistenciaFiltros & { fecha?: string }): Promise<Paginated<AsistenciaDiaResponse>> {
+    const query = new URLSearchParams()
+    query.set("page", String(params?.page ?? 0))
+    query.set("size", String(params?.size ?? 10))
+    if (params?.fecha) query.set("fecha", params.fecha)
+    if (params?.idNivel != null) query.set("idNivel", String(params.idNivel))
+    if (params?.idGrado != null) query.set("idGrado", String(params.idGrado))
+    if (params?.idSeccion != null) query.set("idSeccion", String(params.idSeccion))
+    if (params?.idTurno != null) query.set("idTurno", String(params.idTurno))
+    if (params?.idGradoSeccion != null) query.set("idGradoSeccion", String(params.idGradoSeccion))
+    if (params?.idAnio != null) query.set("idAnio", String(params.idAnio))
+    if (params?.estado) query.set("estado", params.estado)
+    if (params?.search) query.set("search", params.search)
+    return apiFetch<Paginated<AsistenciaDiaResponse>>(`/asistencias/hoy?${query.toString()}`)
   },
-  async semana(fecha: string, page = 0, size = 10): Promise<Paginated<MatrizSemanalResponse>> {
+  async semana(
+    fecha: string,
+    page = 0,
+    size = 10,
+    filtros?: AsistenciaFiltros
+  ): Promise<Paginated<MatrizSemanalResponse>> {
     const params = new URLSearchParams({ fecha, page: String(page), size: String(size) })
+    if (filtros?.idNivel != null) params.set("idNivel", String(filtros.idNivel))
+    if (filtros?.idGrado != null) params.set("idGrado", String(filtros.idGrado))
+    if (filtros?.idSeccion != null) params.set("idSeccion", String(filtros.idSeccion))
+    if (filtros?.idTurno != null) params.set("idTurno", String(filtros.idTurno))
+    if (filtros?.idGradoSeccion != null) params.set("idGradoSeccion", String(filtros.idGradoSeccion))
+    if (filtros?.idAnio != null) params.set("idAnio", String(filtros.idAnio))
+    if (filtros?.estado) params.set("estado", filtros.estado)
+    if (filtros?.search) params.set("search", filtros.search)
     return apiFetch<Paginated<MatrizSemanalResponse>>(
       `/asistencias/semana?${params.toString()}`
     )
   },
-  async mes(fecha: string, page = 0, size = 10): Promise<Paginated<ResumenMensualResponse>> {
+  async mes(
+    fecha: string,
+    page = 0,
+    size = 10,
+    filtros?: AsistenciaFiltros
+  ): Promise<Paginated<ResumenMensualResponse>> {
     const params = new URLSearchParams({ fecha, page: String(page), size: String(size) })
+    if (filtros?.idNivel != null) params.set("idNivel", String(filtros.idNivel))
+    if (filtros?.idGrado != null) params.set("idGrado", String(filtros.idGrado))
+    if (filtros?.idSeccion != null) params.set("idSeccion", String(filtros.idSeccion))
+    if (filtros?.idTurno != null) params.set("idTurno", String(filtros.idTurno))
+    if (filtros?.idGradoSeccion != null) params.set("idGradoSeccion", String(filtros.idGradoSeccion))
+    if (filtros?.idAnio != null) params.set("idAnio", String(filtros.idAnio))
+    if (filtros?.estado) params.set("estado", filtros.estado)
+    if (filtros?.search) params.set("search", filtros.search)
     return apiFetch<Paginated<ResumenMensualResponse>>(
       `/asistencias/mes?${params.toString()}`
     )
@@ -167,5 +238,19 @@ export const asistenciasApi = {
   /** GET /asistencias/hijos — Hijos del apoderado actual (RBAC) */
   async hijos(): Promise<HijoHorario[]> {
     return apiFetch<HijoHorario[]>("/asistencias/hijos")
+  },
+  async reporteGeneral(
+    params: { inicio: string; fin: string; page?: number; size?: number } & AsistenciaFiltros
+  ): Promise<Paginated<AsistenciaDiaResponse>> {
+    const query = new URLSearchParams({ inicio: params.inicio, fin: params.fin })
+    query.set("page", String(params.page ?? 0))
+    query.set("size", String(params.size ?? 10))
+    if (params.idNivel != null) query.set("idNivel", String(params.idNivel))
+    if (params.idGrado != null) query.set("idGrado", String(params.idGrado))
+    if (params.idSeccion != null) query.set("idSeccion", String(params.idSeccion))
+    if (params.idTurno != null) query.set("idTurno", String(params.idTurno))
+    if (params.idGradoSeccion != null) query.set("idGradoSeccion", String(params.idGradoSeccion))
+    if (params.idAnio != null) query.set("idAnio", String(params.idAnio))
+    return apiFetch<Paginated<AsistenciaDiaResponse>>(`/reportes/general?${query.toString()}`)
   },
 }

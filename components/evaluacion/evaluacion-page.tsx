@@ -14,16 +14,14 @@ export default function EvaluacionPage() {
   const puedeNotas = usePuedeLeer("NOTAS")
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Consolidados</h1>
-        <p className="text-sm text-muted-foreground">
-          Consolidados por competencias, registro de notas y promedios por alumno.
-        </p>
+    <div className="flex flex-col gap-4">
+      <div className="space-y-1">
+        <h1 className="text-[20px] font-bold tracking-tight text-foreground">Consolidados</h1>
+        <p className="text-[12px] font-medium leading-5 text-muted-foreground">Consolidados por competencias, registro de notas y promedios por alumno.</p>
       </div>
 
       <Tabs defaultValue={puedeConsolidados ? "consolidado" : "notas"}>
-        <TabsList className="w-full justify-start overflow-x-auto">
+        <TabsList variant="segmented" className="w-full justify-start overflow-x-auto">
           {puedeConsolidados && (
             <TabsTrigger value="consolidado">Consolidados</TabsTrigger>
           )}

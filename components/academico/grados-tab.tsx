@@ -17,11 +17,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Field, FieldContent, FieldError, FieldLabel } from "@/components/ui/field"
+import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldSet } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -78,28 +79,30 @@ export default function GradosTab() {
 
   return (
     <Card>
-      <CardContent className="space-y-4 p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold">Grados</h2>
-            <p className="text-sm text-muted-foreground">
+      <CardContent className="flex flex-col gap-4 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="space-y-0.5">
+            <h2 className="text-[20px] font-semibold tracking-tight">Grados</h2>
+            <p className="text-[14px] leading-5 text-muted-foreground">
               Un grado agrupa secciones dentro de un turno y año escolar.
             </p>
           </div>
           {puedeCrear && (
             <Button
+              className="bg-[#274CB4] text-white hover:bg-[#274CB4]/85"
               onClick={() => {
                 setEditando(null)
                 setDialogOpen(true)
               }}
             >
-              <Plus />
+              <Plus data-icon="inline-start" />
               Nuevo grado
             </Button>
           )}
         </div>
 
-        <Table>
+        <div className="overflow-x-auto rounded-lg border">
+          <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Grado</TableHead>
@@ -167,7 +170,8 @@ export default function GradosTab() {
               ))
             )}
           </TableBody>
-        </Table>
+          </Table>
+        </div>
 
         {isError && (
           <Button variant="outline" size="sm" onClick={() => refetch()}>
@@ -256,198 +260,195 @@ function GradoFormDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle className="text-lg font-semibold tracking-tight">
             {esEdicion ? "Editar grado" : "Nuevo grado"}
           </DialogTitle>
         </DialogHeader>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" noValidate>
-          <Controller
-            control={form.control}
-            name="nombre"
-            render={({ field }) => (
-              <Field>
-                <FieldLabel>Nombre del grado</FieldLabel>
-                <FieldContent>
-                  <Input placeholder="Primero de Secundaria" {...field} />
-                  <FieldError errors={[form.formState.errors.nombre]} />
-                </FieldContent>
-              </Field>
-            )}
-          />
-
-          <Controller
-            control={form.control}
-            name="idNivel"
-            render={({ field }) => (
-              <Field>
-                <FieldLabel>Nivel</FieldLabel>
-                <FieldContent>
-                  <Select
-                    value={field.value ? String(field.value) : ""}
-                    onValueChange={(v) => {
-                      const val = Number(v)
-                      field.onChange(val)
-                      if (val === 1) form.setValue("secciones", [])
-                    }}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue>
-                        {NIVELES.find((n) => n.idNivel === field.value)?.nombre ??
-                          "Selecciona"}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {NIVELES.map((n) => (
-                        <SelectItem key={n.idNivel} value={String(n.idNivel)}>
-                          {n.nombre}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FieldError errors={[form.formState.errors.idNivel]} />
-                </FieldContent>
-              </Field>
-            )}
-          />
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5" noValidate>
+          <FieldGroup>
             <Controller
               control={form.control}
-              name="idAnio"
+              name="nombre"
               render={({ field }) => (
                 <Field>
-                  <FieldLabel>Año escolar</FieldLabel>
+                  <FieldLabel>Nombre del grado</FieldLabel>
                   <FieldContent>
-                    <Select
-                      value={field.value ? String(field.value) : ""}
-                      onValueChange={(v) => field.onChange(Number(v))}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue>
-                          {anios.find((a) => a.idAnio === field.value)?.anio ??
-                            "Selecciona"}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        {anios.map((a) => (
-                          <SelectItem key={a.idAnio} value={String(a.idAnio)}>
-                            {a.anio}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FieldError errors={[form.formState.errors.idAnio]} />
+                    <Input placeholder="Primero de Secundaria" autoFocus {...field} />
+                    <FieldError errors={[form.formState.errors.nombre]} />
                   </FieldContent>
                 </Field>
               )}
             />
+
             <Controller
               control={form.control}
-              name="idTurno"
+              name="idNivel"
               render={({ field }) => (
                 <Field>
-                  <FieldLabel>Turno</FieldLabel>
+                  <FieldLabel>Nivel</FieldLabel>
                   <FieldContent>
                     <Select
                       value={field.value ? String(field.value) : ""}
-                      onValueChange={(v) => field.onChange(Number(v))}
+                      onValueChange={(v) => {
+                        const val = Number(v)
+                        field.onChange(val)
+                        if (val === 1) form.setValue("secciones", [])
+                      }}
                     >
                       <SelectTrigger className="w-full">
                         <SelectValue>
-                          {turnos.find((t) => t.idTurno === field.value)?.nombre ??
-                            "Selecciona"}
+                          {NIVELES.find((n) => n.idNivel === field.value)?.nombre ?? "Selecciona"}
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
-                        {turnos.map((t) => (
-                          <SelectItem key={t.idTurno} value={String(t.idTurno)}>
-                            {t.nombre}
-                          </SelectItem>
-                        ))}
+                        <SelectGroup>
+                          {NIVELES.map((n) => (
+                            <SelectItem key={n.idNivel} value={String(n.idNivel)}>
+                              {n.nombre}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
                       </SelectContent>
                     </Select>
-                    <FieldError errors={[form.formState.errors.idTurno]} />
+                    <FieldDescription className="text-xs">Inicial no lleva secciones.</FieldDescription>
+                    <FieldError errors={[form.formState.errors.idNivel]} />
                   </FieldContent>
                 </Field>
               )}
             />
-          </div>
 
-          {idNivelSeleccionado !== 1 && (
-            <Field>
-              <FieldLabel>Secciones</FieldLabel>
-              <FieldContent>
+            <FieldSet>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Controller
                   control={form.control}
-                  name="secciones"
+                  name="idAnio"
                   render={({ field }) => (
-                    <div className="space-y-2">
-                      {field.value.map((seccion, index) => (
-                        <div key={index} className="flex gap-2">
-                          <Input
-                            className="flex-1"
-                            placeholder="A"
-                            value={seccion}
-                            onChange={(e) => {
-                              const next = [...field.value]
-                              next[index] = e.target.value
-                              field.onChange(next)
-                            }}
-                          />
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            disabled={field.value.length <= 1}
-                            onClick={() =>
-                              field.onChange(
-                                field.value.filter((_, i) => i !== index)
-                              )
-                            }
-                            aria-label={`Quitar sección ${index + 1}`}
-                          >
-                            <X />
-                          </Button>
-                        </div>
-                      ))}
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => field.onChange([...field.value, ""])}
-                      >
-                        <Plus />
-                        Agregar sección
-                      </Button>
-                    </div>
+                    <Field>
+                      <FieldLabel>Año escolar</FieldLabel>
+                      <FieldContent>
+                        <Select
+                          value={field.value ? String(field.value) : ""}
+                          onValueChange={(v) => field.onChange(Number(v))}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue>
+                              {anios.find((a) => a.idAnio === field.value)?.anio ?? "Selecciona"}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectGroup>
+                              {anios.map((a) => (
+                                <SelectItem key={a.idAnio} value={String(a.idAnio)}>
+                                  {a.anio}
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
+                        <FieldError errors={[form.formState.errors.idAnio]} />
+                      </FieldContent>
+                    </Field>
                   )}
                 />
-                <FieldError errors={[form.formState.errors.secciones]} />
-              </FieldContent>
-            </Field>
-          )}
+                <Controller
+                  control={form.control}
+                  name="idTurno"
+                  render={({ field }) => (
+                    <Field>
+                      <FieldLabel>Turno</FieldLabel>
+                      <FieldContent>
+                        <Select
+                          value={field.value ? String(field.value) : ""}
+                          onValueChange={(v) => field.onChange(Number(v))}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue>
+                              {turnos.find((t) => t.idTurno === field.value)?.nombre ?? "Selecciona"}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectGroup>
+                              {turnos.map((t) => (
+                                <SelectItem key={t.idTurno} value={String(t.idTurno)}>
+                                  {t.nombre}
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
+                        <FieldError errors={[form.formState.errors.idTurno]} />
+                      </FieldContent>
+                    </Field>
+                  )}
+                />
+              </div>
+            </FieldSet>
 
-          {esEdicion && (
-            <Controller
-              control={form.control}
-              name="accesoId"
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel>Estado</FieldLabel>
-                  <FieldContent>
-                    <CampoAcceso value={field.value} onChange={field.onChange} />
-                  </FieldContent>
-                </Field>
-              )}
-            />
-          )}
+            {idNivelSeleccionado !== 1 && (
+              <Field>
+                <FieldLabel>Secciones</FieldLabel>
+                <FieldContent>
+                  <Controller
+                    control={form.control}
+                    name="secciones"
+                    render={({ field }) => (
+                      <div className="flex flex-col gap-2">
+                        {field.value.map((seccion, index) => (
+                          <div key={index} className="flex gap-2">
+                            <Input
+                              className="flex-1"
+                              placeholder="A"
+                              value={seccion}
+                              onChange={(e) => {
+                                const next = [...field.value]
+                                next[index] = e.target.value
+                                field.onChange(next)
+                              }}
+                            />
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              disabled={field.value.length <= 1}
+                              onClick={() => field.onChange(field.value.filter((_, i) => i !== index))}
+                              aria-label={`Quitar sección ${index + 1}`}
+                            >
+                              <X data-icon="inline-start" />
+                            </Button>
+                          </div>
+                        ))}
+                        <Button type="button" variant="outline" size="sm" onClick={() => field.onChange([...field.value, ""])}>
+                          <Plus data-icon="inline-start" />
+                          Agregar sección
+                        </Button>
+                      </div>
+                    )}
+                  />
+                  <FieldError errors={[form.formState.errors.secciones]} />
+                </FieldContent>
+              </Field>
+            )}
+
+            {esEdicion && (
+              <Controller
+                control={form.control}
+                name="accesoId"
+                render={({ field }) => (
+                  <Field>
+                    <FieldLabel>Estado</FieldLabel>
+                    <FieldContent>
+                      <CampoAcceso value={field.value} onChange={field.onChange} />
+                    </FieldContent>
+                  </Field>
+                )}
+              />
+            )}
+          </FieldGroup>
 
           <DialogFooter>
-            <DialogTrigger render={<Button variant="outline" />}>
-              Cancelar
-            </DialogTrigger>
+            <DialogTrigger render={<Button variant="outline" />}>Cancelar</DialogTrigger>
             <Button type="submit" disabled={submitDisabled}>
-              {enviando && <Loader2 className="animate-spin" />}
+              {enviando && <Loader2 className="animate-spin" data-icon="inline-start" />}
               {esEdicion ? "Guardar cambios" : "Crear grado"}
             </Button>
           </DialogFooter>

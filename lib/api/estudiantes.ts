@@ -48,6 +48,28 @@ export interface AlumnoResponse {
   urlFoto: string | null
   accesoId: number | null
   apoderados: ApoderadoResponse[]
+  // Enriquecido por GET /alumnos (matrícula vigente) — Figma 4 cols
+  idNivel: number | null
+  nivel: string
+  idGrado: number | null
+  grado: string
+  idSeccion: number | null
+  seccion: string
+  idTurno: number | null
+  turno: string
+  idGradoSeccion: number | null
+  idAnio: number | null
+  anio: string
+}
+
+export interface AlumnosFiltros {
+  idNivel?: number | null
+  idGrado?: number | null
+  idSeccion?: number | null
+  idTurno?: number | null
+  idGradoSeccion?: number | null
+  idAnio?: number | null
+  search?: string | null
 }
 
 export interface AlumnoRequest {
@@ -64,10 +86,20 @@ export interface AlumnoRequest {
 // ── API ──────────────────────────────────────────────────────────────────
 
 export const alumnosApi = {
-  async listar(page = 0, size = 10): Promise<Paginated<AlumnoResponse>> {
-    return apiFetch<Paginated<AlumnoResponse>>(
-      `/alumnos?page=${page}&size=${size}`
-    )
+  async listar(page = 0, size = 10, filtros?: AlumnosFiltros): Promise<Paginated<AlumnoResponse>> {
+    const params = new URLSearchParams({
+      page: String(page),
+      size: String(size),
+      sort: "idAlumno,asc",
+    })
+    if (filtros?.idNivel) params.set("idNivel", String(filtros.idNivel))
+    if (filtros?.idGrado) params.set("idGrado", String(filtros.idGrado))
+    if (filtros?.idSeccion) params.set("idSeccion", String(filtros.idSeccion))
+    if (filtros?.idTurno) params.set("idTurno", String(filtros.idTurno))
+    if (filtros?.idGradoSeccion) params.set("idGradoSeccion", String(filtros.idGradoSeccion))
+    if (filtros?.idAnio) params.set("idAnio", String(filtros.idAnio))
+    // search es filtro client-side opcional; no se envía al back
+    return apiFetch<Paginated<AlumnoResponse>>(`/alumnos?${params.toString()}`)
   },
   async porId(id: number): Promise<AlumnoResponse> {
     return apiFetch<AlumnoResponse>(`/alumnos/${id}`)

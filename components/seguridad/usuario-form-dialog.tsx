@@ -17,7 +17,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Field, FieldContent, FieldError, FieldLabel } from "@/components/ui/field"
+import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 
 import {
@@ -27,11 +27,13 @@ import {
   useRoles,
   useSubirFotoUsuario,
 } from "@/hooks/use-seguridad"
+import { useConsultarDni } from "@/hooks/use-reniec"
 import type { UsuarioResponse, UsuarioRequest } from "@/lib/api/seguridad"
 import {
   usuarioSchema,
   type UsuarioValues,
 } from "@/lib/schemas/seguridad"
+import { BuscarDniButton } from "@/components/shared/buscar-dni-button"
 import { CampoAcceso } from "./shared"
 
 interface UsuarioFormDialogProps {
@@ -51,6 +53,7 @@ export default function UsuarioFormDialog({
   const eliminarFoto = useEliminarFotoUsuario()
 
   const { data: roles = [] } = useRoles()
+  const consultarDni = useConsultarDni()
 
   const esEdicion = !!usuario
   const [fotoNueva, setFotoNueva] = useState<File | null>(null)
@@ -115,9 +118,27 @@ export default function UsuarioFormDialog({
     }
   }
 
+  async function handleBuscarDni() {
+    const dni = form.getValues("documentoIdentidad")?.trim()
+    if (!dni || !/^\d{8}$/.test(dni)) {
+      toast.error("Ingresa un DNI de 8 dígitos")
+      return
+    }
+    try {
+      const r = await consultarDni.mutateAsync(dni)
+      form.setValue("nombre", r.nombres ?? "", { shouldValidate: true })
+      form.setValue("apellidoPat", r.apellidoPaterno ?? "", { shouldValidate: true })
+      form.setValue("apellidoMat", r.apellidoMaterno ?? "", { shouldValidate: true })
+      const origen = r.origen === "LOCAL" ? "Registro local" : "RENIEC"
+      toast.success(`Datos cargados (${origen})`)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo consultar el DNI")
+    }
+  }
+
   async function onSubmit(values: UsuarioValues) {
     if (!esEdicion && !values.contraseña) {
-      toast.error("La contraseña es obligatoria (mínimo 6 caracteres)")
+      toast.error("La contraseña es obligatoria (mín 8: mayúscula, número y símbolo)")
       return
     }
     const guardando = toast.loading(
@@ -164,243 +185,233 @@ export default function UsuarioFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>
-            {esEdicion ? "Editar usuario" : "Nuevo usuario"}
-          </DialogTitle>
+          <DialogTitle className="text-lg font-semibold tracking-tight">{esEdicion ? "Editar usuario" : "Nuevo usuario"}</DialogTitle>
         </DialogHeader>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" noValidate>
-          {/* Foto */}
-          <div className="flex items-center gap-4">
-            <Avatar className="h-16 w-16 rounded-full">
-              {preview ? (
-                <AvatarImage src={preview} alt="Foto del usuario" />
-              ) : (
-                <AvatarFallback className="rounded-full text-lg">
-                  {iniciales || "U"}
-                </AvatarFallback>
-              )}
-            </Avatar>
-            <div className="flex flex-wrap gap-2">
-              <input
-                ref={inputFotoRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleArchivo}
-              />
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => inputFotoRef.current?.click()}
-              >
-                <Camera />
-                {fotoNueva || preview ? "Cambiar foto" : "Subir foto"}
-              </Button>
-              {(fotoNueva || (esEdicion && usuario?.urlFoto)) && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleQuitarFoto}
-                  disabled={eliminarFoto.isPending}
-                >
-                  <Trash2 className="text-destructive" />
-                  Quitar
-                </Button>
-              )}
-            </div>
-            {esEdicion && usuario && !usuario.urlFoto && (
-              <span className="text-xs text-muted-foreground">
-                Sin foto
-              </span>
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <Controller
-              control={form.control}
-              name="nombre"
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel>Nombres</FieldLabel>
-                  <FieldContent>
-                    <Input placeholder="María" {...field} />
-                    <FieldError errors={[form.formState.errors.nombre]} />
-                  </FieldContent>
-                </Field>
-              )}
-            />
-            <Controller
-              control={form.control}
-              name="apellidoPat"
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel>Ap. paterno</FieldLabel>
-                  <FieldContent>
-                    <Input placeholder="López" {...field} />
-                    <FieldError errors={[form.formState.errors.apellidoPat]} />
-                  </FieldContent>
-                </Field>
-              )}
-            />
-            <Controller
-              control={form.control}
-              name="apellidoMat"
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel>Ap. materno</FieldLabel>
-                  <FieldContent>
-                    <Input placeholder="Ramírez" {...field} />
-                    <FieldError errors={[form.formState.errors.apellidoMat]} />
-                  </FieldContent>
-                </Field>
-              )}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <Controller
-              control={form.control}
-              name="documentoIdentidad"
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel>Documento de identidad</FieldLabel>
-                  <FieldContent>
-                    <Input placeholder="8 dígitos" maxLength={8} {...field} />
-                    <FieldError
-                      errors={[form.formState.errors.documentoIdentidad]}
-                    />
-                  </FieldContent>
-                </Field>
-              )}
-            />
-            <Controller
-              control={form.control}
-              name="gmail"
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel>Correo</FieldLabel>
-                  <FieldContent>
-                    <Input type="email" placeholder="usuario@correo.com" {...field} />
-                    <FieldError errors={[form.formState.errors.gmail]} />
-                  </FieldContent>
-                </Field>
-              )}
-            />
-            <Controller
-              control={form.control}
-              name="celular"
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel>Celular</FieldLabel>
-                  <FieldContent>
-                    <Input placeholder="9 dígitos" maxLength={9} {...field} />
-                    <FieldError errors={[form.formState.errors.celular]} />
-                  </FieldContent>
-                </Field>
-              )}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Controller
-              control={form.control}
-              name="fechaNaci"
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel>Fecha de nacimiento</FieldLabel>
-                  <FieldContent>
-                    <Input type="date" {...field} />
-                    <FieldError errors={[form.formState.errors.fechaNaci]} />
-                  </FieldContent>
-                </Field>
-              )}
-            />
-            <Controller
-              control={form.control}
-              name="contraseña"
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel>Contraseña</FieldLabel>
-                  <FieldContent>
-                    <Input
-                      type="password"
-                      placeholder={
-                        esEdicion
-                          ? "Dejar en blanco para no cambiar"
-                          : "Mínimo 6 caracteres"
-                      }
-                      {...field}
-                    />
-                    <FieldError errors={[form.formState.errors.contraseña]} />
-                  </FieldContent>
-                </Field>
-              )}
-            />
-          </div>
-
-          <Field>
-            <FieldLabel>Roles</FieldLabel>
-            <FieldContent>
-              <div className="grid gap-2 rounded-lg border p-3">
-                {!roles.length && (
-                  <p className="text-sm text-muted-foreground">
-                    Crea roles primero (pestaña Roles).
-                  </p>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5" noValidate>
+          <FieldGroup>
+            {/* Foto */}
+            <div className="flex items-center gap-4 rounded-lg border bg-muted/20 p-3">
+              <Avatar className="size-16 rounded-full">
+                {preview ? (
+                  <AvatarImage src={preview} alt="Foto del usuario" />
+                ) : (
+                  <AvatarFallback className="rounded-full text-lg">{iniciales || "U"}</AvatarFallback>
                 )}
-                {roles.map((rol) => (
-                  <label
-                    key={rol.idRol}
-                    className="flex items-center gap-2 text-sm"
-                  >
-                    <Controller
-                      control={form.control}
-                      name="rolIds"
-                      render={({ field }) => (
-                        <Checkbox
-                          checked={field.value.includes(rol.idRol)}
-                          onCheckedChange={(checked) => {
-                            field.onChange(
-                              checked
-                                ? [...field.value, rol.idRol]
-                                : field.value.filter((id) => id !== rol.idRol)
-                            )
-                          }}
-                        />
-                      )}
-                    />
-                    {rol.nombre}
-                  </label>
-                ))}
+              </Avatar>
+              <div className="flex flex-wrap gap-2">
+                <input ref={inputFotoRef} type="file" accept="image/*" className="hidden" onChange={handleArchivo} />
+                <Button type="button" variant="outline" size="sm" onClick={() => inputFotoRef.current?.click()}>
+                  <Camera data-icon="inline-start" />
+                  {fotoNueva || preview ? "Cambiar foto" : "Subir foto"}
+                </Button>
+                {(fotoNueva || (esEdicion && usuario?.urlFoto)) && (
+                  <Button type="button" variant="ghost" size="sm" onClick={handleQuitarFoto} disabled={eliminarFoto.isPending}>
+                    <Trash2 className="text-destructive" data-icon="inline-start" />
+                    Quitar
+                  </Button>
+                )}
               </div>
-              <FieldError errors={[form.formState.errors.rolIds]} />
-            </FieldContent>
-          </Field>
+              {esEdicion && usuario && !usuario.urlFoto && <span className="text-xs text-muted-foreground">Sin foto</span>}
+            </div>
 
-          {esEdicion && (
-            <Controller
-              control={form.control}
-              name="accesoId"
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel>Estado</FieldLabel>
-                  <FieldContent>
-                    <CampoAcceso value={field.value} onChange={field.onChange} />
-                  </FieldContent>
-                </Field>
-              )}
-            />
-          )}
+            {/* Identidad — DNI primero para flujo RENIEC */}
+            <FieldSet>
+              <FieldLegend className="text-sm font-semibold">Identidad</FieldLegend>
+              <FieldDescription className="text-xs">Ingresa el DNI primero y usa Buscar para autocompletar desde RENIEC/BD.</FieldDescription>
+              <div className="flex flex-col gap-4">
+                <Controller
+                  control={form.control}
+                  name="documentoIdentidad"
+                  render={({ field }) => (
+                    <Field>
+                      <FieldLabel>DNI — Documento de identidad *</FieldLabel>
+                      <FieldContent>
+                        <div className="flex gap-2">
+                          <Input placeholder="8 dígitos" maxLength={8} autoFocus {...field} className="flex-1" />
+                          <BuscarDniButton dni={field.value} cargando={consultarDni.isPending} onBuscar={handleBuscarDni} />
+                        </div>
+                        <FieldDescription className="text-xs">8 dígitos exactos. Busca en BD local o RENIEC.</FieldDescription>
+                        <FieldError errors={[form.formState.errors.documentoIdentidad]} />
+                      </FieldContent>
+                    </Field>
+                  )}
+                />
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                  <Controller
+                    control={form.control}
+                    name="nombre"
+                    render={({ field }) => (
+                      <Field>
+                        <FieldLabel>Nombres *</FieldLabel>
+                        <FieldContent>
+                          <Input placeholder="María" {...field} />
+                          <FieldError errors={[form.formState.errors.nombre]} />
+                        </FieldContent>
+                      </Field>
+                    )}
+                  />
+                  <Controller
+                    control={form.control}
+                    name="apellidoPat"
+                    render={({ field }) => (
+                      <Field>
+                        <FieldLabel>Ap. paterno *</FieldLabel>
+                        <FieldContent>
+                          <Input placeholder="López" {...field} />
+                          <FieldError errors={[form.formState.errors.apellidoPat]} />
+                        </FieldContent>
+                      </Field>
+                    )}
+                  />
+                  <Controller
+                    control={form.control}
+                    name="apellidoMat"
+                    render={({ field }) => (
+                      <Field>
+                        <FieldLabel>Ap. materno *</FieldLabel>
+                        <FieldContent>
+                          <Input placeholder="Ramírez" {...field} />
+                          <FieldError errors={[form.formState.errors.apellidoMat]} />
+                        </FieldContent>
+                      </Field>
+                    )}
+                  />
+                </div>
+                <Controller
+                  control={form.control}
+                  name="fechaNaci"
+                  render={({ field }) => (
+                    <Field className="sm:max-w-[240px]">
+                      <FieldLabel>Fecha de nacimiento *</FieldLabel>
+                      <FieldContent>
+                        <Input type="date" {...field} />
+                        <FieldError errors={[form.formState.errors.fechaNaci]} />
+                      </FieldContent>
+                    </Field>
+                  )}
+                />
+              </div>
+            </FieldSet>
+
+            {/* Contacto */}
+            <FieldSet>
+              <FieldLegend className="text-sm font-semibold">Contacto</FieldLegend>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Controller
+                  control={form.control}
+                  name="gmail"
+                  render={({ field }) => (
+                    <Field>
+                      <FieldLabel>Correo electrónico *</FieldLabel>
+                      <FieldContent>
+                        <Input type="email" placeholder="usuario@correo.com" {...field} />
+                        <FieldDescription className="text-xs">Obligatorio para notificaciones.</FieldDescription>
+                        <FieldError errors={[form.formState.errors.gmail]} />
+                      </FieldContent>
+                    </Field>
+                  )}
+                />
+                <Controller
+                  control={form.control}
+                  name="celular"
+                  render={({ field }) => (
+                    <Field>
+                      <FieldLabel>Celular</FieldLabel>
+                      <FieldContent>
+                        <Input placeholder="9 dígitos" maxLength={9} {...field} />
+                        <FieldDescription className="text-xs">Opcional. 9 dígitos si lo ingresas.</FieldDescription>
+                        <FieldError errors={[form.formState.errors.celular]} />
+                      </FieldContent>
+                    </Field>
+                  )}
+                />
+              </div>
+            </FieldSet>
+
+            {/* Acceso */}
+            <FieldSet>
+              <FieldLegend className="text-sm font-semibold">Acceso</FieldLegend>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Controller
+                  control={form.control}
+                  name="contraseña"
+                  render={({ field }) => (
+                    <Field>
+                      <FieldLabel>Contraseña {esEdicion ? "(opcional)" : "*"}</FieldLabel>
+                      <FieldContent>
+                        <Input
+                          type="password"
+                          placeholder={esEdicion ? "Dejar en blanco para no cambiar" : "Mín 8: mayúscula, número y símbolo"}
+                          {...field}
+                        />
+                        <FieldDescription className="text-xs">{esEdicion ? "Solo si deseas cambiarla." : "Mín 8 caracteres, 1 mayúscula, 1 número y 1 símbolo."}</FieldDescription>
+                        <FieldError errors={[form.formState.errors.contraseña]} />
+                      </FieldContent>
+                    </Field>
+                  )}
+                />
+                {esEdicion && (
+                  <Controller
+                    control={form.control}
+                    name="accesoId"
+                    render={({ field }) => (
+                      <Field>
+                        <FieldLabel>Estado</FieldLabel>
+                        <FieldContent>
+                          <CampoAcceso value={field.value} onChange={field.onChange} />
+                        </FieldContent>
+                      </Field>
+                    )}
+                  />
+                )}
+              </div>
+            </FieldSet>
+
+            {/* Roles — mejor diseño conservando estructura */}
+            <FieldSet>
+              <FieldLegend className="text-sm font-semibold">Roles *</FieldLegend>
+              <FieldDescription className="text-xs">El código de acceso se genera según el primer rol. Mínimo 1.</FieldDescription>
+              <FieldContent>
+                <Controller
+                  control={form.control}
+                  name="rolIds"
+                  render={({ field }) => (
+                    <div className="rounded-lg border bg-muted/10 p-3">
+                      {!roles.length ? (
+                        <p className="py-2 text-center text-sm text-muted-foreground">Crea roles primero (pestaña Roles).</p>
+                      ) : (
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          {roles.map((rol) => {
+                            const checked = field.value.includes(rol.idRol)
+                            return (
+                              <label
+                                key={rol.idRol}
+                                className={`flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2.5 text-sm transition-colors ${checked ? "border-[#274CB4]/30 bg-[#E1E7F9] dark:bg-[#1a2744]" : "border-transparent bg-background hover:bg-muted/60"}`}
+                              >
+                                <Checkbox
+                                  checked={checked}
+                                  onCheckedChange={(v) => field.onChange(v ? [...field.value, rol.idRol] : field.value.filter((id: number) => id !== rol.idRol))}
+                                />
+                                <span className={`font-medium ${checked ? "text-[#274CB4] dark:text-white" : "text-foreground"}`}>{rol.nombre}</span>
+                              </label>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                />
+                <FieldError errors={[form.formState.errors.rolIds]} />
+              </FieldContent>
+            </FieldSet>
+          </FieldGroup>
 
           <DialogFooter>
-            <DialogTrigger render={<Button variant="outline" />}>
-              Cancelar
-            </DialogTrigger>
+            <DialogTrigger render={<Button variant="outline" />}>Cancelar</DialogTrigger>
             <Button type="submit" disabled={enviando}>
-              {enviando && <Loader2 className="animate-spin" />}
+              {enviando && <Loader2 className="animate-spin" data-icon="inline-start" />}
               {esEdicion ? "Guardar cambios" : "Crear usuario"}
             </Button>
           </DialogFooter>

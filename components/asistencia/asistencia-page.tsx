@@ -11,16 +11,14 @@ export default function AsistenciaPage() {
   const puedeActualizar = usePuede("ASISTENCIAS", "ACTUALIZAR")
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Asistencia</h1>
-        <p className="text-sm text-muted-foreground">
-          Registro por QR o código manual, justificaciones y días feriados.
-        </p>
+    <div className="flex flex-col gap-4">
+      <div className="space-y-1">
+        <h1 className="text-[20px] font-bold tracking-tight text-foreground">Asistencia</h1>
+        <p className="text-[12px] font-medium leading-5 text-muted-foreground">Registro por QR o código manual, justificaciones y días feriados.</p>
       </div>
 
       <Tabs defaultValue="registro">
-        <TabsList className="w-full justify-start overflow-x-auto">
+        <TabsList variant="segmented" className="w-full justify-start overflow-x-auto">
           <TabsTrigger value="registro">Registro</TabsTrigger>
           {puedeActualizar && (
             <>

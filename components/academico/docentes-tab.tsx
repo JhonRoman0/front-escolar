@@ -18,7 +18,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Field, FieldContent, FieldError, FieldLabel } from "@/components/ui/field"
+import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import {
   Table,
@@ -42,11 +42,13 @@ import {
   useEliminarFotoDocente,
   useSubirFotoDocente,
 } from "@/hooks/use-academico"
+import { useConsultarDni } from "@/hooks/use-reniec"
 import type {
   DocenteRequest,
   DocenteResponse,
 } from "@/lib/api/academico"
 import { docenteSchema, type DocenteValues } from "@/lib/schemas/academico"
+import { BuscarDniButton } from "@/components/shared/buscar-dni-button"
 import { usePuede } from "@/hooks/use-permisos"
 import { reportesApi } from "@/lib/api/reportes"
 import { generarPdfDocentes } from "@/lib/reportes/generar-pdf"
@@ -119,40 +121,38 @@ export default function DocentesTab() {
 
   return (
     <Card>
-      <CardContent className="space-y-4 p-4">
+      <CardContent className="flex flex-col gap-4 p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-semibold">Docentes</h2>
-            <p className="text-sm text-muted-foreground">
+          <div className="space-y-0.5">
+            <h2 className="text-[20px] font-semibold tracking-tight">Docentes</h2>
+            <p className="text-[14px] leading-5 text-muted-foreground">
               Cada docente crea su usuario de acceso (código D2026####).
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {puedeExportar && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setReporteOpen(true)}
-              >
-                <FileDown />
+              <Button variant="outline" size="sm" onClick={() => setReporteOpen(true)}>
+                <FileDown data-icon="inline-start" />
                 Generar reporte
               </Button>
             )}
             {puedeCrear && (
               <Button
+                className="bg-[#274CB4] text-white hover:bg-[#274CB4]/85"
                 onClick={() => {
                   setEditando(null)
                   setDialogOpen(true)
                 }}
               >
-                <Plus />
+                <Plus data-icon="inline-start" />
                 Nuevo docente
               </Button>
             )}
           </div>
         </div>
 
-        <Table>
+        <div className="overflow-x-auto rounded-lg border">
+          <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Docente</TableHead>
@@ -246,7 +246,8 @@ export default function DocentesTab() {
               })
             )}
           </TableBody>
-        </Table>
+          </Table>
+        </div>
 
         {isError && (
           <Button variant="outline" size="sm" onClick={() => refetch()}>
@@ -302,6 +303,7 @@ function DocenteFormDialog({
   const crud = useCrudDocentes()
   const subirFoto = useSubirFotoDocente()
   const eliminarFoto = useEliminarFotoDocente()
+  const consultarDni = useConsultarDni()
   const esEdicion = !!docente
 
   const [fotoNueva, setFotoNueva] = useState<File | null>(null)
@@ -370,9 +372,27 @@ function DocenteFormDialog({
     }
   }
 
+  async function handleBuscarDni() {
+    const dni = form.getValues("documentoIdentidad")?.trim()
+    if (!dni || !/^\d{8}$/.test(dni)) {
+      toast.error("Ingresa un DNI de 8 dígitos")
+      return
+    }
+    try {
+      const r = await consultarDni.mutateAsync(dni)
+      form.setValue("nombre", r.nombres ?? "", { shouldValidate: true })
+      form.setValue("apellidoPat", r.apellidoPaterno ?? "", { shouldValidate: true })
+      form.setValue("apellidoMat", r.apellidoMaterno ?? "", { shouldValidate: true })
+      const origen = r.origen === "LOCAL" ? "Registro local" : "RENIEC"
+      toast.success(`Datos cargados (${origen})`)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo consultar el DNI")
+    }
+  }
+
   async function onSubmit(values: DocenteValues) {
     if (!esEdicion && !values.contraseña) {
-      toast.error("La contraseña es obligatoria (mínimo 6 caracteres)")
+      toast.error("La contraseña es obligatoria (mín 8: mayúscula, número y símbolo)")
       return
     }
     const guardando = toast.loading(
@@ -426,260 +446,239 @@ function DocenteFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle className="text-lg font-semibold tracking-tight">
             {esEdicion ? "Editar docente" : "Nuevo docente"}
           </DialogTitle>
         </DialogHeader>
-        <form
-          onSubmit={form.handleSubmit(onSubmit)}
-          className="space-y-4"
-          noValidate
-        >
-          <div className="flex items-center gap-4">
-            <Avatar className="h-16 w-16 rounded-full">
-              {preview ? (
-                <AvatarImage src={preview} alt="Foto del docente" />
-              ) : (
-                <AvatarFallback className="rounded-full text-lg">
-                  {iniciales || "D"}
-                </AvatarFallback>
-              )}
-            </Avatar>
-            <div className="flex flex-wrap gap-2">
-              <input
-                ref={inputFotoRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleArchivo}
-              />
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => inputFotoRef.current?.click()}
-              >
-                <Camera />
-                {fotoNueva || preview ? "Cambiar foto" : "Subir foto"}
-              </Button>
-              {(fotoNueva || (esEdicion && docente?.urlFoto)) && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleQuitarFoto}
-                  disabled={eliminarFoto.isPending}
-                >
-                  <Trash2 className="text-destructive" />
-                  Quitar
-                </Button>
-              )}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <Controller
-              control={form.control}
-              name="nombre"
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel>Nombres</FieldLabel>
-                  <FieldContent>
-                    <Input placeholder="María" {...field} />
-                    <FieldError errors={[form.formState.errors.nombre]} />
-                  </FieldContent>
-                </Field>
-              )}
-            />
-            <Controller
-              control={form.control}
-              name="apellidoPat"
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel>Ap. paterno</FieldLabel>
-                  <FieldContent>
-                    <Input placeholder="López" {...field} />
-                    <FieldError errors={[form.formState.errors.apellidoPat]} />
-                  </FieldContent>
-                </Field>
-              )}
-            />
-            <Controller
-              control={form.control}
-              name="apellidoMat"
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel>Ap. materno</FieldLabel>
-                  <FieldContent>
-                    <Input placeholder="Ramírez" {...field} />
-                    <FieldError errors={[form.formState.errors.apellidoMat]} />
-                  </FieldContent>
-                </Field>
-              )}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Controller
-              control={form.control}
-              name="documentoIdentidad"
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel>Documento de identidad</FieldLabel>
-                  <FieldContent>
-                    <Input placeholder="Opcional" {...field} />
-                    <FieldError
-                      errors={[form.formState.errors.documentoIdentidad]}
-                    />
-                  </FieldContent>
-                </Field>
-              )}
-            />
-            <Controller
-              control={form.control}
-              name="gmail"
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel>Correo</FieldLabel>
-                  <FieldContent>
-                    <Input type="email" placeholder="docente@correo.com" {...field} />
-                    <FieldError errors={[form.formState.errors.gmail]} />
-                  </FieldContent>
-                </Field>
-              )}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Controller
-              control={form.control}
-              name="fechaNaci"
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel>Fecha de nacimiento</FieldLabel>
-                  <FieldContent>
-                    <Input type="date" {...field} />
-                    <FieldError errors={[form.formState.errors.fechaNaci]} />
-                  </FieldContent>
-                </Field>
-              )}
-            />
-            <Controller
-              control={form.control}
-              name="fechaContratacion"
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel>Fecha de contratación</FieldLabel>
-                  <FieldContent>
-                    <Input type="date" {...field} />
-                    <FieldError
-                      errors={[form.formState.errors.fechaContratacion]}
-                    />
-                  </FieldContent>
-                </Field>
-              )}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <Controller
-              control={form.control}
-              name="tipoContrato"
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel>Tipo de contrato</FieldLabel>
-                  <FieldContent>
-                    <Input
-                      placeholder="Nombrado"
-                      list="tipos-contrato"
-                      {...field}
-                    />
-                    <datalist id="tipos-contrato">
-                      {TIPOS_CONTRATO.map((t) => (
-                        <option key={t} value={t} />
-                      ))}
-                    </datalist>
-                    <FieldError errors={[form.formState.errors.tipoContrato]} />
-                  </FieldContent>
-                </Field>
-              )}
-            />
-            <Controller
-              control={form.control}
-              name="especialidad"
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel>Especialidad</FieldLabel>
-                  <FieldContent>
-                    <Input placeholder="Matemática" {...field} />
-                    <FieldError errors={[form.formState.errors.especialidad]} />
-                  </FieldContent>
-                </Field>
-              )}
-            />
-            <Controller
-              control={form.control}
-              name="gradoAcademico"
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel>Grado académico</FieldLabel>
-                  <FieldContent>
-                    <Input placeholder="Licenciatura" {...field} />
-                    <FieldError
-                      errors={[form.formState.errors.gradoAcademico]}
-                    />
-                  </FieldContent>
-                </Field>
-              )}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Controller
-              control={form.control}
-              name="contraseña"
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel>Contraseña</FieldLabel>
-                  <FieldContent>
-                    <Input
-                      type="password"
-                      placeholder={
-                        esEdicion
-                          ? "Dejar en blanco para no cambiar"
-                          : "Mínimo 6 caracteres"
-                      }
-                      {...field}
-                    />
-                    <FieldError errors={[form.formState.errors.contraseña]} />
-                  </FieldContent>
-                </Field>
-              )}
-            />
-            {esEdicion && (
-              <Controller
-                control={form.control}
-                name="accesoId"
-                render={({ field }) => (
-                  <Field>
-                    <FieldLabel>Estado</FieldLabel>
-                    <FieldContent>
-                      <CampoAcceso value={field.value} onChange={field.onChange} />
-                    </FieldContent>
-                  </Field>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5" noValidate>
+          <FieldGroup>
+            <div className="flex items-center gap-4 rounded-lg border bg-muted/20 p-3">
+              <Avatar className="size-16 rounded-full">
+                {preview ? (
+                  <AvatarImage src={preview} alt="Foto del docente" />
+                ) : (
+                  <AvatarFallback className="rounded-full text-lg">{iniciales || "D"}</AvatarFallback>
                 )}
-              />
-            )}
-          </div>
+              </Avatar>
+              <div className="flex flex-wrap gap-2">
+                <input ref={inputFotoRef} type="file" accept="image/*" className="hidden" onChange={handleArchivo} />
+                <Button type="button" variant="outline" size="sm" onClick={() => inputFotoRef.current?.click()}>
+                  <Camera data-icon="inline-start" />
+                  {fotoNueva || preview ? "Cambiar foto" : "Subir foto"}
+                </Button>
+                {(fotoNueva || (esEdicion && docente?.urlFoto)) && (
+                  <Button type="button" variant="ghost" size="sm" onClick={handleQuitarFoto} disabled={eliminarFoto.isPending}>
+                    <Trash2 className="text-destructive" data-icon="inline-start" />
+                    Quitar
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            <FieldSet>
+              <FieldLegend className="text-sm font-semibold">Identidad</FieldLegend>
+              <FieldDescription className="text-xs">Ingresa el DNI primero y usa Buscar para autocompletar desde RENIEC/BD.</FieldDescription>
+              <div className="flex flex-col gap-4">
+                <Controller
+                  control={form.control}
+                  name="documentoIdentidad"
+                  render={({ field }) => (
+                    <Field>
+                      <FieldLabel>DNI — Documento de identidad</FieldLabel>
+                      <FieldContent>
+                        <div className="flex gap-2">
+                          <Input placeholder="8 dígitos" maxLength={8} autoFocus {...field} className="flex-1" />
+                          <BuscarDniButton dni={field.value} cargando={consultarDni.isPending} onBuscar={handleBuscarDni} />
+                        </div>
+                        <FieldDescription className="text-xs">8 dígitos exactos. Busca en BD local o RENIEC.</FieldDescription>
+                        <FieldError errors={[form.formState.errors.documentoIdentidad]} />
+                      </FieldContent>
+                    </Field>
+                  )}
+                />
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                  <Controller
+                    control={form.control}
+                    name="nombre"
+                    render={({ field }) => (
+                      <Field>
+                        <FieldLabel>Nombres *</FieldLabel>
+                        <FieldContent>
+                          <Input placeholder="María" {...field} />
+                          <FieldError errors={[form.formState.errors.nombre]} />
+                        </FieldContent>
+                      </Field>
+                    )}
+                  />
+                  <Controller
+                    control={form.control}
+                    name="apellidoPat"
+                    render={({ field }) => (
+                      <Field>
+                        <FieldLabel>Ap. paterno *</FieldLabel>
+                        <FieldContent>
+                          <Input placeholder="López" {...field} />
+                          <FieldError errors={[form.formState.errors.apellidoPat]} />
+                        </FieldContent>
+                      </Field>
+                    )}
+                  />
+                  <Controller
+                    control={form.control}
+                    name="apellidoMat"
+                    render={({ field }) => (
+                      <Field>
+                        <FieldLabel>Ap. materno *</FieldLabel>
+                        <FieldContent>
+                          <Input placeholder="Ramírez" {...field} />
+                          <FieldError errors={[form.formState.errors.apellidoMat]} />
+                        </FieldContent>
+                      </Field>
+                    )}
+                  />
+                </div>
+                <Controller
+                  control={form.control}
+                  name="fechaNaci"
+                  render={({ field }) => (
+                    <Field className="sm:max-w-[240px]">
+                      <FieldLabel>Fecha de nacimiento *</FieldLabel>
+                      <FieldContent>
+                        <Input type="date" {...field} />
+                        <FieldError errors={[form.formState.errors.fechaNaci]} />
+                      </FieldContent>
+                    </Field>
+                  )}
+                />
+              </div>
+            </FieldSet>
+
+            <FieldSet>
+              <FieldLegend className="text-sm font-semibold">Contacto</FieldLegend>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-1">
+                <Controller
+                  control={form.control}
+                  name="gmail"
+                  render={({ field }) => (
+                    <Field>
+                      <FieldLabel>Correo electrónico *</FieldLabel>
+                      <FieldContent>
+                        <Input type="email" placeholder="docente@correo.com" {...field} />
+                        <FieldDescription className="text-xs">Obligatorio para notificaciones.</FieldDescription>
+                        <FieldError errors={[form.formState.errors.gmail]} />
+                      </FieldContent>
+                    </Field>
+                  )}
+                />
+              </div>
+            </FieldSet>
+
+            <FieldSet>
+              <FieldLegend className="text-sm font-semibold">Datos laborales</FieldLegend>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <Controller
+                  control={form.control}
+                  name="fechaContratacion"
+                  render={({ field }) => (
+                    <Field>
+                      <FieldLabel>Fecha de contratación</FieldLabel>
+                      <FieldContent>
+                        <Input type="date" {...field} />
+                        <FieldError errors={[form.formState.errors.fechaContratacion]} />
+                      </FieldContent>
+                    </Field>
+                  )}
+                />
+                <Controller
+                  control={form.control}
+                  name="tipoContrato"
+                  render={({ field }) => (
+                    <Field>
+                      <FieldLabel>Tipo de contrato</FieldLabel>
+                      <FieldContent>
+                        <Input placeholder="Nombrado" list="tipos-contrato" {...field} />
+                        <datalist id="tipos-contrato">
+                          {TIPOS_CONTRATO.map((t) => (
+                            <option key={t} value={t} />
+                          ))}
+                        </datalist>
+                        <FieldError errors={[form.formState.errors.tipoContrato]} />
+                      </FieldContent>
+                    </Field>
+                  )}
+                />
+                <Controller
+                  control={form.control}
+                  name="especialidad"
+                  render={({ field }) => (
+                    <Field>
+                      <FieldLabel>Especialidad</FieldLabel>
+                      <FieldContent>
+                        <Input placeholder="Matemática" {...field} />
+                        <FieldError errors={[form.formState.errors.especialidad]} />
+                      </FieldContent>
+                    </Field>
+                  )}
+                />
+                <Controller
+                  control={form.control}
+                  name="gradoAcademico"
+                  render={({ field }) => (
+                    <Field>
+                      <FieldLabel>Grado académico</FieldLabel>
+                      <FieldContent>
+                        <Input placeholder="Licenciatura" {...field} />
+                        <FieldError errors={[form.formState.errors.gradoAcademico]} />
+                      </FieldContent>
+                    </Field>
+                  )}
+                />
+              </div>
+            </FieldSet>
+
+            <FieldSet>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Controller
+                  control={form.control}
+                  name="contraseña"
+                  render={({ field }) => (
+                    <Field>
+                      <FieldLabel>Contraseña</FieldLabel>
+                      <FieldContent>
+                        <Input
+                          type="password"
+                          placeholder={esEdicion ? "Dejar en blanco para no cambiar" : "Mín 8: mayúscula, número y símbolo"}
+                          {...field}
+                        />
+                        <FieldError errors={[form.formState.errors.contraseña]} />
+                      </FieldContent>
+                    </Field>
+                  )}
+                />
+                {esEdicion && (
+                  <Controller
+                    control={form.control}
+                    name="accesoId"
+                    render={({ field }) => (
+                      <Field>
+                        <FieldLabel>Estado</FieldLabel>
+                        <FieldContent>
+                          <CampoAcceso value={field.value} onChange={field.onChange} />
+                        </FieldContent>
+                      </Field>
+                    )}
+                  />
+                )}
+              </div>
+            </FieldSet>
+          </FieldGroup>
 
           <DialogFooter>
-            <DialogTrigger render={<Button variant="outline" />}>
-              Cancelar
-            </DialogTrigger>
+            <DialogTrigger render={<Button variant="outline" />}>Cancelar</DialogTrigger>
             <Button type="submit" disabled={enviando}>
-              {enviando && <Loader2 className="animate-spin" />}
+              {enviando && <Loader2 className="animate-spin" data-icon="inline-start" />}
               {esEdicion ? "Guardar cambios" : "Crear docente"}
             </Button>
           </DialogFooter>

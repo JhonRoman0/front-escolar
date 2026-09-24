@@ -56,7 +56,7 @@ const DIAS_SEMANA = [
 const recreoSchema = z
   .object({
     idNivel: z.number().int().min(1, "Selecciona un nivel"),
-    idGradoSeccion: z.number().int().optional(),
+    idGradoSeccion: z.number().int().min(1, "ID de grado-sección inválido").optional(),
     diaSemana: z.number().int().min(1).max(7, "Selecciona un día"),
     horaInicio: z
       .string()

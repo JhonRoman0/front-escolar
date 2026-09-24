@@ -142,12 +142,11 @@ export default function AccesosTab() {
 
   return (
     <Card>
-      <CardContent className="space-y-4 p-4">
-        <div>
-          <h2 className="text-[20px] font-semibold">Accesos por rol</h2>
-          <p className="text-[16px] text-[#7D7D7F]">
-            Elige un rol y marca qué puede ver y hacer. Cada área del sistema
-            tiene sus opciones (por ejemplo: ver, crear, editar o eliminar).
+      <CardContent className="flex flex-col gap-4 p-4">
+        <div className="space-y-0.5">
+          <h2 className="text-[20px] font-semibold tracking-tight">Accesos por rol</h2>
+          <p className="text-[14px] leading-5 text-muted-foreground">
+            Elige un rol y marca qué puede ver y hacer. Cada área del sistema tiene sus opciones (ver, crear, editar, eliminar).
           </p>
         </div>
 

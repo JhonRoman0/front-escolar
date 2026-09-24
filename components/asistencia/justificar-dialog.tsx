@@ -22,6 +22,7 @@ import {
 
 import { useJustificaciones } from "@/hooks/use-asistencia"
 import type { AsistenciaDiaResponse } from "@/lib/api/asistencia"
+import { justificarRequestSchema } from "@/lib/schemas/asistencia"
 
 import { AsistenciaEstadoBadge } from "./asistencia-estado-badge"
 
@@ -45,8 +46,9 @@ export function JustificarAsistenciaDialog({
   const { data: justificaciones } = useJustificaciones()
 
   async function handleConfirm() {
-    if (!idJustificacion) return
-    await onConfirm(idJustificacion)
+    const parsed = justificarRequestSchema.safeParse({ idJustificacion: idJustificacion ?? 0 })
+    if (!parsed.success) return
+    await onConfirm(parsed.data.idJustificacion)
   }
 
   return (

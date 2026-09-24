@@ -76,23 +76,15 @@ export default function RolesTab() {
 
   return (
     <Card>
-      <CardContent className="space-y-4 p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-[20px] font-semibold">Roles</h2>
-            <p className="text-[16px] text-[#7D7D7F]">
-              Roles que se va a asignar a cada usuario
-            </p>
+      <CardContent className="flex flex-col gap-4 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="space-y-0.5">
+            <h2 className="text-[20px] font-semibold tracking-tight">Roles</h2>
+            <p className="text-[14px] leading-5 text-muted-foreground">Roles que se asignan a cada usuario para definir sus accesos.</p>
           </div>
           {puedeCrear && (
-            <Button
-              className="bg-[#274CB4] text-white hover:bg-[#274CB4]/80"
-              onClick={() => {
-                setEditando(null)
-                setDialogOpen(true)
-              }}
-            >
-              <Plus />
+            <Button className="bg-[#274CB4] text-white hover:bg-[#274CB4]/85" onClick={() => { setEditando(null); setDialogOpen(true) }}>
+              <Plus data-icon="inline-start" />
               Nuevo rol
             </Button>
           )}

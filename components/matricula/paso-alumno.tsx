@@ -13,6 +13,8 @@ import { Field, FieldContent, FieldError, FieldLabel } from "@/components/ui/fie
 import { Input } from "@/components/ui/input"
 
 import { useAlumnoPorDocumento } from "@/hooks/use-estudiantes"
+import { useConsultarDni } from "@/hooks/use-reniec"
+import { ApiError } from "@/lib/api"
 import type { AlumnoResponse } from "@/lib/api/estudiantes"
 
 export interface PasoAlumnoData {
@@ -57,6 +59,7 @@ interface PasoAlumnoProps {
 
 export function PasoAlumno({ value, onChange, onNext }: PasoAlumnoProps) {
   const buscarAlumno = useAlumnoPorDocumento()
+  const reniec = useConsultarDni()
   const [busqueda, setBusqueda] = useState(value?.documentoIdentidad ?? "")
   const [alumnoSel, setAlumnoSel] = useState<AlumnoResponse | null>(
     value?.existe ? (value.alumno ?? null) : null
@@ -87,12 +90,37 @@ export function PasoAlumno({ value, onChange, onNext }: PasoAlumnoProps) {
         `Alumno encontrado: ${alumno.nombre} ${alumno.apellidoPat} ${alumno.apellidoMat}`
       )
     } catch (error) {
-      const msg = error instanceof Error ? error.message : ""
-      if (msg.includes("no encontrado")) {
+      const isNotFound =
+        (error instanceof ApiError && error.status === 404) ||
+        (error instanceof Error && error.message.toLowerCase().includes("no encontrado"))
+      if (isNotFound) {
+        if (/^\d{8}$/.test(dni)) {
+          try {
+            const r = await reniec.mutateAsync(dni)
+            setAlumnoSel(null)
+            form.setValue("documentoIdentidad", r.dni ?? dni)
+            form.setValue("nombre", r.nombres ?? "", { shouldValidate: true })
+            form.setValue("apellidoPat", r.apellidoPaterno ?? "", { shouldValidate: true })
+            form.setValue("apellidoMat", r.apellidoMaterno ?? "", { shouldValidate: true })
+            const origen = r.origen === "CACHE" || r.origen === "RENIEC" ? "RENIEC" : r.origen
+            toast.success(`Datos cargados desde ${origen}`)
+            return
+          } catch (reniecError) {
+            if (reniecError instanceof ApiError && reniecError.status === 404) {
+              setAlumnoSel(null)
+              form.setValue("documentoIdentidad", dni)
+              toast.info("DNI no encontrado en RENIEC: completa los datos manualmente")
+              return
+            }
+            toast.error(reniecError instanceof Error ? reniecError.message : "No se pudo consultar RENIEC")
+            return
+          }
+        }
         setAlumnoSel(null)
         form.setValue("documentoIdentidad", dni)
         toast.info("No existe un alumno con ese DNI. Completa los datos.")
       } else {
+        const msg = error instanceof Error ? error.message : ""
         toast.error(msg || "No se pudo buscar el alumno")
       }
     }

@@ -17,16 +17,14 @@ export default function PortalAdminPage() {
   const puedeAjustes = usePuedeLeer("AJUSTES")
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Portal</h1>
-        <p className="text-sm text-muted-foreground">
-          Gestión del portal público del colegio.
-        </p>
+    <div className="flex flex-col gap-4">
+      <div className="space-y-1">
+        <h1 className="text-[20px] font-bold tracking-tight text-foreground">Portal</h1>
+        <p className="text-[12px] font-medium leading-5 text-muted-foreground">Gestión del portal público del colegio.</p>
       </div>
 
       <Tabs defaultValue="publicaciones">
-        <TabsList className="w-full justify-start overflow-x-auto">
+        <TabsList variant="segmented" className="w-full justify-start overflow-x-auto">
           {puedePublicaciones && <TabsTrigger value="publicaciones">Publicaciones</TabsTrigger>}
           {puedeEventos && <TabsTrigger value="eventos">Eventos</TabsTrigger>}
           {puedeGalerias && <TabsTrigger value="galerias">Galerías</TabsTrigger>}

@@ -1,5 +1,7 @@
 import * as z from "zod"
 
+import { contrasenaSeguraOpcional } from "@/lib/schemas/comun"
+
 const accesoId = z.number().int().min(1, "Selecciona un estado").max(3)
 const fecha = z
   .string()
@@ -19,11 +21,7 @@ export const docenteSchema = z.object({
     .regex(/^\d{8}$/, "El DNI debe contener exactamente 8 dígitos")
     .optional()
     .or(z.literal("")),
-  contraseña: z
-    .string()
-    .min(6, "La contraseña debe tener al menos 6 caracteres")
-    .optional()
-    .or(z.literal("")),
+  contraseña: contrasenaSeguraOpcional,
   gmail: z
     .string()
     .min(1, "El email es obligatorio")
