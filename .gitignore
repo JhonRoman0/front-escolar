@@ -30,18 +30,8 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# package manager
-package-lock.json
-
-# backups
-*.bak
-
-# env files
-.env
-!.env.example
-AGENTS.md
-APRENDAMOS.md
-FRONTEND-BACK-CONTRATO.md
+# env files (can opt-in for committing if needed)
+.env*
 
 # vercel
 .vercel
