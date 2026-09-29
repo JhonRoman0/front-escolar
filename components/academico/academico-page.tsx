@@ -24,8 +24,9 @@ export default function AcademicoPage() {
 
   const tieneEstructura = puedeAnios || puedeGrados || puedeTurnos || puedeAulas
 
-  // default según permisos (respeta orden del Figma: Docentes > Cursos > Estructura > Asignaciones)
-  const defaultTab = puedeDocentes ? "docentes" : puedeCursos ? "cursos" : tieneEstructura ? "estructura" : puedeAsignaciones ? "asignaciones" : "docentes"
+  // Estructura académica va primero: es el catálogo base del módulo y el resto
+  // de pestañas dependen de lo que se registre ahí.
+  const defaultTab = tieneEstructura ? "estructura" : puedeDocentes ? "docentes" : puedeCursos ? "cursos" : puedeAsignaciones ? "asignaciones" : "docentes"
 
   return (
     <div className="flex flex-col gap-4">
@@ -38,15 +39,25 @@ export default function AcademicoPage() {
 
       <Tabs defaultValue={defaultTab}>
         <TabsList variant="segmented" className="w-full justify-start overflow-x-auto">
+          {tieneEstructura && <TabsTrigger value="estructura">Estructura académica</TabsTrigger>}
           {puedeDocentes && <TabsTrigger value="docentes">Docentes</TabsTrigger>}
           {puedeCursos && <TabsTrigger value="cursos">Cursos</TabsTrigger>}
-          {tieneEstructura && <TabsTrigger value="estructura">Estructura académica</TabsTrigger>}
           {puedeAsignaciones && <TabsTrigger value="asignaciones">Asignaciones</TabsTrigger>}
           {puedeRecreos && <TabsTrigger value="recreos">Recreos</TabsTrigger>}
           {puedeSuspensiones && <TabsTrigger value="suspensiones">Suspensiones</TabsTrigger>}
           {puedeCambiosDocente && <TabsTrigger value="cambios">Cambios docente</TabsTrigger>}
         </TabsList>
 
+        {tieneEstructura && (
+          <TabsContent value="estructura">
+            <CatalogosTab
+              puedeTurnos={puedeTurnos}
+              puedeAnios={puedeAnios}
+              puedeAulas={puedeAulas}
+              puedeGrados={puedeGrados}
+            />
+          </TabsContent>
+        )}
         {puedeDocentes && (
           <TabsContent value="docentes">
             <DocentesTab />
@@ -55,17 +66,6 @@ export default function AcademicoPage() {
         {puedeCursos && (
           <TabsContent value="cursos">
             <CursosTab />
-          </TabsContent>
-        )}
-        {tieneEstructura && (
-          <TabsContent value="estructura">
-            <CatalogosTab
-              puedeCursos={puedeCursos}
-              puedeTurnos={puedeTurnos}
-              puedeAnios={puedeAnios}
-              puedeAulas={puedeAulas}
-              puedeGrados={puedeGrados}
-            />
           </TabsContent>
         )}
         {puedeAsignaciones && (

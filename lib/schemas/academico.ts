@@ -1,6 +1,7 @@
 import * as z from "zod"
 
 import { contrasenaSeguraOpcional } from "@/lib/schemas/comun"
+import { esHoraValida, turnoAnterior, type TurnoFranja } from "@/lib/turnos"
 
 const accesoId = z.number().int().min(1, "Selecciona un estado").max(3)
 const fecha = z
@@ -46,43 +47,70 @@ export type CursoValues = z.infer<typeof cursoSchema>
 
 // ── Turno ────────────────────────────────────────────────────────────────
 
-export const turnoSchema = z
-  .object({
-    nombre: z.string().min(1, "El nombre es requerido").max(50),
-    horaEntrada: hora,
-    horaEntradaLimite: hora,
-    horaFaltaLimite: hora,
-    horaSalida: hora,
-    accesoId: accesoId.optional(),
-  })
-  .superRefine((turno, ctx) => {
-    // "HH:mm" en formato fijo se compara de forma segura como string.
-    const pares = [
-      {
-        a: turno.horaEntrada,
-        b: turno.horaEntradaLimite,
-        campo: "horaEntradaLimite",
-        mensaje: "El límite de puntualidad debe ser mayor a la hora de entrada",
-      },
-      {
-        a: turno.horaEntradaLimite,
-        b: turno.horaFaltaLimite,
-        campo: "horaFaltaLimite",
-        mensaje: "El límite de tardanza debe ser mayor al límite de puntualidad",
-      },
-      {
-        a: turno.horaFaltaLimite,
-        b: turno.horaSalida,
-        campo: "horaSalida",
-        mensaje: "La hora de salida debe ser mayor al límite de tardanza",
-      },
-    ]
-    for (const { a, b, campo, mensaje } of pares) {
-      if (!(a < b)) {
-        ctx.addIssue({ code: "custom", path: [campo], message: mensaje })
+export const crearTurnoSchema = (turnos: TurnoFranja[] = [], idTurno = -1) =>
+  z
+    .object({
+      nombre: z.string().min(1, "El nombre es requerido").max(50),
+      horaEntrada: hora,
+      horaEntradaLimite: hora,
+      horaFaltaLimite: hora,
+      horaSalida: hora,
+      accesoId: accesoId.optional(),
+    })
+    .superRefine((turno, ctx) => {
+      // "HH:mm" en formato fijo se compara de forma segura como string.
+      const pares = [
+        {
+          a: turno.horaEntrada,
+          b: turno.horaEntradaLimite,
+          campo: "horaEntradaLimite",
+          mensaje: "El límite de puntualidad debe ser mayor a la hora de entrada",
+        },
+        {
+          a: turno.horaEntradaLimite,
+          b: turno.horaFaltaLimite,
+          campo: "horaFaltaLimite",
+          mensaje: "El límite de tardanza debe ser mayor al límite de puntualidad",
+        },
+        {
+          a: turno.horaFaltaLimite,
+          b: turno.horaSalida,
+          campo: "horaSalida",
+          mensaje: "La hora de salida debe ser mayor al límite de tardanza",
+        },
+      ]
+      for (const { a, b, campo, mensaje } of pares) {
+        // Si alguna de las dos no es una hora válida el error de formato ya la
+        // señala, no tiene sentido encima apilar un error de orden.
+        if (!esHoraValida(a) || !esHoraValida(b)) continue
+        if (!(a < b)) {
+          ctx.addIssue({ code: "custom", path: [campo], message: mensaje })
+        }
       }
-    }
-  })
+      // Un turno solo se valida contra el que lo precede en la jornada, y el
+      // empate está permitido porque representa el cambio de turno: Mañana sale
+      // 12:30 y Tarde entra 12:30 es una configuración válida. Al revés no se
+      // comprueba, así que editar Mañana nunca falla por un turno posterior.
+      // La cadena se arma con las horas del formulario, no con las guardadas,
+      // para que al cambiar la hora de entrada el orden se recalcule al vuelo.
+      const anterior = turnoAnterior(
+        turnos.map((t) =>
+          t.id === idTurno
+            ? { ...t, horaEntrada: turno.horaEntrada, horaSalida: turno.horaSalida }
+            : t,
+        ),
+        idTurno,
+      )
+      if (anterior && turno.horaEntrada < anterior.horaSalida) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["horaEntrada"],
+          message: `No puede iniciar antes de que termine el turno ${anterior.nombre} (${anterior.horaSalida})`,
+        })
+      }
+    })
+
+export const turnoSchema = crearTurnoSchema()
 export type TurnoValues = z.infer<typeof turnoSchema>
 
 // ── Grado ────────────────────────────────────────────────────────────────
