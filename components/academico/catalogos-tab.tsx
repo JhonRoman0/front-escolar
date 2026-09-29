@@ -813,7 +813,9 @@ function AnioDialog({
   const form = useForm<AnioEscolarValues>({
     resolver: zodResolver(anioEscolarSchema),
     defaultValues: {
-      anio: anio?.anio ?? "",
+      // Por si la base tiene un año con caracteres raros, se muestra ya limpio
+      // en vez de obligar a corregirlo a mano.
+      anio: (anio?.anio ?? "").replace(/\D/g, "").slice(0, 4),
       fechaInicio: anio?.fechaInicio ?? "",
       fechaFin: anio?.fechaFin ?? "",
     },
@@ -839,7 +841,40 @@ function AnioDialog({
         <DialogHeader><DialogTitle className="text-lg font-semibold tracking-tight">{esEdicion ? "Editar año escolar" : "Nuevo año escolar"}</DialogTitle></DialogHeader>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5" noValidate>
           <FieldGroup>
-            <Controller control={form.control} name="anio" render={({ field }) => (<Field><FieldLabel>Año</FieldLabel><FieldContent><Input placeholder="2026" maxLength={4} autoFocus {...field} /><FieldDescription className="text-xs">Formato 4 dígitos, ej: 2026.</FieldDescription><FieldError errors={[form.formState.errors.anio]} /></FieldContent></Field>)} />
+            <Controller
+              control={form.control}
+              name="anio"
+              render={({ field }) => {
+                // El error y la descripción dicen lo mismo, así que cuando hay
+                // error la descripción se oculta: el bloque de abajo no crece y
+                // el motivo queda como único texto a leer.
+                const error = form.formState.errors.anio
+                return (
+                  <Field>
+                    <FieldLabel>Año</FieldLabel>
+                    <FieldContent>
+                      <Input
+                        placeholder="2026"
+                        inputMode="numeric"
+                        maxLength={4}
+                        autoFocus
+                        {...field}
+                        // Silencioso a propósito: una tecla que no es dígito
+                        // simplemente no entra. El filtro vive aquí y no en
+                        // onKeyDown para que también tape el pegado y el arrastre
+                        // de texto. El slice deja el tope de 4 en el código y no
+                        // apoyado en que el navegador respete maxLength.
+                        onChange={(e) => field.onChange(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                      />
+                      {!error && (
+                        <FieldDescription className="text-xs">Solo números, 4 dígitos. Ej: 2026.</FieldDescription>
+                      )}
+                      <FieldError errors={[error]} />
+                    </FieldContent>
+                  </Field>
+                )
+              }}
+            />
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Controller
                 control={form.control}

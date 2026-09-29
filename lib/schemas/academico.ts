@@ -157,10 +157,13 @@ export type GradoValues = z.infer<typeof gradoSchema>
 // ── Año escolar ──────────────────────────────────────────────────────────
 
 export const anioEscolarSchema = z.object({
+  // El .min va primero a propósito: zod corre las validaciones en el orden en
+  // que se declaran y el formulario muestra el primer error. Con el regex
+  // primero, un campo vacío decía "Año inválido" en vez de "es requerido".
   anio: z
     .string()
-    .regex(/^\d{4}$/, "Año inválido (4 dígitos)")
-    .min(1, "El año es requerido"),
+    .min(1, "El año es requerido")
+    .regex(/^\d{4}$/, "Año inválido (4 dígitos)"),
   estado: z.number().int().min(1).max(2).optional(),
   fechaInicio: z.string().optional().or(z.literal("")),
   fechaFin: z.string().optional().or(z.literal("")),
