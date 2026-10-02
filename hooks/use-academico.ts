@@ -30,6 +30,10 @@ const KEYS = {
   anios: ["anios-escolares"] as const,
   aulas: ["aulas"] as const,
   asignaciones: ["asignaciones"] as const,
+  // Vive en use-horario.ts. Se replica aquí porque un aula y un turno se
+  // muestran por nombre dentro de otras respuestas, así que hay que invalidar
+  // esos catálogos al crear o renombrar el aula. Ver use-horario.ts KEYS.
+  horarios: ["horarios"] as const,
   niveles: ["niveles"] as const,
   secciones: ["secciones"] as const,
   suspensiones: ["suspensiones"] as const,
@@ -263,7 +267,9 @@ export function useCrudCursos() {
 export function useCrudTurnos() {
   return useCrud(
     KEYS.turnos,
-    [],
+    // AsignacionResponse trae `turno` ya resuelto a texto: sin invalidar, la
+    // pestaña Asignaciones muestra el nombre anterior tras crear o renombrar.
+    [KEYS.asignaciones],
     turnosApi.crear,
     ({ id, data }) => turnosApi.actualizar(id, data),
     (id) => turnosApi.eliminar(id)
@@ -293,7 +299,9 @@ export function useCrudAniosEscolares() {
 export function useCrudAulas() {
   return useCrud(
     KEYS.aulas,
-    [KEYS.asignaciones],
+    // HorarioResponse trae `aula` resuelta a texto (la consulta vive en
+    // use-horario.ts), y AsignacionResponse anida horarios[].
+    [KEYS.asignaciones, KEYS.horarios],
     aulasApi.crear,
     ({ id, data }) => aulasApi.actualizar(id, data),
     (id) => aulasApi.eliminar(id)

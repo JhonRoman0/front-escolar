@@ -1,17 +1,16 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { toast } from "sonner"
 import {
   ArrowRight,
   CalendarDays,
   Clock3,
   GraduationCap,
-  Loader2,
   type LucideIcon,
 } from "lucide-react"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { Controller, useForm } from "react-hook-form"
+import { Controller, useForm, useWatch } from "react-hook-form"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -53,7 +52,9 @@ import {
 
 import { EstadoBadge } from "@/components/seguridad/estado-badge"
 import { BotonNuevo } from "@/components/shared/boton-nuevo"
+import { BotonGuardar } from "@/components/shared/boton-guardar"
 import { HeaderSeccion } from "@/components/shared/header-seccion"
+import { useEliminarConToast } from "@/hooks/use-eliminar-toast"
 import {
   AccionesFila,
   CampoAcceso,
@@ -107,13 +108,13 @@ export function GradosEstructura({
   const faltaAnio = !anioVigente
   const bloqueado = (faltaTurno || faltaAnio) && !cargandoTurnos && !cargandoAnios
 
-  async function handleEliminar(grado: GradoResponse) {
-    try {
-      await crud.eliminar.mutateAsync(grado.idGrado)
-      toast.success(`Grado "${grado.nombre}" eliminado`)
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Error al eliminar")
-    }
+  const eliminarConToast = useEliminarConToast()
+
+  function handleEliminar(grado: GradoResponse) {
+    return eliminarConToast(crud.eliminar.mutateAsync, {
+      id: grado.idGrado,
+      mensaje: `Grado "${grado.nombre}" eliminado`,
+    })
   }
 
   if (bloqueado) {
@@ -204,13 +205,16 @@ export function GradosEstructura({
         </div>
         {isError && <Button variant="outline" size="sm" onClick={() => refetch()}>Reintentar</Button>}
         <GradoDialog
-          key={editando?.idGrado ?? "nuevo"}
           open={dialogOpen}
           onOpenChange={setDialogOpen}
           grado={editando}
           niveles={niveles}
           anioVigente={anioVigente}
           turnoActivo={turnoActivo}
+          anios={anios}
+          turnos={turnos}
+          crear={crud.crear}
+          actualizar={crud.actualizar}
         />
       </CardContent>
     </Card>
@@ -312,6 +316,10 @@ function GradoDialog({
   niveles,
   anioVigente,
   turnoActivo,
+  anios,
+  turnos,
+  crear,
+  actualizar,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -319,10 +327,11 @@ function GradoDialog({
   niveles: { idNivel: number; nombre: string }[]
   anioVigente: AnioEscolarResponse | null
   turnoActivo: TurnoResponse | null
+  anios: AnioEscolarResponse[]
+  turnos: TurnoResponse[]
+  crear: ReturnType<typeof useCrudGrados>["crear"]
+  actualizar: ReturnType<typeof useCrudGrados>["actualizar"]
 }) {
-  const crud = useCrudGrados()
-  const { data: anios = [] } = useAniosEscolares()
-  const { data: turnos = [] } = useTurnos()
   const esEdicion = !!grado
   const form = useForm<GradoValues>({
     resolver: zodResolver(gradoSchema),
@@ -335,11 +344,27 @@ function GradoDialog({
       accesoId: grado?.accesoId ?? 1,
     },
   })
-  const idNivelSeleccionado = form.watch("idNivel")
-  const enviando = crud.crear.isPending || crud.actualizar.isPending
-  const idAnioVal = form.watch("idAnio")
-  const idTurnoVal = form.watch("idTurno")
-  const submitDisabled = enviando || !idNivelSeleccionado || !idAnioVal || !idTurnoVal
+
+  // El diálogo se renderiza siempre y solo cambia `open`, así que useForm
+  // conserva los valores entre aperturas. Resetear al abrir deja el form limpio
+  // sin depender de una key que solo remonta cuando cambia el registro.
+  useEffect(() => {
+    if (!open) return
+    form.reset({
+      nombre: grado?.nombre ?? "",
+      idNivel: grado?.idNivel ?? 0,
+      idAnio: grado?.idAnio ?? anioVigente?.idAnio ?? 0,
+      idTurno: grado?.idTurno ?? turnoActivo?.idTurno ?? 0,
+      secciones: grado?.secciones.map((s) => s.nombre) ?? [],
+      accesoId: grado?.accesoId ?? 1,
+    })
+  }, [open, grado, anioVigente, turnoActivo, form])
+  // useWatch en vez de form.watch: watch() no se puede memoizar y hace que React
+  // Compiler se salte el componente entero.
+  const idNivelSeleccionado = useWatch({ control: form.control, name: "idNivel" })
+  const idAnioVal = useWatch({ control: form.control, name: "idAnio" })
+  const idTurnoVal = useWatch({ control: form.control, name: "idTurno" })
+  const enviando = crear.isPending || actualizar.isPending
 
   function buildRequest(values: GradoValues): GradoRequest {
     return {
@@ -354,8 +379,8 @@ function GradoDialog({
 
   async function onSubmit(values: GradoValues) {
     try {
-      if (esEdicion && grado) await crud.actualizar.mutateAsync({ id: grado.idGrado, data: buildRequest(values) })
-      else await crud.crear.mutateAsync(buildRequest(values))
+      if (esEdicion && grado) await actualizar.mutateAsync({ id: grado.idGrado, data: buildRequest(values) })
+      else await crear.mutateAsync(buildRequest(values))
       toast.success(esEdicion ? "Grado actualizado" : "Grado creado")
       onOpenChange(false)
     } catch (error) {
@@ -377,7 +402,7 @@ function GradoDialog({
             {idNivelSeleccionado !== 1 && (<Field><FieldLabel>Secciones</FieldLabel><FieldContent><Controller control={form.control} name="secciones" render={({ field }) => (<div className="flex flex-col gap-2">{field.value.map((seccion, index) => (<div key={index} className="flex gap-2"><Input className="flex-1" placeholder="A" value={seccion} onChange={(e) => { const next = [...field.value]; next[index] = e.target.value; field.onChange(next) }} /><Button type="button" variant="outline" size="icon" disabled={field.value.length <= 1} onClick={() => field.onChange(field.value.filter((_, i) => i !== index))} aria-label={`Quitar sección ${index + 1}`}>X</Button></div>))}<Button type="button" variant="outline" size="sm" onClick={() => field.onChange([...field.value, ""])}>Agregar sección</Button></div>)} /><FieldError errors={[form.formState.errors.secciones]} /></FieldContent></Field>)}
             {esEdicion && (<Controller control={form.control} name="accesoId" render={({ field }) => (<Field><FieldLabel>Estado</FieldLabel><FieldContent><CampoAcceso value={field.value} onChange={field.onChange} /></FieldContent></Field>)} />)}
           </FieldGroup>
-          <DialogFooter><DialogTrigger render={<Button variant="outline" />}>Cancelar</DialogTrigger><Button type="submit" disabled={submitDisabled}>{enviando && <Loader2 className="animate-spin" data-icon="inline-start" />}{esEdicion ? "Guardar cambios" : "Crear grado"}</Button></DialogFooter>
+          <DialogFooter><DialogTrigger render={<Button variant="outline" />}>Cancelar</DialogTrigger><BotonGuardar etiqueta={esEdicion ? "Guardar cambios" : "Crear grado"} enviando={enviando} disabled={!idNivelSeleccionado || !idAnioVal || !idTurnoVal} /></DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

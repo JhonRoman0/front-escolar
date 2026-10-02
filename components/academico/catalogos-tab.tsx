@@ -1,10 +1,10 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 import { CalendarDays, CircleHelp, Clock3, CloudSun, DoorOpen, GraduationCap, Loader2, Pencil, Sun, TriangleAlert, X, type LucideIcon } from "lucide-react"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { Controller, useForm } from "react-hook-form"
+import { Controller, useForm, useWatch } from "react-hook-form"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -40,7 +40,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 import { EstadoBadge } from "@/components/seguridad/estado-badge"
 import { BotonNuevo } from "@/components/shared/boton-nuevo"
+import { BotonGuardar } from "@/components/shared/boton-guardar"
 import { HeaderSeccion } from "@/components/shared/header-seccion"
+import { useEliminarConToast } from "@/hooks/use-eliminar-toast"
 import {
   AccionesFila,
   CampoAcceso,
@@ -248,7 +250,6 @@ export function CursosTab() {
           </Button>
         )}
         <CursoDialog
-          key={editando?.idCurso ?? "nuevo"}
           open={dialogOpen}
           onOpenChange={setDialogOpen}
           curso={editando}
@@ -274,13 +275,22 @@ function CursoDialog({
   actualizar: ReturnType<typeof useCrudCursos>["actualizar"]
 }) {
   const esEdicion = !!curso
+  // Primitivos y no el objeto: un refetch de React Query devuelve una referencia
+  // nueva y con el objeto en las deps el reset se dispararía mientras se escribe.
+  const nombre = curso?.nombre ?? ""
+  const accesoId = curso?.accesoId ?? 1
   const form = useForm<CursoValues>({
     resolver: zodResolver(cursoSchema),
-    defaultValues: {
-      nombre: curso?.nombre ?? "",
-      accesoId: curso?.accesoId ?? 1,
-    },
+    defaultValues: { nombre, accesoId },
   })
+
+  // El diálogo se renderiza siempre y solo cambia `open`, así que useForm
+  // conserva los valores entre aperturas. Resetear al abrir deja el form limpio
+  // sin depender de una key que solo remonta cuando cambia el registro.
+  useEffect(() => {
+    if (!open) return
+    form.reset({ nombre, accesoId })
+  }, [open, nombre, accesoId, form])
 
   async function onSubmit(values: CursoValues) {
     try {
@@ -358,13 +368,13 @@ function AulasTab() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editando, setEditando] = useState<AulaResponse | null>(null)
 
-  async function handleEliminar(aula: AulaResponse) {
-    try {
-      await crud.eliminar.mutateAsync(aula.idAula)
-      toast.success(`Aula "${aula.nombre}" eliminada`)
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Error al eliminar")
-    }
+  const eliminarConToast = useEliminarConToast()
+
+  function handleEliminar(aula: AulaResponse) {
+    return eliminarConToast(crud.eliminar.mutateAsync, {
+      id: aula.idAula,
+      mensaje: `Aula "${aula.nombre}" eliminada`,
+    })
   }
 
   return (
@@ -435,7 +445,6 @@ function AulasTab() {
           </Button>
         )}
         <AulaDialog
-          key={editando?.idAula ?? "nuevo"}
           open={dialogOpen}
           onOpenChange={setDialogOpen}
           aula={editando}
@@ -667,9 +676,7 @@ function TurnoCard({
             <Button type="button" variant="outline" size="sm" onClick={cancelar}>
               <X /> Cancelar
             </Button>
-            <Button type="submit" variant="brand" size="sm" disabled={enviando}>
-              {enviando && <Loader2 className="animate-spin" data-icon="inline-start" />} Guardar
-            </Button>
+            <BotonGuardar etiqueta="Guardar" enviando={enviando} size="sm" />
           </div>
         </form>
       ) : (
@@ -707,6 +714,21 @@ function TurnoDialog({
     },
   })
 
+  // El diálogo se renderiza siempre y solo cambia `open`, así que useForm
+  // conserva los valores entre aperturas. Resetear al abrir deja el form limpio
+  // sin depender de una key que solo remonta cuando cambia el registro.
+  useEffect(() => {
+    if (!open) return
+    form.reset({
+      nombre: "",
+      horaEntrada: "",
+      horaEntradaLimite: "",
+      horaFaltaLimite: "",
+      horaSalida: "",
+      accesoId: 1,
+    })
+  }, [open, form])
+
   async function onSubmit(values: TurnoValues) {
     try {
       await crear.mutateAsync(values)
@@ -728,7 +750,7 @@ function TurnoDialog({
               <FieldSet><div className="grid grid-cols-1 gap-4 sm:grid-cols-2">{CAMPOS_TURNO.map((campo) => (<Controller key={campo.name} control={form.control} name={campo.name} render={({ field }) => (<Field><div className="flex items-center gap-1.5"><FieldLabel>{campo.label}</FieldLabel><Tooltip><TooltipTrigger aria-label={`Info ${campo.label}`} className="inline-flex size-5 items-center justify-center rounded-full p-0.5 hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"><CircleHelp className="size-3 text-[#274CB4]" /></TooltipTrigger><TooltipContent side="top" sideOffset={6} className="max-w-[220px] text-xs leading-snug"><p>{campo.descripcion}</p></TooltipContent></Tooltip></div><FieldContent><Input type="time" {...field} /><FieldError errors={[form.formState.errors[campo.name]]} /></FieldContent></Field>)} />))}</div></FieldSet>
             </TooltipProvider>
           </FieldGroup>
-          <DialogFooter><DialogTrigger render={<Button variant="outline" />}>Cancelar</DialogTrigger><Button type="submit" disabled={crear.isPending}>{(crear.isPending) && <Loader2 className="animate-spin" data-icon="inline-start" />}Crear turno</Button></DialogFooter>
+          <DialogFooter><DialogTrigger render={<Button variant="outline" />}>Cancelar</DialogTrigger><BotonGuardar etiqueta="Crear turno" enviando={crear.isPending} /></DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
@@ -746,13 +768,13 @@ function AniosTab() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editando, setEditando] = useState<AnioEscolarResponse | null>(null)
 
-  async function handleEliminar(anio: AnioEscolarResponse) {
-    try {
-      await crud.eliminar.mutateAsync(anio.idAnio)
-      toast.success(`Año escolar ${anio.anio} eliminado`)
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Error al eliminar")
-    }
+  const eliminarConToast = useEliminarConToast()
+
+  function handleEliminar(anio: AnioEscolarResponse) {
+    return eliminarConToast(crud.eliminar.mutateAsync, {
+      id: anio.idAnio,
+      mensaje: `Año escolar ${anio.anio} eliminado`,
+    })
   }
 
   return (
@@ -797,7 +819,7 @@ function AniosTab() {
           </Table>
         </div>
         {isError && <Button variant="outline" size="sm" onClick={() => refetch()}>Reintentar</Button>}
-        <AnioDialog key={editando?.idAnio ?? "nuevo"} open={dialogOpen} onOpenChange={setDialogOpen} anio={editando} crear={crud.crear} actualizar={crud.actualizar} />
+        <AnioDialog open={dialogOpen} onOpenChange={setDialogOpen} anio={editando} crear={crud.crear} actualizar={crud.actualizar} />
       </CardContent>
     </Card>
   )
@@ -833,19 +855,32 @@ function AnioDialog({
   actualizar: ReturnType<typeof useCrudAniosEscolares>["actualizar"]
 }) {
   const esEdicion = !!anio
+  // Por si la base tiene un año con caracteres raros, se muestra ya limpio
+  // en vez de obligar a corregirlo a mano.
+  // Primitivos y no el objeto: un refetch de React Query devuelve una referencia
+  // nueva y con el objeto en las deps el reset se dispararía mientras se escribe.
+  const anioTexto = (anio?.anio ?? "").replace(/\D/g, "").slice(0, 4)
+  const fechaInicioInicial = anio?.fechaInicio ?? ""
+  const fechaFinInicial = anio?.fechaFin ?? ""
   const form = useForm<AnioEscolarValues>({
     resolver: zodResolver(anioEscolarSchema),
-    defaultValues: {
-      // Por si la base tiene un año con caracteres raros, se muestra ya limpio
-      // en vez de obligar a corregirlo a mano.
-      anio: (anio?.anio ?? "").replace(/\D/g, "").slice(0, 4),
-      fechaInicio: anio?.fechaInicio ?? "",
-      fechaFin: anio?.fechaFin ?? "",
-    },
+    defaultValues: { anio: anioTexto, fechaInicio: fechaInicioInicial, fechaFin: fechaFinInicial },
   })
+
   // El selector de fin no puede ofrecer fechas anteriores al día siguiente
   // del inicio. Sin fecha de inicio no hay mínimo y se puede elegir cualquiera.
-  const minFechaFin = diaSiguiente(form.watch("fechaInicio"))
+  // useWatch en vez de form.watch: watch() no se puede memoizar y hace que React
+  // Compiler se salte el componente entero.
+  const fechaInicio = useWatch({ control: form.control, name: "fechaInicio" })
+  const minFechaFin = diaSiguiente(fechaInicio)
+
+  // El diálogo se renderiza siempre y solo cambia `open`, así que useForm
+  // conserva los valores entre aperturas. Resetear al abrir deja el form limpio
+  // sin depender de una key que solo remonta cuando cambia el registro.
+  useEffect(() => {
+    if (!open) return
+    form.reset({ anio: anioTexto, fechaInicio: fechaInicioInicial, fechaFin: fechaFinInicial })
+  }, [open, anioTexto, fechaInicioInicial, fechaFinInicial, form])
 
   async function onSubmit(values: AnioEscolarValues) {
     try {
@@ -941,7 +976,7 @@ function AnioDialog({
               />
             </div>
           </FieldGroup>
-          <DialogFooter><DialogTrigger render={<Button variant="outline" />}>Cancelar</DialogTrigger><Button type="submit" disabled={crear.isPending || actualizar.isPending}>{(crear.isPending || actualizar.isPending) && <Loader2 className="animate-spin" data-icon="inline-start" />}{esEdicion ? "Guardar cambios" : "Crear año"}</Button></DialogFooter>
+          <DialogFooter><DialogTrigger render={<Button variant="outline" />}>Cancelar</DialogTrigger><BotonGuardar etiqueta={esEdicion ? "Guardar cambios" : "Crear año"} enviando={crear.isPending || actualizar.isPending} /></DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
@@ -964,14 +999,23 @@ function AulaDialog({
   actualizar: ReturnType<typeof useCrudAulas>["actualizar"]
 }) {
   const esEdicion = !!aula
+  // Primitivos y no el objeto: un refetch de React Query devuelve una referencia
+  // nueva y con el objeto en las deps el reset se dispararía mientras se escribe.
+  const nombre = aula?.nombre ?? ""
+  const capacidad = aula?.capacidad ?? undefined
+  const accesoId = aula?.accesoId ?? 1
   const form = useForm<AulaValues>({
     resolver: zodResolver(aulaSchema),
-    defaultValues: {
-      nombre: aula?.nombre ?? "",
-      capacidad: aula?.capacidad ?? undefined,
-      accesoId: aula?.accesoId ?? 1,
-    },
+    defaultValues: { nombre, capacidad, accesoId },
   })
+
+  // El diálogo se renderiza siempre y solo cambia `open`, así que useForm
+  // conserva los valores entre aperturas. Resetear al abrir deja el form limpio
+  // sin depender de una key que solo remonta cuando cambia el registro.
+  useEffect(() => {
+    if (!open) return
+    form.reset({ nombre, capacidad, accesoId })
+  }, [open, nombre, capacidad, accesoId, form])
 
   async function onSubmit(values: AulaValues) {
     try {
@@ -994,7 +1038,7 @@ function AulaDialog({
             <Controller control={form.control} name="capacidad" render={({ field }) => (<Field><FieldLabel>Capacidad</FieldLabel><FieldContent><Input type="number" min="1" placeholder="30" value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value === "" ? undefined : Number(e.target.value))} /><FieldDescription className="text-xs">Opcional. Número de asientos.</FieldDescription><FieldError errors={[form.formState.errors.capacidad]} /></FieldContent></Field>)} />
             {esEdicion && <Controller control={form.control} name="accesoId" render={({ field }) => (<Field><FieldLabel>Estado</FieldLabel><FieldContent><CampoAcceso value={field.value} onChange={field.onChange} /></FieldContent></Field>)} />}
           </FieldGroup>
-          <DialogFooter><DialogTrigger render={<Button variant="outline" />}>Cancelar</DialogTrigger><Button type="submit" disabled={crear.isPending || actualizar.isPending}>{(crear.isPending || actualizar.isPending) && <Loader2 className="animate-spin" data-icon="inline-start" />}{esEdicion ? "Guardar cambios" : "Crear aula"}</Button></DialogFooter>
+          <DialogFooter><DialogTrigger render={<Button variant="outline" />}>Cancelar</DialogTrigger><BotonGuardar etiqueta={esEdicion ? "Guardar cambios" : "Crear aula"} enviando={crear.isPending || actualizar.isPending} /></DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
