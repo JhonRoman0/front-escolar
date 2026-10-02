@@ -24,7 +24,7 @@ const badgeVariants = cva(
         warning:
           "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
         info:
-          "bg-[#E1E7F9] text-[#3A62D4] dark:bg-blue-900/40 dark:text-blue-300",
+          "bg-brand-subtle text-brand-info dark:bg-blue-900/40 dark:text-blue-300",
         danger:
           "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300",
         rol: "bg-[#FAA94B] text-white dark:bg-[#FAA94B]/25 dark:text-[#FFE0B0]",

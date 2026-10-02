@@ -87,7 +87,7 @@ export function LoginForm() {
             <FieldContent>
               <Input
                 placeholder="Usuario"
-                className="h-[51px] rounded-2xl border-[0.5px] border-[#A9A9AA] text-[20px] font-semibold text-foreground placeholder:text-[#A9A9AA] focus-visible:ring-[#3A62D4]"
+                className="h-[51px] rounded-2xl border-[0.5px] border-[#A9A9AA] text-[20px] font-semibold text-foreground placeholder:text-[#A9A9AA] focus-visible:ring-brand-info"
                 autoComplete="username"
                 {...field}
               />
@@ -109,7 +109,7 @@ export function LoginForm() {
                   type={mostrarContrasena ? "text" : "password"}
                   placeholder="••••••••"
                   autoComplete="current-password"
-                  className="h-[51px] rounded-2xl border-[0.5px] border-[#A9A9AA] pr-10 text-[20px] font-semibold text-foreground placeholder:text-[#A9A9AA] focus-visible:ring-[#3A62D4]"
+                  className="h-[51px] rounded-2xl border-[0.5px] border-[#A9A9AA] pr-10 text-[20px] font-semibold text-foreground placeholder:text-[#A9A9AA] focus-visible:ring-brand-info"
                   {...field}
                 />
                 <button
@@ -135,7 +135,7 @@ export function LoginForm() {
       <Button
         type="submit"
         size="lg"
-        className="h-[51px] w-full rounded-2xl bg-[#3A62D4] text-[25px] font-semibold text-white hover:bg-[#2d4fb8]"
+        className="h-[51px] w-full rounded-2xl bg-brand-info text-[25px] font-semibold text-white hover:bg-[#2d4fb8]"
         disabled={enviando}
       >
         {enviando ? (

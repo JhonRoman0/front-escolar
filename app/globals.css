@@ -4,6 +4,12 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Tailwind v4 envuelve la variante `hover:` en `@media (hover: hover)`, que descarta
+   el bloque en pantallas tactiles y portatiles con tactil (reportan `hover: none`).
+   Redefinir la variante sin esa guarda hace que el hover aplique siempre, igual que
+   `:active` y `cursor-pointer`. Aplica a todo el proyecto, no solo al sidebar. */
+@custom-variant hover (&:hover);
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -14,10 +20,13 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-accent: var(--sidebar-accent);
+  --color-brand-info: var(--brand-info);
+  --color-brand: var(--brand);
   --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar: var(--sidebar);
+  --color-brand-subtle: var(--brand-subtle);
   --color-chart-5: var(--chart-5);
   --color-chart-4: var(--chart-4);
   --color-chart-3: var(--chart-3);
@@ -79,9 +88,14 @@
   --radius: 0.625rem;
   --sidebar: #ffffff;
   --sidebar-foreground: #000000;
+  --brand-subtle: #E1E7F9;
+  /* Azul de accion primaria (botones, tabs segmented, dialogos). */
+  --brand: #274CB4;
+  /* Azul informativo (indicador de tabs, checkbox, badge info, enlaces). */
+  --brand-info: #3A62D4;
   --sidebar-primary: #004497;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #E1E7F9;
+  --sidebar-accent: var(--brand-subtle);
   --sidebar-accent-foreground: #000000;
   --sidebar-border: #A9A9AA;
   --sidebar-ring: #A9A9AA;
@@ -115,7 +129,10 @@
   --sidebar-foreground: #e4eaf5;
   --sidebar-primary: #2e6fd6;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #1a2744;
+  --brand-subtle: #1a2744;
+  --brand: #274CB4;
+  --brand-info: #3A62D4;
+  --sidebar-accent: var(--brand-subtle);
   --sidebar-accent-foreground: #e4eaf5;
   --sidebar-border: #2a3a55;
   --sidebar-ring: #2e6fd6;

@@ -33,12 +33,13 @@ export default function MenuModules({ items }: MenuModulesProps) {
           const isActive = pathname === url || pathname.startsWith(url + "/")
           return (
             <SidebarMenuItem key={nombre}>
-              <Link href={url}>
-                <SidebarMenuButton isActive={isActive}>
-                  <Icon />
-                  <span className="font-[family-name:var(--font-sidebar)]">{nombre}</span>
-                </SidebarMenuButton>
-              </Link>
+              {/* El Link va por prop `render` y no envolviendo al botón: anidar un
+                  <a> alrededor de un <button> deja el botón fuera de la caja del
+                  enlace, así que el cursor y el hover caían en elementos distintos. */}
+              <SidebarMenuButton render={<Link href={url} />} isActive={isActive}>
+                <Icon />
+                <span className="font-[family-name:var(--font-sidebar)]">{nombre}</span>
+              </SidebarMenuButton>
             </SidebarMenuItem>
           )
         })}

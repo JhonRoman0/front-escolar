@@ -385,13 +385,13 @@ export default function UsuarioFormDialog({
                             return (
                               <label
                                 key={rol.idRol}
-                                className={`flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2.5 text-sm transition-colors ${checked ? "border-[#274CB4]/30 bg-[#E1E7F9] dark:bg-[#1a2744]" : "border-transparent bg-background hover:bg-muted/60"}`}
+                                className={`flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2.5 text-sm transition-colors ${checked ? "border-brand/30 bg-brand-subtle" : "border-transparent bg-background hover:bg-muted/60"}`}
                               >
                                 <Checkbox
                                   checked={checked}
                                   onCheckedChange={(v) => field.onChange(v ? [...field.value, rol.idRol] : field.value.filter((id: number) => id !== rol.idRol))}
                                 />
-                                <span className={`font-medium ${checked ? "text-[#274CB4] dark:text-white" : "text-foreground"}`}>{rol.nombre}</span>
+                                <span className={`font-medium ${checked ? "text-brand dark:text-white" : "text-foreground"}`}>{rol.nombre}</span>
                               </label>
                             )
                           })}

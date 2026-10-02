@@ -655,7 +655,7 @@ function TurnoCard({
                         <FieldLabel>{campo.label}</FieldLabel>
                         <Tooltip>
                           <TooltipTrigger aria-label={`Info ${campo.label}`} className="inline-flex size-5 items-center justify-center rounded-full p-0.5 hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">
-                            <CircleHelp className="size-3 text-[#274CB4]" />
+                            <CircleHelp className="size-3 text-brand" />
                           </TooltipTrigger>
                           <TooltipContent side="top" sideOffset={6} className="max-w-[220px] text-xs leading-snug">
                             <p>{campo.descripcion}</p>
@@ -747,7 +747,7 @@ function TurnoDialog({
           <FieldGroup>
             <Controller control={form.control} name="nombre" render={({ field }) => (<Field><FieldLabel>Nombre del turno</FieldLabel><FieldContent><Input placeholder="Mañana" autoFocus {...field} /><FieldError errors={[form.formState.errors.nombre]} /></FieldContent></Field>)} />
             <TooltipProvider delay={0}>
-              <FieldSet><div className="grid grid-cols-1 gap-4 sm:grid-cols-2">{CAMPOS_TURNO.map((campo) => (<Controller key={campo.name} control={form.control} name={campo.name} render={({ field }) => (<Field><div className="flex items-center gap-1.5"><FieldLabel>{campo.label}</FieldLabel><Tooltip><TooltipTrigger aria-label={`Info ${campo.label}`} className="inline-flex size-5 items-center justify-center rounded-full p-0.5 hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"><CircleHelp className="size-3 text-[#274CB4]" /></TooltipTrigger><TooltipContent side="top" sideOffset={6} className="max-w-[220px] text-xs leading-snug"><p>{campo.descripcion}</p></TooltipContent></Tooltip></div><FieldContent><Input type="time" {...field} /><FieldError errors={[form.formState.errors[campo.name]]} /></FieldContent></Field>)} />))}</div></FieldSet>
+              <FieldSet><div className="grid grid-cols-1 gap-4 sm:grid-cols-2">{CAMPOS_TURNO.map((campo) => (<Controller key={campo.name} control={form.control} name={campo.name} render={({ field }) => (<Field><div className="flex items-center gap-1.5"><FieldLabel>{campo.label}</FieldLabel><Tooltip><TooltipTrigger aria-label={`Info ${campo.label}`} className="inline-flex size-5 items-center justify-center rounded-full p-0.5 hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"><CircleHelp className="size-3 text-brand" /></TooltipTrigger><TooltipContent side="top" sideOffset={6} className="max-w-[220px] text-xs leading-snug"><p>{campo.descripcion}</p></TooltipContent></Tooltip></div><FieldContent><Input type="time" {...field} /><FieldError errors={[form.formState.errors[campo.name]]} /></FieldContent></Field>)} />))}</div></FieldSet>
             </TooltipProvider>
           </FieldGroup>
           <DialogFooter><DialogTrigger render={<Button variant="outline" />}>Cancelar</DialogTrigger><BotonGuardar etiqueta="Crear turno" enviando={crear.isPending} /></DialogFooter>
