@@ -40,11 +40,12 @@ import {
   TableRow,
 } from "@/components/ui/table"
 
+import { BotonNuevo } from "@/components/shared/boton-nuevo"
+import { HeaderSeccion } from "@/components/shared/header-seccion"
 import {
   AccionesFila,
   CampoAcceso,
   FilasCargando,
-  HeaderTabla,
   MensajeSinDatos,
 } from "@/components/shared/table-helpers"
 import { EstadoBadge } from "@/components/seguridad/estado-badge"
@@ -86,14 +87,19 @@ export function FeriadosTab() {
   return (
     <Card>
       <CardContent className="space-y-4 p-4">
-        <HeaderTabla
+        <HeaderSeccion
           titulo="Días feriados"
           descripcion="Fechas sin clases; ese día no se registra asistencia."
-          puedeCrear={puedeCrear}
-          onNuevo={() => {
-            setEditando(null)
-            setDialogOpen(true)
-          }}
+          acciones={
+            <BotonNuevo
+              texto="Nuevo día feriado"
+              puedeCrear={puedeCrear}
+              onClick={() => {
+                setEditando(null)
+                setDialogOpen(true)
+              }}
+            />
+          }
         />
         <Table>
           <TableHeader>

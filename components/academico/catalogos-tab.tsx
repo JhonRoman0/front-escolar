@@ -1,11 +1,10 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { toast } from "sonner"
-import { CalendarDays, CircleHelp, Clock3, CloudSun, DoorOpen, GraduationCap, Loader2, Pencil, Plus, Sun, TriangleAlert, X, type LucideIcon } from "lucide-react"
+import { CalendarDays, CircleHelp, Clock3, CloudSun, DoorOpen, GraduationCap, Loader2, Pencil, Sun, TriangleAlert, X, type LucideIcon } from "lucide-react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm } from "react-hook-form"
-import { useState } from "react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -40,12 +39,13 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 import { EstadoBadge } from "@/components/seguridad/estado-badge"
+import { BotonNuevo } from "@/components/shared/boton-nuevo"
+import { HeaderSeccion } from "@/components/shared/header-seccion"
 import {
   AccionesFila,
   CampoAcceso,
   CargandoTarjetas,
   FilasCargando,
-  HeaderTabla,
   MensajeSinDatos,
 } from "@/components/shared/table-helpers"
 import {
@@ -185,14 +185,19 @@ export function CursosTab() {
   return (
     <Card>
       <CardContent className="flex flex-col gap-4 p-4">
-        <HeaderTabla
+        <HeaderSeccion
           titulo="Cursos"
           descripcion="Las materias que se dictan (Matemática, Comunicación...)."
-          puedeCrear={puedeCrear}
-          onNuevo={() => {
-            setEditando(null)
-            setDialogOpen(true)
-          }}
+          acciones={
+            <BotonNuevo
+              texto="Nuevo curso"
+              puedeCrear={puedeCrear}
+              onClick={() => {
+                setEditando(null)
+                setDialogOpen(true)
+              }}
+            />
+          }
         />
         <div className="overflow-x-auto rounded-lg border">
           <Table>
@@ -365,14 +370,19 @@ function AulasTab() {
   return (
     <Card>
       <CardContent className="flex flex-col gap-4 p-4">
-        <HeaderTabla
+        <HeaderSeccion
           titulo="Aulas"
           descripcion="Los salones o ambientes disponibles para las clases."
-          puedeCrear={puedeCrear}
-          onNuevo={() => {
-            setEditando(null)
-            setDialogOpen(true)
-          }}
+          acciones={
+            <BotonNuevo
+              texto="Nueva aula"
+              puedeCrear={puedeCrear}
+              onClick={() => {
+                setEditando(null)
+                setDialogOpen(true)
+              }}
+            />
+          }
         />
         <div className="overflow-x-auto rounded-lg border">
           <Table>
@@ -477,17 +487,17 @@ function TurnosTab() {
   return (
     <Card>
       <CardContent className="flex flex-col gap-4 p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="space-y-0.5">
-            <h2 className="text-[20px] font-semibold tracking-tight">Turnos</h2>
-            <p className="text-[14px] leading-5 text-muted-foreground">Horarios de entrada y tardanza por turno</p>
-          </div>
-          {puedeCrear && (
-            <Button size="sm" className="bg-[#274CB4] text-white hover:bg-[#274CB4]/85" onClick={() => setDialogOpen(true)}>
-              <Plus /> Nuevo
-            </Button>
-          )}
-        </div>
+        <HeaderSeccion
+          titulo="Turnos"
+          descripcion="Horarios de entrada y tardanza por turno"
+          acciones={
+            <BotonNuevo
+              texto="Nuevo turno"
+              puedeCrear={puedeCrear}
+              onClick={() => setDialogOpen(true)}
+            />
+          }
+        />
         {conflictos.length > 0 && (
           <div className="flex gap-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-amber-900">
             <TriangleAlert className="mt-0.5 size-4 shrink-0 text-amber-600" />
@@ -657,7 +667,7 @@ function TurnoCard({
             <Button type="button" variant="outline" size="sm" onClick={cancelar}>
               <X /> Cancelar
             </Button>
-            <Button type="submit" size="sm" className="bg-[#274CB4] text-white hover:bg-[#274CB4]/85" disabled={enviando}>
+            <Button type="submit" variant="brand" size="sm" disabled={enviando}>
               {enviando && <Loader2 className="animate-spin" data-icon="inline-start" />} Guardar
             </Button>
           </div>
@@ -748,7 +758,20 @@ function AniosTab() {
   return (
     <Card>
       <CardContent className="flex flex-col gap-4 p-4">
-        <HeaderTabla titulo="Años escolares" descripcion="Al crear un año nuevo queda vigente y el anterior se cierra automáticamente." puedeCrear={puedeCrear} onNuevo={() => { setEditando(null); setDialogOpen(true) }} />
+        <HeaderSeccion
+          titulo="Años escolares"
+          descripcion="Al crear un año nuevo queda vigente y el anterior se cierra automáticamente."
+          acciones={
+            <BotonNuevo
+              texto="Nuevo año escolar"
+              puedeCrear={puedeCrear}
+              onClick={() => {
+                setEditando(null)
+                setDialogOpen(true)
+              }}
+            />
+          }
+        />
         <div className="overflow-x-auto rounded-lg border">
           <Table>
             <TableHeader>

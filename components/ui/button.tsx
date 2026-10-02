@@ -9,6 +9,9 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default: "bg-primary text-primary-foreground hover:bg-primary/80",
+        // Azul de marca de los botones de alta. Distinto de --primary (#004497):
+        // conviven los dos en la interfaz, así que no se unifican sin revisar.
+        brand: "bg-[#274CB4] text-white hover:bg-[#274CB4]/85",
         outline:
           "border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50",
         secondary:

@@ -33,11 +33,12 @@ import {
   TableRow,
 } from "@/components/ui/table"
 
+import { BotonNuevo } from "@/components/shared/boton-nuevo"
+import { HeaderSeccion } from "@/components/shared/header-seccion"
 import {
   AccionesFila,
   CampoAcceso,
   FilasCargando,
-  HeaderTabla,
   MensajeSinDatos,
 } from "@/components/shared/table-helpers"
 import { EstadoBadge } from "@/components/seguridad/estado-badge"
@@ -79,14 +80,19 @@ export function JustificacionesTab() {
   return (
     <Card>
       <CardContent className="space-y-4 p-4">
-        <HeaderTabla
+        <HeaderSeccion
           titulo="Motivos de justificación"
           descripcion="Motivos disponibles al justificar ingresos tardíos o inasistencias."
-          puedeCrear={puedeCrear}
-          onNuevo={() => {
-            setEditando(null)
-            setDialogOpen(true)
-          }}
+          acciones={
+            <BotonNuevo
+              texto="Nuevo motivo"
+              puedeCrear={puedeCrear}
+              onClick={() => {
+                setEditando(null)
+                setDialogOpen(true)
+              }}
+            />
+          }
         />
         <Table>
           <TableHeader>

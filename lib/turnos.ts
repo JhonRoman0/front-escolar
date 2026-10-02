@@ -21,7 +21,7 @@ export function esHoraValida(valor: string): boolean {
  * Turnos en el orden en que se dan durante el día. El desempate por id
  * mantiene el resultado estable cuando dos turnos empiezan a la misma hora.
  */
-export function ordenarTurnos(turnos: TurnoFranja[]): TurnoFranja[] {
+function ordenarTurnos(turnos: TurnoFranja[]): TurnoFranja[] {
   return turnos
     .filter((t) => esHoraValida(t.horaEntrada))
     .sort((a, b) => {

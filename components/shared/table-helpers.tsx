@@ -1,6 +1,6 @@
 "use client"
 
-import { Pencil, Plus } from "lucide-react"
+import { Pencil } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -91,33 +91,6 @@ export function MensajeSinDatos({
         {mensaje}
       </TableCell>
     </TableRow>
-  )
-}
-
-export function HeaderTabla({
-  titulo,
-  descripcion,
-  puedeCrear,
-  onNuevo,
-}: {
-  titulo: string
-  descripcion: string
-  puedeCrear: boolean
-  onNuevo: () => void
-}) {
-  return (
-    <div className="flex items-center justify-between">
-      <div>
-        <h2 className="text-lg font-semibold">{titulo}</h2>
-        <p className="text-sm text-muted-foreground">{descripcion}</p>
-      </div>
-      {puedeCrear && (
-        <Button onClick={onNuevo}>
-          <Plus />
-          Nuevo
-        </Button>
-      )}
-    </div>
   )
 }
 

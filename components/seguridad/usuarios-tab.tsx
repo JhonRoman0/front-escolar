@@ -125,7 +125,7 @@ export default function UsuariosTab() {
             )}
             {puedeCrear && (
               <Button
-                className="bg-[#274CB4] text-white hover:bg-[#274CB4]/85"
+                variant="brand"
                 onClick={() => {
                   setEditando(null)
                   setDialogSeq((s) => s + 1)

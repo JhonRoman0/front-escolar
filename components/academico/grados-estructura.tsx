@@ -52,6 +52,8 @@ import {
 } from "@/components/ui/table"
 
 import { EstadoBadge } from "@/components/seguridad/estado-badge"
+import { BotonNuevo } from "@/components/shared/boton-nuevo"
+import { HeaderSeccion } from "@/components/shared/header-seccion"
 import {
   AccionesFila,
   CampoAcceso,
@@ -74,7 +76,7 @@ import type {
 } from "@/lib/api/academico"
 import { gradoSchema, type GradoValues } from "@/lib/schemas/academico"
 
-export interface GradosEstructuraProps {
+interface GradosEstructuraProps {
   /** Navega a la subpestaña de Turnos. undefined si el usuario no puede verla. */
   onIrATurnos?: () => void
   /** Navega a la subpestaña de Año escolar. undefined si el usuario no puede verla. */
@@ -128,17 +130,20 @@ export function GradosEstructura({
   return (
     <Card>
       <CardContent className="flex flex-col gap-4 p-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="space-y-0.5">
-            <h2 className="text-[20px] font-semibold tracking-tight">Grados y secciones</h2>
-            <p className="text-[14px] leading-5 text-muted-foreground">Un grado agrupa secciones dentro de un turno y año escolar.</p>
-          </div>
-          {puedeCrear && (
-            <Button className="bg-[#274CB4] text-white hover:bg-[#274CB4]/85" onClick={() => { setEditando(null); setDialogOpen(true) }}>
-              Nuevo grado
-            </Button>
-          )}
-        </div>
+        <HeaderSeccion
+          titulo="Grados y secciones"
+          descripcion="Un grado agrupa secciones dentro de un turno y año escolar."
+          acciones={
+            <BotonNuevo
+              texto="Nuevo grado"
+              puedeCrear={puedeCrear}
+              onClick={() => {
+                setEditando(null)
+                setDialogOpen(true)
+              }}
+            />
+          }
+        />
         <div className="overflow-x-auto rounded-lg border">
           <Table>
             <TableHeader>
@@ -256,18 +261,11 @@ function RequisitosPendientes({
   return (
     <Card>
       <CardContent className="flex flex-col gap-5 p-6">
-        <div className="flex items-start gap-3">
-          <span className="rounded-full bg-muted p-2">
-            <GraduationCap className="size-5 text-muted-foreground" />
-          </span>
-          <div className="space-y-1">
-            <h2 className="text-[20px] font-semibold tracking-tight">Grados y secciones</h2>
-            <p className="text-[14px] leading-5 text-muted-foreground">
-              Un grado agrupa secciones dentro de un turno y un año escolar, así que
-              ambos deben existir antes de registrarlo.
-            </p>
-          </div>
-        </div>
+        <HeaderSeccion
+          titulo="Grados y secciones"
+          descripcion="Un grado agrupa secciones dentro de un turno y un año escolar, así que ambos deben existir antes de registrarlo."
+          icono={GraduationCap}
+        />
         <ul className="flex flex-col gap-3">
           {pendientes.map((p) => {
             const Icono = p.icono

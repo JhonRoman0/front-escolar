@@ -19,7 +19,6 @@ import {
   recreosApi,
   suspensionesApi,
   turnosApi,
-  type RecreoRequest,
   type SuspensionRequest,
 } from "@/lib/api/academico"
 

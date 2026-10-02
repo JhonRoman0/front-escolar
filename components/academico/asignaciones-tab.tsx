@@ -120,7 +120,7 @@ export default function AsignacionesTab() {
             </div>
             {puedeCrear && (
               <Button
-                className="bg-[#274CB4] text-white hover:bg-[#274CB4]/85"
+                variant="brand"
                 onClick={() => {
                   setEditando(null)
                   setDialogOpen(true)

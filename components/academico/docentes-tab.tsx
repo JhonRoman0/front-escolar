@@ -137,13 +137,13 @@ export default function DocentesTab() {
               </Button>
             )}
             {puedeCrear && (
-              <Button
-                className="bg-[#274CB4] text-white hover:bg-[#274CB4]/85"
-                onClick={() => {
-                  setEditando(null)
-                  setDialogOpen(true)
-                }}
-              >
+            <Button
+              variant="brand"
+              onClick={() => {
+                setEditando(null)
+                setDialogOpen(true)
+              }}
+            >
                 <Plus data-icon="inline-start" />
                 Nuevo docente
               </Button>

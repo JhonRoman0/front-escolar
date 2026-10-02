@@ -247,7 +247,8 @@ export function AlumnosTab() {
             )}
             {puedeCrear && (
               <Button
-                className="h-8 rounded-[8px] bg-[#274CB4] text-white hover:bg-[#274CB4]/85 text-[12px] font-semibold"
+                variant="brand"
+                className="rounded-[8px] text-[12px] font-semibold"
                 onClick={() => {
                   setEditando(null)
                   setDialogSeq((s) => s + 1)
