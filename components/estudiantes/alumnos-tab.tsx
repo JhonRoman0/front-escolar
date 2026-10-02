@@ -45,7 +45,7 @@ import { AlumnoQrModal } from "./alumno-qr-modal"
 
 const TAMANIO_PAGINA = 10
 
-const AVATAR_COLORS = ["bg-[#3A62D4]", "bg-[#16A34A]", "bg-[#8EA5E6]", "bg-[#FAA94B]", "bg-[#DC2626]", "bg-[#E1E7F9]"]
+const AVATAR_COLORS = ["bg-brand-info", "bg-[#16A34A]", "bg-[#8EA5E6]", "bg-[#FAA94B]", "bg-[#DC2626]", "bg-brand-subtle"]
 
 function avatarColor(nombre: string) {
   let h = 0
@@ -465,7 +465,7 @@ export function AlumnosTab() {
               label: "Grado y sección",
               opciones: [],
               valor: "",
-              onChange: () => {},
+              onChange: () => { },
               render: () => <GradoSeccionCascada value={filtroGradoSeccion} onChange={setFiltroGradoSeccion} />,
             },
           ]}

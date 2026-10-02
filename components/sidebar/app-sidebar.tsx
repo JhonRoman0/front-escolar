@@ -34,19 +34,19 @@ export default function AppSidebar({ ...props }: React.ComponentProps<typeof Sid
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg">
-              <Link href="/" className="flex items-center gap-2">
-                <Image
-                  src="/logo-colegio.jpg"
-                  alt="Logo del colegio"
-                  width={24}
-                  height={24}
-                  className="h-6 w-6 rounded-lg object-cover"
-                />
-                <span className="select-none text-base font-semibold text-black/20 font-[family-name:var(--font-sidebar)]">
-                  Sistema Escolar
-                </span>
-              </Link>
+            {/* Mismo patrón que MenuModules: el Link entra por `render` para que el
+                botón y el enlace sean un solo elemento clickeable. */}
+            <SidebarMenuButton size="lg" render={<Link href="/" />}>
+              <Image
+                src="/logo-colegio.jpg"
+                alt="Logo del colegio"
+                width={24}
+                height={24}
+                className="h-6 w-6 rounded-lg object-cover"
+              />
+              <span className="select-none text-base font-semibold text-black/20 font-[family-name:var(--font-sidebar)]">
+                Sistema Escolar
+              </span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
