@@ -125,34 +125,44 @@ export const gradoSchema = z
     accesoId: accesoId.optional(),
   })
   .superRefine((data, ctx) => {
-    if (data.idNivel !== 1 && data.secciones.length === 0) {
+    if (data.secciones.length === 0) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["secciones"],
         message: "Indica al menos una sección",
       })
     }
-    if (data.idNivel === 1 && data.secciones.length > 0) {
+    const limpias = data.secciones.map((s) => s.trim().toLowerCase())
+    const duplicado = limpias.find((s, i) => limpias.indexOf(s) !== i)
+    if (duplicado) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["secciones"],
-        message: "El nivel Inicial no tiene secciones",
+        message:
+          "No se pueden repetir secciones dentro del mismo grado (secciones duplicadas).",
       })
-    }
-    if (data.secciones.length > 0) {
-      const limpias = data.secciones.map((s) => s.trim().toLowerCase())
-      const duplicado = limpias.find((s, i) => limpias.indexOf(s) !== i)
-      if (duplicado) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["secciones"],
-          message:
-            "No se pueden repetir secciones dentro del mismo grado (secciones duplicadas).",
-        })
-      }
     }
   })
 export type GradoValues = z.infer<typeof gradoSchema>
+
+// ── Sección nueva ────────────────────────────────────────────────────────
+
+/**
+ * Alta de una sección sobre un grado que ya existe. El año no viaja en el
+ * formulario: el backend usa el vigente. Mandarlo abriría la puerta a colgar
+ * la sección de un año que el usuario no está viendo.
+ */
+export const seccionSchema = z.object({
+  idTurno: z.number().int().min(1, "Selecciona un turno"),
+  idNivel: z.number().int().min(1, "Selecciona un nivel"),
+  idGrado: z.number().int().min(1, "Selecciona un grado"),
+  nombre: z
+    .string()
+    .trim()
+    .min(1, "La sección es requerida")
+    .max(50, "Máximo 50 caracteres"),
+})
+export type SeccionValues = z.infer<typeof seccionSchema>
 
 // ── Año escolar ──────────────────────────────────────────────────────────
 

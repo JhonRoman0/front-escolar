@@ -80,7 +80,7 @@ import {
   type TurnoValues,
 } from "@/lib/schemas/academico"
 import { usePuede } from "@/hooks/use-permisos"
-import { GradosEstructura } from "./grados-estructura"
+import { SeccionesEstructura } from "./secciones-estructura"
 
 interface CatalogosTabProps {
   puedeTurnos: boolean
@@ -104,7 +104,7 @@ export default function CatalogosTab({
       { value: "turnos", label: "Turnos", icon: Clock3, show: puedeTurnos },
       { value: "aulas", label: "Aulas", icon: DoorOpen, show: puedeAulas },
       { value: "anios", label: "Año escolar", icon: CalendarDays, show: puedeAnios },
-      { value: "grados", label: "Grados y secciones", icon: GraduationCap, show: puedeGrados },
+      { value: "grados", label: "Secciones", icon: GraduationCap, show: puedeGrados },
     ],
     [puedeAnios, puedeAulas, puedeGrados, puedeTurnos]
   )
@@ -154,7 +154,7 @@ export default function CatalogosTab({
       )}
       {puedeGrados && (
         <TabsContent value="grados">
-          <GradosEstructura
+          <SeccionesEstructura
             onIrATurnos={puedeTurnos ? () => setActivo("turnos") : undefined}
             onIrAAnios={puedeAnios ? () => setActivo("anios") : undefined}
           />

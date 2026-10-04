@@ -2,6 +2,7 @@ import {
   keepPreviousData,
   useMutation,
   useQuery,
+  useQueryClient,
 } from "@tanstack/react-query"
 
 import { useCrud } from "@/hooks/use-crud"
@@ -19,6 +20,7 @@ import {
   recreosApi,
   suspensionesApi,
   turnosApi,
+  type SeccionRequest,
   type SuspensionRequest,
 } from "@/lib/api/academico"
 
@@ -130,6 +132,36 @@ export function useSeccionesPorGrado(idGrado: number | null) {
     queryFn: () => gradoSeccionApi.porGrado(idGrado as number),
     enabled: !!idGrado,
     staleTime: 1000 * 60 * 10,
+  })
+}
+
+/**
+ * Alta y baja de una seccion suelta sobre un grado existente. Se invalidan
+ * grados y asignaciones porque las dos listas muestran el nombre de la seccion
+ * y, ademas, crear una seccion con el anio vigente suma un turno nuevo en la
+ * cascada de matricula.
+ */
+export function useCrearSeccion() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (data: SeccionRequest) => gradoSeccionApi.crear(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: KEYS.grados })
+      queryClient.invalidateQueries({ queryKey: KEYS.secciones })
+      queryClient.invalidateQueries({ queryKey: KEYS.asignaciones })
+    },
+  })
+}
+
+export function useEliminarSeccion() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (idGradoSeccion: number) => gradoSeccionApi.eliminar(idGradoSeccion),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: KEYS.grados })
+      queryClient.invalidateQueries({ queryKey: KEYS.secciones })
+      queryClient.invalidateQueries({ queryKey: KEYS.asignaciones })
+    },
   })
 }
 

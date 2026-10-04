@@ -49,19 +49,14 @@ export function GradoSeccionCascada({
     : todosGrados
   const { data: secciones = [] } = useSeccionesPorGrado(idGrado)
 
-  const gradoSel = grados.find((g) => g.idGrado === idGrado)
-  const esInicial = !!gradoSel && secciones.length === 0 && gradoSel.idGradoSeccionDefault != null
-
   useEffect(() => {
     if (value && secciones.length > 0) {
       const sec = secciones.find((s) => s.idGradoSeccion === value)
       if (sec) {
         onSeccionInfo?.({ idGradoSeccion: sec.idGradoSeccion, nombreSeccion: sec.nombre, turno: sec.turno })
       }
-    } else if (esInicial && gradoSel) {
-      onSeccionInfo?.({ idGradoSeccion: gradoSel.idGradoSeccionDefault!, nombreSeccion: "Única", turno: gradoSel.turno })
     }
-  }, [value, secciones, esInicial, gradoSel, onSeccionInfo])
+  }, [value, secciones, onSeccionInfo])
 
   function cambiarNivel(v: string | null) {
     const nuevo = v ? Number(v) : null
@@ -151,37 +146,31 @@ export function GradoSeccionCascada({
             Sección
           </label>
         )}
-        {esInicial ? (
-          <div className="flex h-9 items-center rounded-md border px-3 text-sm text-muted-foreground">
-            Única
-          </div>
-        ) : (
-          <Select
-            value={value ? String(value) : ""}
-            onValueChange={(v) => {
-              const id = v ? Number(v) : null
-              onChange(id)
-              if (id) {
-                const sec = secciones.find((s) => s.idGradoSeccion === id)
-                onSeccionInfo?.(sec ? { idGradoSeccion: sec.idGradoSeccion, nombreSeccion: sec.nombre, turno: sec.turno } : null)
-              } else {
-                onSeccionInfo?.(null)
-              }
-            }}
-            disabled={disabled || !idGrado}
-          >
-            <SelectTrigger>
-              <SelectValue>{label ?? "Sección"}</SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {secciones.map((s) => (
-                <SelectItem key={s.idGradoSeccion} value={String(s.idGradoSeccion)}>
-                  {s.nombre} ({s.turno})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
+        <Select
+          value={value ? String(value) : ""}
+          onValueChange={(v) => {
+            const id = v ? Number(v) : null
+            onChange(id)
+            if (id) {
+              const sec = secciones.find((s) => s.idGradoSeccion === id)
+              onSeccionInfo?.(sec ? { idGradoSeccion: sec.idGradoSeccion, nombreSeccion: sec.nombre, turno: sec.turno } : null)
+            } else {
+              onSeccionInfo?.(null)
+            }
+          }}
+          disabled={disabled || !idGrado}
+        >
+          <SelectTrigger>
+            <SelectValue>{label ?? "Sección"}</SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {secciones.map((s) => (
+              <SelectItem key={s.idGradoSeccion} value={String(s.idGradoSeccion)}>
+                {s.nombre} ({s.turno})
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
     </div>
   )
