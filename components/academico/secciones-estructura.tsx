@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { toast } from "sonner"
 import {
   ArrowRight,
@@ -9,13 +9,9 @@ import {
   GraduationCap,
   Plus,
   Trash2,
-  X,
   type LucideIcon,
 } from "lucide-react"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form"
 
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import {
@@ -27,14 +23,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import {
-  Field,
-  FieldContent,
-  FieldDescription,
-  FieldError,
-  FieldGroup,
-  FieldLabel,
-} from "@/components/ui/field"
+import { Field, FieldContent, FieldDescription, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import {
   Select,
@@ -45,22 +34,20 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { BotonNuevo } from "@/components/shared/boton-nuevo"
-import { BotonGuardar } from "@/components/shared/boton-guardar"
 import { HeaderSeccion } from "@/components/shared/header-seccion"
 import { SeccionesPorNivel } from "@/components/academico/secciones-por-nivel"
+import { NuevaSeccionDialog } from "@/components/academico/nueva-seccion-dialog"
 import {
   useAniosEscolares,
   useCrearSeccion,
   useEliminarSeccion,
   useGrados,
-  useGradosPorNivel,
   useNiveles,
   useSeccionesPorGrado,
   useTurnos,
 } from "@/hooks/use-academico"
 import { usePuede } from "@/hooks/use-permisos"
 import type { GradoResponse, TurnoResponse } from "@/lib/api/academico"
-import { seccionSchema, type SeccionValues } from "@/lib/schemas/academico"
 
 interface SeccionesEstructuraProps {
   onIrATurnos?: () => void
@@ -127,15 +114,13 @@ export function SeccionesEstructura({
             Reintentar
           </Button>
         )}
-        {/* TODO: Reactivar cuando se implemente NuevaSeccionDialog
-<NuevaSeccionDialog
-  open={nuevaAbierto}
-  onOpenChange={setNuevaAbierto}
-  niveles={niveles}
-  turnos={turnos}
-  turnoPorDefecto={turnoActivo}
-/>
-*/}
+        <NuevaSeccionDialog
+          open={nuevaAbierto}
+          onOpenChange={setNuevaAbierto}
+          niveles={niveles}
+          turnos={turnos}
+          turnoPorDefecto={turnoActivo}
+        />
         {editando && (
           <EditarSeccionesDialog
             key={`${editando.grado.idGrado}-${editando.idTurno}`}

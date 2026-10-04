@@ -147,21 +147,94 @@ export type GradoValues = z.infer<typeof gradoSchema>
 
 // ── Sección nueva ────────────────────────────────────────────────────────
 
+/** Una sola letra mayúscula: es como se rotulan las secciones en los listados. */
+const letraSeccion = /^[A-Z]$/
+
 /**
- * Alta de una sección sobre un grado que ya existe. El año no viaja en el
- * formulario: el backend usa el vigente. Mandarlo abriría la puerta a colgar
- * la sección de un año que el usuario no está viendo.
+ * Indices de las secciones que chocan entre si o con las que ya estan creadas,
+ * con el mensaje que va bajo cada input. Vive fuera del schema porque la misma
+ * comprobacion se usa al enviar y mientras se escribe: tenerla en un solo lado
+ * evita que los dos caminos se diferencien en el texto.
+ *
+ * Se salta lo que aun no es una letra (vacio o con formato invalido) para no
+ * marcar en rojo una fila recien agregada. Ese caso lo cubre el schema, que
+ * ademas es el que bloquea el envio.
  */
-export const seccionSchema = z.object({
-  idTurno: z.number().int().min(1, "Selecciona un turno"),
-  idNivel: z.number().int().min(1, "Selecciona un nivel"),
-  idGrado: z.number().int().min(1, "Selecciona un grado"),
-  nombre: z
-    .string()
-    .trim()
-    .min(1, "La sección es requerida")
-    .max(50, "Máximo 50 caracteres"),
-})
+export function duplicadosDeSeccion(
+  secciones: string[],
+  existentes: string[] = [],
+): Map<number, string> {
+  const yaCreadas = new Set(
+    existentes.map((s) => s.trim().toUpperCase()).filter(Boolean),
+  )
+  // La que se marca es la segunda, no la primera: el error tiene que señalar el
+  // input que el usuario acaba de escribir, no uno que ya estaba bien.
+  const enElFormulario = new Set<string>()
+  const conflictos = new Map<number, string>()
+
+  secciones.forEach((bruto, i) => {
+    const seccion = bruto.trim().toUpperCase()
+
+    if (!seccion || !letraSeccion.test(seccion)) return
+
+    if (enElFormulario.has(seccion)) {
+      conflictos.set(i, "Ya agregaste esta sección")
+      return
+    }
+    if (yaCreadas.has(seccion)) {
+      conflictos.set(i, `La sección ${seccion} ya existe en ese turno`)
+      return
+    }
+    enElFormulario.add(seccion)
+  })
+
+  return conflictos
+}
+
+/**
+ * Alta de varias secciones sobre un grado que ya existe, todas de la misma
+ * combinacion de turno, nivel y grado. El año no viaja en el formulario: el
+ * backend usa el vigente. Mandarlo abriría la puerta a colgar las secciones de
+ * un año que el usuario no está viendo.
+ *
+ * `existentes` son las letras que ya tiene ese grado en ese turno y año. Se
+ * pasan desde el formulario porque el backend responde el lote entero con un
+ * error genérico, y el mensaje tiene que caer junto al input que lo produjo,
+ * no arriba de todo el formulario. El backend sigue siendo quien corta de
+ * verdad: esto es para que el error se vea antes de enviar.
+ */
+export const crearSeccionSchema = (existentes: string[] = []) =>
+  z
+    .object({
+      idTurno: z.number().int().min(1, "Selecciona un turno"),
+      idNivel: z.number().int().min(1, "Selecciona un nivel"),
+      idGrado: z.number().int().min(1, "Selecciona un grado"),
+      secciones: z
+        .array(z.string())
+        .min(1, "Indica al menos una sección")
+        .max(26, "Máximo 26 secciones"),
+    })
+    .superRefine((data, ctx) => {
+      data.secciones.forEach((bruto, i) => {
+        if (!letraSeccion.test(bruto.trim().toUpperCase())) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["secciones", i],
+            message: "Ingresa una sola letra (A-Z)",
+          })
+        }
+      })
+
+      duplicadosDeSeccion(data.secciones, existentes).forEach((message, i) => {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["secciones", i],
+          message,
+        })
+      })
+    })
+
+export const seccionSchema = crearSeccionSchema()
 export type SeccionValues = z.infer<typeof seccionSchema>
 
 // ── Año escolar ──────────────────────────────────────────────────────────

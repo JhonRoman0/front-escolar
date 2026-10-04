@@ -145,6 +145,19 @@ export interface SeccionRequest {
   idAnio?: number | null
 }
 
+/**
+ * Varias secciones de una vez sobre la misma combinación de grado, turno y año
+ * vigente. El backend las valida todas antes de insertar la primera, así que si
+ * una se repite o ya existe no se crea ninguna.
+ */
+export interface SeccionesBatchRequest {
+  idGrado: number
+  idTurno: number
+  nombres: string[]
+  /** Opcional: el backend usa el año vigente cuando no viene. */
+  idAnio?: number | null
+}
+
 // ── Año escolar ──────────────────────────────────────────────────────────
 
 export interface AnioEscolarResponse {
@@ -309,6 +322,13 @@ export const gradoSeccionApi = {
     apiFetch<GradoSeccionItem[]>(`/secciones?idGrado=${idGrado}`),
   async crear(request: SeccionRequest): Promise<GradoSeccionItem> {
     return apiFetch<GradoSeccionItem>("/secciones", {
+      method: "POST",
+      body: JSON.stringify(request),
+    })
+  },
+  /** Lote atómico: o se crean todas las secciones o ninguna. */
+  async crearLote(request: SeccionesBatchRequest): Promise<GradoSeccionItem[]> {
+    return apiFetch<GradoSeccionItem[]>("/secciones/lote", {
       method: "POST",
       body: JSON.stringify(request),
     })

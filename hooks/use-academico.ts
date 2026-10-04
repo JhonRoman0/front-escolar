@@ -21,6 +21,7 @@ import {
   suspensionesApi,
   turnosApi,
   type SeccionRequest,
+  type SeccionesBatchRequest,
   type SuspensionRequest,
 } from "@/lib/api/academico"
 
@@ -145,6 +146,24 @@ export function useCrearSeccion() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (data: SeccionRequest) => gradoSeccionApi.crear(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: KEYS.grados })
+      queryClient.invalidateQueries({ queryKey: KEYS.secciones })
+      queryClient.invalidateQueries({ queryKey: KEYS.asignaciones })
+    },
+  })
+}
+
+/**
+ * Alta de varias secciones de golpe sobre la misma combinacion de grado, turno
+ * y anio. Se invalidan las mismas tres listas que la alta simple: grados porque
+ * es la tabla que las muestra, secciones porque las lista el dialogo de editar,
+ * y asignaciones porque courses quedan colgados de ellas.
+ */
+export function useCrearSeccionesLote() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (data: SeccionesBatchRequest) => gradoSeccionApi.crearLote(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: KEYS.grados })
       queryClient.invalidateQueries({ queryKey: KEYS.secciones })
