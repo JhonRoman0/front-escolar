@@ -3,6 +3,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
+        NEXT_PUBLIC_USAR_MOCK: ${NEXT_PUBLIC_USAR_MOCK:-}
     container_name: nextjs_frontend
     restart: always
     ports:
