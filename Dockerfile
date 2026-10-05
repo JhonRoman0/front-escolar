@@ -1,12 +1,13 @@
 # 1. Dependencias
-FROM node:20-slim AS deps
+FROM node:20-alpine AS deps
+RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-COPY package.json pnpm-lock.yaml .npmrc ./
+COPY package.json pnpm-lock.yaml ./
 RUN npm install -g pnpm && pnpm install --frozen-lockfile
 
 # 2. Builder
-FROM node:20-slim AS builder
+FROM node:20-alpine AS builder
 WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
@@ -15,16 +16,10 @@ COPY . .
 # Desactivar telemetría durante el build
 ENV NEXT_TELEMETRY_DISABLED 1
 
-# Vars públicas pasadas como build args (next build las incrusta en el bundle)
-ARG NEXT_PUBLIC_API_URL
-ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
-ARG NEXT_PUBLIC_USAR_MOCK
-ENV NEXT_PUBLIC_USAR_MOCK=$NEXT_PUBLIC_USAR_MOCK
-
-RUN npm install -g pnpm && pnpm run build
+RUN pnpm run build
 
 # 3. Runner (Imagen final ligera)
-FROM node:20-slim AS runner
+FROM node:20-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV production
