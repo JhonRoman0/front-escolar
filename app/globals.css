@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+@import "react-day-picker/style.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -136,6 +137,30 @@
   --sidebar-accent-foreground: #e4eaf5;
   --sidebar-border: #2a3a55;
   --sidebar-ring: #2e6fd6;
+}
+
+/*
+ * react-day-picker v10 trae su propia hoja de estilos y expone el color y las
+ * medidas como variables --rdp-*. Se sobreescriben aquí para que el calendario
+ * use la paleta del tema en vez de su azul por defecto, sin tener que replicar
+ * en classNames cada elemento de la librería.
+ */
+.rdp-root {
+  --rdp-accent-color: var(--primary);
+  --rdp-accent-background-color: var(--accent);
+  --rdp-day-height: 2rem;
+  --rdp-day-width: 2rem;
+  --rdp-day_button-height: 2rem;
+  --rdp-day_button-width: 2rem;
+  --rdp-day_button-border-radius: calc(var(--radius-md) - 2px);
+  --rdp-day_button-border: 1px solid transparent;
+  --rdp-today-color: var(--primary);
+  --rdp-disabled-opacity: 0.35;
+  --rdp-outside-opacity: 0.4;
+  --rdp-nav-height: 2rem;
+  --rdp-nav_button-height: 1.75rem;
+  --rdp-nav_button-width: 1.75rem;
+  --rdp-months-gap: 0;
 }
 
 @layer base {

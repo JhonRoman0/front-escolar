@@ -144,6 +144,13 @@ export interface AnioEscolarRequest {
   accesoId?: number | null
 }
 
+/** 1 = VIGENTE, 2 = CERRADO (lo asigna el backend al vencer fechaFin), 3 = POR COMENZAR. */
+export const ESTADO_ANIO = {
+  VIGENTE: 1,
+  CERRADO: 2,
+  POR_COMENZAR: 3,
+} as const
+
 // ── Aula ─────────────────────────────────────────────────────────────────
 
 export interface AulaResponse {
@@ -271,9 +278,20 @@ export const gradosApi = {
     return apiFetch<GradoResponse[]>(`/grados?idNivel=${idNivel}`)
   },
 }
-export const aniosEscolaresApi = crud<AnioEscolarResponse, AnioEscolarRequest>(
-  "/anios-escolares"
-)
+export const aniosEscolaresApi = {
+  ...crud<AnioEscolarResponse, AnioEscolarRequest>("/anios-escolares"),
+  /**
+   * El estado se cambia por endpoint propio y no por el PUT general: al activar
+   * un VIGENTE el backend cierra el anterior en la misma transacción, y esa
+   * transición no se puede expresar como un update del recurso.
+   */
+  async cambiarEstado(idAnio: number, estado: number): Promise<AnioEscolarResponse> {
+    return apiFetch<AnioEscolarResponse>(`/anios-escolares/${idAnio}/estado`, {
+      method: "PATCH",
+      body: JSON.stringify({ estado }),
+    })
+  },
+}
 export const aulasApi = crud<AulaResponse, AulaRequest>("/aulas")
 
 export const nivelesApi = {
