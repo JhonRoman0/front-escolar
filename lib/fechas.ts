@@ -64,3 +64,36 @@ export function esFechaFutura(fecha: Date): boolean {
   f.setHours(0, 0, 0, 0)
   return f > hoy
 }
+
+// ── Año lectivo ──────────────────────────────────────────────────────────
+
+/** "YYYY-MM-DD" → Date en hora local; undefined si el texto no es una fecha. */
+export function isoADate(iso: string | null | undefined): Date | undefined {
+  if (!iso) return undefined
+  const d = new Date(iso.length === 10 ? `${iso}T00:00:00` : iso)
+  return Number.isNaN(d.getTime()) ? undefined : d
+}
+
+/**
+ * Date → "YYYY-MM-DD" en hora local.
+ *
+ * No usar toISOString(): eso convierte a UTC y enUtc-5 un 1 de marzo a la
+ * medianoche sale como 28 de febrero del año anterior.
+ */
+export function dateAIso(fecha: Date): string {
+  const mes = String(fecha.getMonth() + 1).padStart(2, "0")
+  const dia = String(fecha.getDate()).padStart(2, "0")
+  return `${fecha.getFullYear()}-${mes}-${dia}`
+}
+
+/**
+ * Rango admitido para el periodo lectivo de un año escolar, en ISO.
+ *
+ * El año escolar guarda el periodo lectivo, no el de matrícula, así que se
+ * admiten fechas del año anterior: es lo que permite abrir la matrícula antes
+ * de que empiece el año o registrar un periodo ya transcurrido que empezó en
+ * diciembre del año previo.
+ */
+export function rangoLectivo(anio: string): { min: string; max: string } {
+  return { min: `${Number(anio) - 1}-01-01`, max: `${anio}-12-31` }
+}

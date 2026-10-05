@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 import { CalendarDays, CircleHelp, Clock3, CloudSun, DoorOpen, GraduationCap, Loader2, Pencil, Sun, TriangleAlert, X, type LucideIcon } from "lucide-react"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -24,10 +24,20 @@ import {
   FieldError,
   FieldGroup,
   FieldLabel,
+  FieldLegend,
   FieldSet,
 } from "@/components/ui/field"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import {
   Table,
   TableBody,
@@ -39,9 +49,11 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 import { EstadoBadge } from "@/components/seguridad/estado-badge"
+import { ConfirmarEliminar } from "@/components/seguridad/confirmar-eliminar"
 import { BotonNuevo } from "@/components/shared/boton-nuevo"
 import { BotonGuardar } from "@/components/shared/boton-guardar"
 import { HeaderSeccion } from "@/components/shared/header-seccion"
+import { SelectorFecha } from "@/components/shared/selector-fecha"
 import { useEliminarConToast } from "@/hooks/use-eliminar-toast"
 import {
   AccionesFila,
@@ -53,6 +65,7 @@ import {
 import {
   useAniosEscolares,
   useAulas,
+  useCambiarEstadoAnioEscolar,
   useCrudAniosEscolares,
   useCrudAulas,
   useCrudCursos,
@@ -66,8 +79,9 @@ import type {
   CursoResponse,
   TurnoResponse,
 } from "@/lib/api/academico"
-import { horaCorta } from "@/lib/api/academico"
+import { ESTADO_ANIO, horaCorta } from "@/lib/api/academico"
 import { conflictosTurnos, type TurnoFranja } from "@/lib/turnos"
+import { rangoLectivo } from "@/lib/fechas"
 import {
   anioEscolarSchema,
   aulaSchema,
@@ -770,6 +784,13 @@ function AniosTab() {
 
   const eliminarConToast = useEliminarConToast()
 
+  // Años ya registrados, para deshabilitarlos en el selector del diálogo y no
+  // chocar contra el UNIQUE de la tabla.
+  const aniosExistentes = useMemo(
+    () => (data ?? []).map((a) => a.anio),
+    [data]
+  )
+
   function handleEliminar(anio: AnioEscolarResponse) {
     return eliminarConToast(crud.eliminar.mutateAsync, {
       id: anio.idAnio,
@@ -782,7 +803,7 @@ function AniosTab() {
       <CardContent className="flex flex-col gap-4 p-4">
         <HeaderSeccion
           titulo="Años escolares"
-          descripcion="Al crear un año nuevo queda vigente y el anterior se cierra automáticamente."
+          descripcion="Un año por vez puede estar vigente; los demás quedan por comenzar o cerrados al vencer su fecha de fin."
           acciones={
             <BotonNuevo
               texto="Nuevo año escolar"
@@ -812,21 +833,23 @@ function AniosTab() {
                   <TableCell className="text-xs">{anio.fechaInicio || "—"}</TableCell>
                   <TableCell className="text-xs">{anio.fechaFin || "—"}</TableCell>
                   <TableCell><AnioBadge estado={anio.estado} /></TableCell>
-                  <TableCell className="text-right"><AccionesFila puedeActualizar={puedeActualizar} puedeEliminar={puedeEliminar} onEditar={() => { setEditando(anio); setDialogOpen(true) }} onEliminar={() => handleEliminar(anio)} tituloEliminar="Eliminar año escolar" descripcionEliminar={`Se marcará el año ${anio.anio} como eliminado.`} ariaEditar={`Editar año ${anio.anio}`} /></TableCell>
+                  <TableCell className="text-right"><AccionesFila puedeActualizar={puedeActualizar && anio.estado !== ESTADO_ANIO.CERRADO} puedeEliminar={puedeEliminar} onEditar={() => { setEditando(anio); setDialogOpen(true) }} onEliminar={() => handleEliminar(anio)} tituloEliminar="Eliminar año escolar" descripcionEliminar={`Se marcará el año ${anio.anio} como eliminado.`} ariaEditar={`Editar año ${anio.anio}`} /></TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </div>
         {isError && <Button variant="outline" size="sm" onClick={() => refetch()}>Reintentar</Button>}
-        <AnioDialog open={dialogOpen} onOpenChange={setDialogOpen} anio={editando} crear={crud.crear} actualizar={crud.actualizar} />
+        <AnioDialog open={dialogOpen} onOpenChange={setDialogOpen} anio={editando} anios={data} aniosExistentes={aniosExistentes} crear={crud.crear} actualizar={crud.actualizar} />
       </CardContent>
     </Card>
   )
 }
 
 export function AnioBadge({ estado }: { estado: number }) {
-  if (estado === 1) return <Badge variant="success">Vigente</Badge>
+  if (estado === ESTADO_ANIO.VIGENTE) return <Badge variant="success">Vigente</Badge>
+  if (estado === ESTADO_ANIO.POR_COMENZAR)
+    return <Badge variant="warning">Por comenzar</Badge>
   return <Badge variant="outline">Cerrado</Badge>
 }
 
@@ -841,20 +864,41 @@ function diaSiguiente(iso: string | undefined): string | undefined {
   return d.toISOString().slice(0, 10)
 }
 
+/**
+ * Años ofrecidos por el selector: solo el año actual y el siguiente, los dos
+ * que el backend admite al crear. Recalculados en cada apertura para que la
+ * lista no envejezca.
+ *
+ * El `extra` es el año que se está editando: si es un año ya pasado sigue
+ * apareciendo, aunque quede fuera del rango, para no editar a ciegas. El
+ * backend no lo restringe al actualizar, solo al crear.
+ */
+function aniosSugeridos(anioEnEdicion?: string): number[] {
+  const actual = new Date().getFullYear()
+  const rango = Array.from({ length: 2 }, (_, i) => actual + i)
+  const extra = anioEnEdicion && /^\d{4}$/.test(anioEnEdicion) ? [Number(anioEnEdicion)] : []
+  return [...new Set([...rango, ...extra])].sort((a, b) => a - b)
+}
+
 function AnioDialog({
   open,
   onOpenChange,
   anio,
+  anios,
+  aniosExistentes,
   crear,
   actualizar,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   anio?: AnioEscolarResponse | null
+  anios: AnioEscolarResponse[] | undefined
+  aniosExistentes: string[]
   crear: ReturnType<typeof useCrudAniosEscolares>["crear"]
   actualizar: ReturnType<typeof useCrudAniosEscolares>["actualizar"]
 }) {
   const esEdicion = !!anio
+  const cambiarEstado = useCambiarEstadoAnioEscolar()
   // Por si la base tiene un año con caracteres raros, se muestra ya limpio
   // en vez de obligar a corregirlo a mano.
   // Primitivos y no el objeto: un refetch de React Query devuelve una referencia
@@ -862,35 +906,126 @@ function AnioDialog({
   const anioTexto = (anio?.anio ?? "").replace(/\D/g, "").slice(0, 4)
   const fechaInicioInicial = anio?.fechaInicio ?? ""
   const fechaFinInicial = anio?.fechaFin ?? ""
+  // Un CERRADO no vuelve a abrir: el selector de estado queda deshabilitado y su
+  // valor no se manda en el submit, porque cambiarlo es una transición prohibida
+  // y además el backend rechaza la edición de un cerrado completo.
+  const estadoInicial = anio?.estado ?? ESTADO_ANIO.POR_COMENZAR
+  const cerrado = estadoInicial === ESTADO_ANIO.CERRADO
+  // Al activar un vigente se cierra el anterior en la misma transacción. El
+  // relevo no se puede deshacer, así que se pide confirmación antes de enviar.
+  const [confirmarRelevo, setConfirmarRelevo] = useState(false)
+  const [pendiente, setPendiente] = useState<AnioEscolarValues | null>(null)
   const form = useForm<AnioEscolarValues>({
     resolver: zodResolver(anioEscolarSchema),
-    defaultValues: { anio: anioTexto, fechaInicio: fechaInicioInicial, fechaFin: fechaFinInicial },
+    defaultValues: {
+      anio: anioTexto,
+      estado: estadoInicial,
+      fechaInicio: fechaInicioInicial,
+      fechaFin: fechaFinInicial,
+    },
   })
 
   // El selector de fin no puede ofrecer fechas anteriores al día siguiente
   // del inicio. Sin fecha de inicio no hay mínimo y se puede elegir cualquiera.
   // useWatch en vez de form.watch: watch() no se puede memoizar y hace que React
   // Compiler se salte el componente entero.
+  const anioSeleccionado = useWatch({ control: form.control, name: "anio" })
   const fechaInicio = useWatch({ control: form.control, name: "fechaInicio" })
   const minFechaFin = diaSiguiente(fechaInicio)
+
+  // El vigente que se cerraría al guardar. Se excluye el propio año en edición:
+  // re-guardar un vigente que ya lo es no releva a nadie, así que no debe pedir
+  // confirmación. En alta (anio == null) cualquier vigente cuenta como otro.
+  const vigenteQueSeCierra = useMemo(
+    () =>
+      (anios ?? []).find(
+        (a) =>
+          a.estado === ESTADO_ANIO.VIGENTE && a.idAnio !== anio?.idAnio
+      ),
+    [anios, anio?.idAnio]
+  )
+
+  // El calendario se acota al año escolar elegido y al anterior: estas fechas
+  // son el periodo lectivo, no el de matrícula, pero el periodo sí puede empezar
+  // en diciembre del año previo al que se está matriculando.
+  const rango = useMemo(
+    () =>
+      /^\d{4}$/.test(anioSeleccionado)
+        ? rangoLectivo(anioSeleccionado)
+        : undefined,
+    [anioSeleccionado]
+  )
+
+  // Cambiar el año mueve el rango admitido y deja obsoletas las fechas ya
+  // elegidas: el calendario las mostraría seleccionadas pero deshabilitadas, sin
+  // forma de ver ni de corregir el error. Se limpian en vez de dejarse.
+  const saneaFechasAlCambiarAnio = useCallback(
+    (nuevoAnio: string) => {
+      if (!/^\d{4}$/.test(nuevoAnio)) return
+      const { min, max } = rangoLectivo(nuevoAnio)
+      const dentro = (fecha: string) => fecha !== "" && fecha >= min && fecha <= max
+      const inicio = form.getValues("fechaInicio") ?? ""
+      const fin = form.getValues("fechaFin") ?? ""
+      const nuevoInicio = dentro(inicio) ? inicio : ""
+      // El fin solo sobrevive si el inicio sobrevivió y sigue siendo posterior.
+      const nuevoFin = nuevoInicio && dentro(fin) && fin > nuevoInicio ? fin : ""
+      if (nuevoInicio !== inicio) form.setValue("fechaInicio", nuevoInicio)
+      if (nuevoFin !== fin) form.setValue("fechaFin", nuevoFin)
+    },
+    [form]
+  )
+
+  // Los años ya registrados se deshabilitan para no chocar contra el UNIQUE de
+  // la tabla. El que se está editando sí queda habilitado.
+  const aniosUsados = useMemo(
+    () => new Set(aniosExistentes.filter((a) => a !== anio?.anio)),
+    [aniosExistentes, anio?.anio]
+  )
 
   // El diálogo se renderiza siempre y solo cambia `open`, así que useForm
   // conserva los valores entre aperturas. Resetear al abrir deja el form limpio
   // sin depender de una key que solo remonta cuando cambia el registro.
   useEffect(() => {
     if (!open) return
-    form.reset({ anio: anioTexto, fechaInicio: fechaInicioInicial, fechaFin: fechaFinInicial })
-  }, [open, anioTexto, fechaInicioInicial, fechaFinInicial, form])
+    form.reset({
+      anio: anioTexto,
+      estado: estadoInicial,
+      fechaInicio: fechaInicioInicial,
+      fechaFin: fechaFinInicial,
+    })
+  }, [open, anioTexto, estadoInicial, fechaInicioInicial, fechaFinInicial, form])
 
-  async function onSubmit(values: AnioEscolarValues) {
+  async function guardar(values: AnioEscolarValues) {
+    const { estado, ...datos } = values
     try {
-      if (esEdicion && anio) await actualizar.mutateAsync({ id: anio.idAnio, data: values })
-      else await crear.mutateAsync(values)
+      if (esEdicion && anio) {
+        // El estado viaja por su PATCH: activar un VIGENTE cierra el anterior en
+        // la misma transacción y eso no lo resuelve el update general.
+        if (!cerrado && estado !== anio.estado) {
+          await cambiarEstado.mutateAsync({ idAnio: anio.idAnio, estado })
+        }
+        await actualizar.mutateAsync({ id: anio.idAnio, data: datos })
+      } else {
+        await crear.mutateAsync({ ...datos, estado })
+      }
       toast.success(esEdicion ? "Año escolar actualizado" : "Año creado")
+      setPendiente(null)
       onOpenChange(false)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Error al guardar")
     }
+  }
+
+  // El submit no guarda de inmediato si va a cerrar otro vigente: guarda los
+  // valores y abre la confirmación, que es la que finally llama a guardar.
+  function onSubmit(values: AnioEscolarValues) {
+    const activaVigente = values.estado === ESTADO_ANIO.VIGENTE
+    if (activaVigente && vigenteQueSeCierra) {
+      setPendiente(values)
+      setConfirmarRelevo(true)
+      return
+    }
+    return guardar(values)
   }
 
   return (
@@ -911,21 +1046,50 @@ function AnioDialog({
                   <Field>
                     <FieldLabel>Año</FieldLabel>
                     <FieldContent>
-                      <Input
-                        placeholder="2026"
-                        inputMode="numeric"
-                        maxLength={4}
-                        autoFocus
-                        {...field}
-                        // Silencioso a propósito: una tecla que no es dígito
-                        // simplemente no entra. El filtro vive aquí y no en
-                        // onKeyDown para que también tape el pegado y el arrastre
-                        // de texto. El slice deja el tope de 4 en el código y no
-                        // apoyado en que el navegador respete maxLength.
-                        onChange={(e) => field.onChange(e.target.value.replace(/\D/g, "").slice(0, 4))}
-                      />
+                      <Select
+                        value={field.value || null}
+                        onValueChange={(valor) => {
+                          field.onChange(valor ?? "")
+                          if (valor) saneaFechasAlCambiarAnio(valor)
+                        }}
+                      >
+                        <SelectTrigger
+                          className="w-full"
+                          aria-invalid={error ? true : undefined}
+                        >
+                          <SelectValue>{field.value || "Selecciona"}</SelectValue>
+                        </SelectTrigger>
+                        {/* Este `SelectContent` va sin props, como los otros 44 del repo, y hay que
+                            dejarlo así. `alignItemWithTrigger` no es un fix de ancho: es lo
+                            que decide si la lista se alinea con el trigger o cuelga debajo.
+                            Con `true`, que es el default, Base UI descarta las coordenadas
+                            de floating-ui y recalcula para que el ítem elegido, o el
+                            primero si no hay nada elegido, quede a la altura del valor del
+                            trigger (SelectPopup.js:253-256). Con `false` el desplegable
+                            simplemente queda `sideOffset` debajo, y se nota como un hueco.
+                            No volver a agregar `min-w-0 w-[var(--anchor-width)]`: en un
+                            diálogo `sm:max-w-md` el trigger es más ancho que `min-w-36`,
+                            así que ninguna de las dos reglas llega a mandar. */}
+                        <SelectContent>
+                          <SelectGroup>
+                            {aniosSugeridos(anio?.anio).map((valor) => (
+                              <SelectItem
+                                key={valor}
+                                value={String(valor)}
+                                disabled={aniosUsados.has(String(valor))}
+                              >
+                                {valor}
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
                       {!error && (
-                        <FieldDescription className="text-xs">Solo números, 4 dígitos. Ej: 2026.</FieldDescription>
+                        <FieldDescription className="text-xs">
+                          {anioSeleccionado
+                            ? "Las fechas se limitan al año seleccionado."
+                            : "Elige el año para habilitar las fechas."}
+                        </FieldDescription>
                       )}
                       <FieldError errors={[error]} />
                     </FieldContent>
@@ -933,51 +1097,102 @@ function AnioDialog({
                 )
               }}
             />
+            <Controller
+              control={form.control}
+              name="estado"
+              render={({ field }) => (
+                <FieldSet disabled={cerrado}>
+                  <FieldLegend>Estado del año</FieldLegend>
+                  <FieldDescription className="mb-2 -mt-2 text-xs">
+                    {cerrado
+                      ? "Este año está cerrado y no admite cambios de estado."
+                      : "Al activar uno vigente, el anterior se cierra automáticamente."}
+                  </FieldDescription>
+                  <RadioGroup
+                    disabled={cerrado}
+                    value={String(field.value)}
+                    onValueChange={(valor) =>
+                      field.onChange(
+                        Number(valor) as (typeof ESTADO_ANIO)[keyof typeof ESTADO_ANIO]
+                      )
+                    }
+                  >
+                    <RadioGroupItem value={String(ESTADO_ANIO.POR_COMENZAR)}>
+                      <span className="text-sm font-medium">Por comenzar</span>
+                      <span className="text-xs text-muted-foreground">
+                        Las clases aún no inician.
+                      </span>
+                    </RadioGroupItem>
+                    <RadioGroupItem value={String(ESTADO_ANIO.VIGENTE)}>
+                      <span className="text-sm font-medium">Vigente</span>
+                      <span className="text-xs text-muted-foreground">
+                        Las clases ya están en curso.
+                      </span>
+                    </RadioGroupItem>
+                  </RadioGroup>
+                  <FieldError errors={[form.formState.errors.estado]} />
+                </FieldSet>
+              )}
+            />
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Controller
                 control={form.control}
                 name="fechaInicio"
                 render={({ field }) => (
-                  <Field>
-                    <FieldLabel>Fecha de inicio</FieldLabel>
-                    <FieldContent>
-                      <Input
-                        type="date"
-                        {...field}
-                        onChange={(e) => {
-                          const valor = e.target.value
-                          field.onChange(valor)
-                          // Si el inicio se mueve más allá del fin ya elegido,
-                          // ese fin queda obsoleto: se limpia para no dejarlo inválido.
-                          const min = diaSiguiente(valor)
-                          const finActual = form.getValues("fechaFin")
-                          if (valor && min && finActual && finActual < min) {
-                            form.setValue("fechaFin", "")
-                          }
-                        }}
-                      />
-                      <FieldError errors={[form.formState.errors.fechaInicio]} />
-                    </FieldContent>
-                  </Field>
+                  <SelectorFecha
+                    label="Fecha de inicio"
+                    value={field.value ?? ""}
+                    onChange={(valor) => {
+                      field.onChange(valor)
+                      // Si el inicio se mueve más allá del fin ya elegido,
+                      // ese fin queda obsoleto: se limpia para no dejarlo inválido.
+                      const min = diaSiguiente(valor)
+                      const finActual = form.getValues("fechaFin")
+                      if (valor && min && finActual && finActual < min) {
+                        form.setValue("fechaFin", "")
+                      }
+                    }}
+                    descripcion="Primer día de clases."
+                    min={rango?.min}
+                    max={rango?.max}
+                    error={form.formState.errors.fechaInicio}
+                  />
                 )}
               />
               <Controller
                 control={form.control}
                 name="fechaFin"
                 render={({ field }) => (
-                  <Field>
-                    <FieldLabel>Fecha de fin</FieldLabel>
-                    <FieldContent>
-                      <Input type="date" min={minFechaFin} {...field} />
-                      <FieldError errors={[form.formState.errors.fechaFin]} />
-                    </FieldContent>
-                  </Field>
+                  <SelectorFecha
+                    label="Fecha de fin"
+                    value={field.value ?? ""}
+                    onChange={field.onChange}
+                    descripcion="Último día de clases."
+                    min={minFechaFin ?? rango?.min}
+                    max={rango?.max}
+                    error={form.formState.errors.fechaFin}
+                  />
                 )}
               />
             </div>
           </FieldGroup>
           <DialogFooter><DialogTrigger render={<Button variant="outline" />}>Cancelar</DialogTrigger><BotonGuardar etiqueta={esEdicion ? "Guardar cambios" : "Crear año"} enviando={crear.isPending || actualizar.isPending} /></DialogFooter>
         </form>
+        {/* El relevo se confirma después de que el formulario ya validó: por eso
+            va controlado, fuera del <form>, y no como un trigger más. */}
+        {pendiente && (
+          <ConfirmarEliminar
+            open={confirmarRelevo}
+            onOpenChange={setConfirmarRelevo}
+            titulo={`Activar el año ${pendiente.anio} como vigente`}
+            descripcion={`Al guardar, el año ${vigenteQueSeCierra?.anio} se cerrará automáticamente porque solo puede haber un año vigente. Esta acción no se puede deshacer.`}
+            onConfirm={async () => {
+              await guardar(pendiente)
+            }}
+            textoBoton="Activar como vigente"
+            variantConfirmar="default"
+          />
+        )}
       </DialogContent>
     </Dialog>
   )

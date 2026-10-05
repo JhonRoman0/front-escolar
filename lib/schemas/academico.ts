@@ -164,9 +164,23 @@ export const anioEscolarSchema = z.object({
     .string()
     .min(1, "El año es requerido")
     .regex(/^\d{4}$/, "Año inválido (4 dígitos)"),
-  estado: z.number().int().min(1).max(2).optional(),
-  fechaInicio: z.string().optional().or(z.literal("")),
-  fechaFin: z.string().optional().or(z.literal("")),
+  // 1=VIGENTE, 3=POR_COMENZAR. El 2 (CERRADO) lo asigna el backend al vencer
+  // fechaFin, por eso no es seleccionable desde el formulario.
+  estado: z
+    .number({ error: "Selecciona el estado del año escolar" })
+    .int()
+    .min(1)
+    .max(3, "Estado inválido"),
+  fechaInicio: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Selecciona la fecha de inicio")
+    .optional()
+    .or(z.literal("")),
+  fechaFin: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Selecciona la fecha de fin")
+    .optional()
+    .or(z.literal("")),
   bloqueoHorariosPorFecha: z.boolean().optional(),
   accesoId: accesoId.optional(),
 })
