@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
@@ -9,24 +9,24 @@ import * as z from "zod"
 import { Loader2, CheckCircle2, Lock, Mail, KeyRound } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
-import { CampoAcceso, botonAcceso } from "@/components/shared/campo-acceso"
+import { CampoTextoAcceso, botonAcceso } from "@/components/shared/campo-texto-acceso"
 import { authApi } from "@/lib/api/auth"
 import { contrasenaSegura } from "@/lib/schemas/comun"
 import { cn } from "@/lib/utils"
 
 const schema = z
   .object({
-    gmail: z.string().min(1, "El email es requerido").email("Formato de email no válido"),
+    gmail: z.string().min(1, "El email es requerido").email("Formato de email no vÃ¡lido"),
     codigo: z
       .string()
-      .min(6, "El código debe tener 6 dígitos")
-      .max(6, "El código debe tener 6 dígitos")
-      .regex(/^\d+$/, "El código debe ser numérico"),
+      .min(6, "El cÃ³digo debe tener 6 dÃ­gitos")
+      .max(6, "El cÃ³digo debe tener 6 dÃ­gitos")
+      .regex(/^\d+$/, "El cÃ³digo debe ser numÃ©rico"),
     nuevaContrasena: contrasenaSegura,
-    confirmar: z.string().min(1, "Confirma la contraseña"),
+    confirmar: z.string().min(1, "Confirma la contraseÃ±a"),
   })
   .refine((data) => data.nuevaContrasena === data.confirmar, {
-    message: "Las contraseñas no coinciden",
+    message: "Las contraseÃ±as no coinciden",
     path: ["confirmar"],
   })
 
@@ -54,12 +54,12 @@ export function RestablecerContrasenaForm() {
     try {
       await authApi.resetPassword(values.gmail, values.codigo, values.nuevaContrasena)
       setExitoso(true)
-      toast.success("Contraseña actualizada correctamente")
+      toast.success("ContraseÃ±a actualizada correctamente")
     } catch (error) {
       const message =
         error instanceof Error
           ? error.message
-          : "No se pudo restablecer la contraseña"
+          : "No se pudo restablecer la contraseÃ±a"
       toast.error(message)
     } finally {
       setEnviando(false)
@@ -70,9 +70,9 @@ export function RestablecerContrasenaForm() {
     return (
       <div className="space-y-4 text-center">
         <CheckCircle2 className="mx-auto h-12 w-12 text-exito" />
-        <h2 className="text-encabezado font-semibold">Contraseña actualizada</h2>
+        <h2 className="text-encabezado font-semibold">ContraseÃ±a actualizada</h2>
         <p className="text-pequeno text-muted-foreground">
-          Ya puedes iniciar sesión con tu nueva contraseña.
+          Ya puedes iniciar sesiÃ³n con tu nueva contraseÃ±a.
         </p>
         <Button onClick={() => router.push("/login")} className="mt-4">
           Ir al login
@@ -87,7 +87,7 @@ export function RestablecerContrasenaForm() {
       className="space-y-4"
       noValidate
     >
-      <CampoAcceso
+      <CampoTextoAcceso
         etiqueta="Email"
         icono={Mail}
         error={form.formState.errors.gmail}
@@ -97,11 +97,11 @@ export function RestablecerContrasenaForm() {
         {...form.register("gmail")}
       />
 
-      <CampoAcceso
-        etiqueta="Código de verificación"
+      <CampoTextoAcceso
+        etiqueta="CÃ³digo de verificaciÃ³n"
         icono={KeyRound}
         error={form.formState.errors.codigo}
-        auxiliar="Ingresa el código de 6 dígitos enviado a tu correo"
+        auxiliar="Ingresa el cÃ³digo de 6 dÃ­gitos enviado a tu correo"
         placeholder="000000"
         maxLength={6}
         inputMode="numeric"
@@ -110,12 +110,12 @@ export function RestablecerContrasenaForm() {
         {...form.register("codigo")}
       />
 
-      <CampoAcceso
-        etiqueta="Nueva contraseña"
+      <CampoTextoAcceso
+        etiqueta="Nueva contraseÃ±a"
         icono={Lock}
         error={form.formState.errors.nuevaContrasena}
         type={mostrarContrasena ? "text" : "password"}
-        placeholder="Mín 8: mayúscula, número y símbolo"
+        placeholder="MÃ­n 8: mayÃºscula, nÃºmero y sÃ­mbolo"
         autoComplete="new-password"
         alternable
         alternando={mostrarContrasena}
@@ -123,11 +123,11 @@ export function RestablecerContrasenaForm() {
         {...form.register("nuevaContrasena")}
       />
 
-      <CampoAcceso
-        etiqueta="Confirmar contraseña"
+      <CampoTextoAcceso
+        etiqueta="Confirmar contraseÃ±a"
         error={form.formState.errors.confirmar}
         type={mostrarContrasena ? "text" : "password"}
-        placeholder="Repite la contraseña"
+        placeholder="Repite la contraseÃ±a"
         autoComplete="new-password"
         {...form.register("confirmar")}
       />
@@ -144,7 +144,7 @@ export function RestablecerContrasenaForm() {
             Restableciendo...
           </>
         ) : (
-          <>Restablecer contraseña</>
+          <>Restablecer contraseÃ±a</>
         )}
       </Button>
     </form>

@@ -9,7 +9,7 @@ import * as z from "zod"
 import { Loader2, Mail, CheckCircle2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
-import { CampoAcceso, botonAcceso } from "@/components/shared/campo-acceso"
+import { CampoTextoAcceso, botonAcceso } from "@/components/shared/campo-texto-acceso"
 import { authApi } from "@/lib/api/auth"
 import { cn } from "@/lib/utils"
 
@@ -73,7 +73,7 @@ export function RecuperarContrasenaForm() {
         control={form.control}
         name="gmail"
         render={({ field }) => (
-          <CampoAcceso
+          <CampoTextoAcceso
             etiqueta="Correo electrónico"
             icono={Mail}
             error={form.formState.errors.gmail}

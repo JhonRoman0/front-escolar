@@ -11,7 +11,7 @@ import { ApiError } from "@/lib/api"
 import { cn } from "@/lib/utils"
 
 import { Button } from "@/components/ui/button"
-import { CampoAcceso, botonAcceso } from "@/components/shared/campo-acceso"
+import { CampoTextoAcceso, botonAcceso } from "@/components/shared/campo-texto-acceso"
 import { useAuth } from "@/components/auth-provider"
 
 const formSchema = z.object({
@@ -82,7 +82,7 @@ export function LoginForm() {
         control={form.control}
         name="codigo"
         render={({ field }) => (
-          <CampoAcceso
+          <CampoTextoAcceso
             etiqueta="Código institucional"
             error={form.formState.errors.codigo}
             placeholder="Usuario"
@@ -96,7 +96,7 @@ export function LoginForm() {
         control={form.control}
         name="contraseña"
         render={({ field }) => (
-          <CampoAcceso
+          <CampoTextoAcceso
             etiqueta="Contraseña"
             error={form.formState.errors.contraseña}
             type={mostrarContrasena ? "text" : "password"}
