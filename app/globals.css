@@ -60,6 +60,40 @@
 
 @theme {
   --container-8xl: 88rem;
+
+  /* Escala tipográfica global. La semántica es por rol, no por módulo: un
+     token describe el papel que cumple el texto en la pantalla, no la pantalla
+     donde se usa. Así un formulario de la gestión y uno de acceso comparten
+     tamaño sin que ninguno sepa del otro.
+     Solo controla el tamaño. Los pesos (font-bold, font-semibold) siguen
+     viajando sueltos en el componente, porque un mismo rol puede necesitar
+     distinto peso según el contexto.
+     `campo` y no `input`: --color-input ya existe y genera la utilidad de
+     color text-input, que colisionaria con un token de tamaño homónimo. */
+  --text-display: 36px;
+  --text-titulo: 30px;
+  --text-subtitulo: 24px;
+  --text-encabezado: 20px;
+  --text-descripcion: 16px;
+  --text-body: 16px;
+  --text-label: 18px;
+  --text-campo: 18px;
+  --text-boton: 22px;
+  --text-pequeno: 14px;
+  --text-mini: 12px;
+
+  /* Tokens de rol para las superficies de acceso. Mismo criterio que la escala
+     tipográfica: un token describe el papel que cumple algo en la pantalla, no el
+     módulo donde vive. Así el borde de un campo, el hover de un botón o el icono de
+     un estado exitoso significan lo mismo en cualquier parte sin que nadie tenga que
+     saber de dónde salió el valor.
+     `campo-alto` va en el namespace --spacing para que genere utilidades de
+     dimensión (h-, min-h-, etc.) y no solo de padding. */
+  --color-borde-campo: #A9A9AA;
+  --color-brand-info-hover: #2d4fb8;
+  --color-exito: #00bb7f;
+  --spacing-campo-alto: 51px;
+  --color-gris-descripcion: #7D7D7F;
 }
 
 :root {
