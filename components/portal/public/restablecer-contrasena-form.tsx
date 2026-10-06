@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
@@ -6,27 +6,27 @@ import { toast } from "sonner"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
-import { Loader2, Eye, EyeOff, CheckCircle2, Lock, Mail, KeyRound } from "lucide-react"
+import { Loader2, CheckCircle2, Lock, Mail, KeyRound } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
-import { Field, FieldContent, FieldError, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
+import { CampoTextoAcceso, botonAcceso } from "@/components/shared/campo-texto-acceso"
 import { authApi } from "@/lib/api/auth"
 import { contrasenaSegura } from "@/lib/schemas/comun"
+import { cn } from "@/lib/utils"
 
 const schema = z
   .object({
-    gmail: z.string().min(1, "El email es requerido").email("Formato de email no válido"),
+    gmail: z.string().min(1, "El email es requerido").email("Formato de email no vÃ¡lido"),
     codigo: z
       .string()
-      .min(6, "El código debe tener 6 dígitos")
-      .max(6, "El código debe tener 6 dígitos")
-      .regex(/^\d+$/, "El código debe ser numérico"),
+      .min(6, "El cÃ³digo debe tener 6 dÃ­gitos")
+      .max(6, "El cÃ³digo debe tener 6 dÃ­gitos")
+      .regex(/^\d+$/, "El cÃ³digo debe ser numÃ©rico"),
     nuevaContrasena: contrasenaSegura,
-    confirmar: z.string().min(1, "Confirma la contraseña"),
+    confirmar: z.string().min(1, "Confirma la contraseÃ±a"),
   })
   .refine((data) => data.nuevaContrasena === data.confirmar, {
-    message: "Las contraseñas no coinciden",
+    message: "Las contraseÃ±as no coinciden",
     path: ["confirmar"],
   })
 
@@ -54,12 +54,12 @@ export function RestablecerContrasenaForm() {
     try {
       await authApi.resetPassword(values.gmail, values.codigo, values.nuevaContrasena)
       setExitoso(true)
-      toast.success("Contraseña actualizada correctamente")
+      toast.success("ContraseÃ±a actualizada correctamente")
     } catch (error) {
       const message =
         error instanceof Error
           ? error.message
-          : "No se pudo restablecer la contraseña"
+          : "No se pudo restablecer la contraseÃ±a"
       toast.error(message)
     } finally {
       setEnviando(false)
@@ -69,10 +69,10 @@ export function RestablecerContrasenaForm() {
   if (exitoso) {
     return (
       <div className="space-y-4 text-center">
-        <CheckCircle2 className="mx-auto h-12 w-12 text-emerald-500" />
-        <h2 className="text-xl font-semibold">Contraseña actualizada</h2>
-        <p className="text-sm text-muted-foreground">
-          Ya puedes iniciar sesión con tu nueva contraseña.
+        <CheckCircle2 className="mx-auto h-12 w-12 text-exito" />
+        <h2 className="text-encabezado font-semibold">ContraseÃ±a actualizada</h2>
+        <p className="text-pequeno text-muted-foreground">
+          Ya puedes iniciar sesiÃ³n con tu nueva contraseÃ±a.
         </p>
         <Button onClick={() => router.push("/login")} className="mt-4">
           Ir al login
@@ -87,84 +87,65 @@ export function RestablecerContrasenaForm() {
       className="space-y-4"
       noValidate
     >
-      <Field>
-        <FieldLabel>Email</FieldLabel>
-        <FieldContent>
-          <div className="relative">
-            <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              type="email"
-              placeholder="tu@email.com"
-              className="pl-10"
-              {...form.register("gmail")}
-            />
-          </div>
-          <FieldError errors={[form.formState.errors.gmail]} />
-        </FieldContent>
-      </Field>
+      <CampoTextoAcceso
+        etiqueta="Email"
+        icono={Mail}
+        error={form.formState.errors.gmail}
+        type="email"
+        placeholder="tu@email.com"
+        autoComplete="email"
+        {...form.register("gmail")}
+      />
 
-      <Field>
-        <FieldLabel>Código de verificación</FieldLabel>
-        <FieldContent>
-          <div className="relative">
-            <KeyRound className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="000000"
-              maxLength={6}
-              className="pl-10 tracking-[0.5em] text-center font-mono text-lg"
-              {...form.register("codigo")}
-            />
-          </div>
-          <p className="text-xs text-muted-foreground mt-1">
-            Ingresa el código de 6 dígitos enviado a tu correo
-          </p>
-          <FieldError errors={[form.formState.errors.codigo]} />
-        </FieldContent>
-      </Field>
+      <CampoTextoAcceso
+        etiqueta="CÃ³digo de verificaciÃ³n"
+        icono={KeyRound}
+        error={form.formState.errors.codigo}
+        auxiliar="Ingresa el cÃ³digo de 6 dÃ­gitos enviado a tu correo"
+        placeholder="000000"
+        maxLength={6}
+        inputMode="numeric"
+        autoComplete="one-time-code"
+        className="pr-3 text-center font-mono tracking-[0.5em]"
+        {...form.register("codigo")}
+      />
 
-      <Field>
-        <FieldLabel>Nueva contraseña</FieldLabel>
-        <FieldContent>
-          <div className="relative">
-            <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              type={mostrarContrasena ? "text" : "password"}
-              placeholder="Mín 8: mayúscula, número y símbolo"
-              className="pl-10 pr-10"
-              {...form.register("nuevaContrasena")}
-            />
-            <button
-              type="button"
-              onClick={() => setMostrarContrasena((v) => !v)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              tabIndex={-1}
-            >
-              {mostrarContrasena ? (
-                <EyeOff className="h-4 w-4" />
-              ) : (
-                <Eye className="h-4 w-4" />
-              )}
-            </button>
-          </div>
-          <FieldError errors={[form.formState.errors.nuevaContrasena]} />
-        </FieldContent>
-      </Field>
+      <CampoTextoAcceso
+        etiqueta="Nueva contraseÃ±a"
+        icono={Lock}
+        error={form.formState.errors.nuevaContrasena}
+        type={mostrarContrasena ? "text" : "password"}
+        placeholder="MÃ­n 8: mayÃºscula, nÃºmero y sÃ­mbolo"
+        autoComplete="new-password"
+        alternable
+        alternando={mostrarContrasena}
+        onAlternar={() => setMostrarContrasena((v) => !v)}
+        {...form.register("nuevaContrasena")}
+      />
 
-      <Field>
-        <FieldLabel>Confirmar contraseña</FieldLabel>
-        <FieldContent>
-          <Input
-            type="password"
-            placeholder="Repite la contraseña"
-            {...form.register("confirmar")}
-          />
-          <FieldError errors={[form.formState.errors.confirmar]} />
-        </FieldContent>
-      </Field>
+      <CampoTextoAcceso
+        etiqueta="Confirmar contraseÃ±a"
+        error={form.formState.errors.confirmar}
+        type={mostrarContrasena ? "text" : "password"}
+        placeholder="Repite la contraseÃ±a"
+        autoComplete="new-password"
+        {...form.register("confirmar")}
+      />
 
-      <Button type="submit" className="w-full" disabled={enviando}>
-        {enviando && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-        Restablecer contraseña
+      <Button
+        type="submit"
+        size="lg"
+        className={cn(botonAcceso)}
+        disabled={enviando}
+      >
+        {enviando ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Restableciendo...
+          </>
+        ) : (
+          <>Restablecer contraseÃ±a</>
+        )}
       </Button>
     </form>
   )

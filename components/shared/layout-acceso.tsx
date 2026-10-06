@@ -24,9 +24,9 @@ export function LayoutAcceso({
   pie?: ReactNode
 }) {
   return (
-    <div className="flex min-h-dvh dark:bg-[#0a1626]">
+    <div className="flex min-h-dvh dark:bg-background">
       {/* Form - en mobile abajo, en desktop izquierda */}
-      <div className="order-last flex w-full items-center justify-center bg-white p-6 sm:p-10 lg:order-first lg:w-1/2 lg:p-28 dark:bg-[#101f36]">
+      <div className="order-last flex w-full items-center justify-center bg-background p-6 sm:p-10 lg:order-first lg:w-1/2 lg:p-28 dark:bg-card">
         <div className="w-full max-w-md space-y-6">
           {/* Brand + toggle de tema */}
           <div className="flex items-center justify-between gap-3">
@@ -37,9 +37,9 @@ export function LayoutAcceso({
                 width={70}
                 height={70}
                 priority
-                className="h-[70px] w-[70px] rounded-xl object-cover"
+                className="rounded-xl object-cover"
               />
-              <h2 className="text-[30px] font-bold text-black/20">
+              <h2 className="text-titulo font-bold text-foreground/20">
                 Sistema Escolar
               </h2>
             </div>
