@@ -4,9 +4,10 @@ import { contrasenaSeguraOpcional } from "@/lib/schemas/comun"
 import { esHoraValida, turnoAnterior, type TurnoFranja } from "@/lib/turnos"
 
 const accesoId = z.number().int().min(1, "Selecciona un estado").max(3)
+const REGEX_FECHA = /^\d{4}-\d{2}-\d{2}$/
 const fecha = z
   .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha requerida (aaaa-mm-dd)")
+  .regex(REGEX_FECHA, "Fecha requerida (aaaa-mm-dd)")
 const hora = z
   .string()
   .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Hora requerida (HH:mm)")
@@ -154,7 +155,7 @@ export const gradoSchema = z
   })
 export type GradoValues = z.infer<typeof gradoSchema>
 
-// ── Año escolar ──────────────────────────────────────────────────────────
+// Año escolar 
 
 export const anioEscolarSchema = z.object({
   // El .min va primero a propósito: zod corre las validaciones en el orden en
@@ -173,12 +174,12 @@ export const anioEscolarSchema = z.object({
     .max(3, "Estado inválido"),
   fechaInicio: z
     .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, "Selecciona la fecha de inicio")
+    .regex(REGEX_FECHA, "Selecciona la fecha de inicio")
     .optional()
     .or(z.literal("")),
   fechaFin: z
     .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, "Selecciona la fecha de fin")
+    .regex(REGEX_FECHA, "Selecciona la fecha de fin")
     .optional()
     .or(z.literal("")),
   bloqueoHorariosPorFecha: z.boolean().optional(),
@@ -186,18 +187,63 @@ export const anioEscolarSchema = z.object({
 })
 export type AnioEscolarValues = z.infer<typeof anioEscolarSchema>
 
-// ── Aula ─────────────────────────────────────────────────────────────────
+//Aula 
 
-export const aulaSchema = z.object({
-  nombre: z.string().min(1, "El nombre es requerido").max(50),
+// Letras (con tildes y ñ), números, espacios, guiones y puntos: lo justo para
+// "Aula 101", "Lab. de Física" o "Sala B-2" sin dejar entrar símbolos que no
+// tienen sentido en el nombre de un salón. El alfabeto vive en una sola
+// constante para que la validación y el bloqueo al escribir no puedan separarse.
+const CARACTERES_NOMBRE_AULA = "A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9 .-"
+export const LIMITE_NOMBRE_AULA = 50
+export const CAPACIDAD_MIN = 1
+export const CAPACIDAD_MAX = 50
+const REGEX_NOMBRE_AULA = new RegExp(`^[${CARACTERES_NOMBRE_AULA}]+$`)
+const REGEX_NO_PERMITIDO_NOMBRE_AULA = new RegExp(`[^${CARACTERES_NOMBRE_AULA}]`, "g")
+
+// El diálogo filtra el valor con esto antes de que llegue al form, de modo que
+// un carácter fuera del regex nunca llega a quedarse en el campo. La validación
+// del schema se queda como segunda protección (y la del backend como tercera).
+// El slice es por si pegan más de 50 caracteres de una.
+export function sanitizarNombreAula(valor: string) {
+  return valor.replace(REGEX_NO_PERMITIDO_NOMBRE_AULA, "").slice(0, LIMITE_NOMBRE_AULA)
+}
+
+const aulaSchemaBase = z.object({
+  nombre: z
+    .string()
+    .min(1, "El nombre es requerido")
+    .max(LIMITE_NOMBRE_AULA, "Máximo 50 caracteres")
+    .regex(REGEX_NOMBRE_AULA, "Solo se admiten letras, números, espacios, guiones y puntos"),
   capacidad: z
-    .number()
-    .int()
-    .min(1, "La capacidad debe ser al menos 1")
-    .optional(),
+    .number({ error: "La capacidad es obligatoria" })
+    .int("La capacidad debe ser un número entero")
+    .min(CAPACIDAD_MIN, "La capacidad debe ser al menos 1")
+    .max(CAPACIDAD_MAX, "La capacidad máxima es 50"),
   accesoId: accesoId.optional(),
 })
-export type AulaValues = z.infer<typeof aulaSchema>
+export type AulaValues = z.infer<typeof aulaSchemaBase>
+
+// El nombre repetido se avisa mientras se escribe, no al pulsar Guardar: el
+// diálogo arma este schema con los nombres ya registrados y excluye el que se
+// está editando. Se compara sin mayúsculas ni minúsculas porque así también
+// las compara MySQL, de lo contrario el UNIQUE de la tabla rechazaría el
+// guardado pasada la validación.
+export function crearAulaSchema(nombresEnUso: string[]) {
+  const usados = new Set(nombresEnUso.map((nombre) => normalizarNombreAula(nombre)))
+  return aulaSchemaBase.superRefine((valores, ctx) => {
+    if (usados.has(normalizarNombreAula(valores.nombre))) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["nombre"],
+        message: "Ya existe un aula con ese nombre",
+      })
+    }
+  })
+}
+
+function normalizarNombreAula(nombre: string) {
+  return nombre.trim().toLocaleLowerCase("es")
+}
 
 // ── Asignación ───────────────────────────────────────────────────────────
 

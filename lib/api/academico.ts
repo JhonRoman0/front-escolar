@@ -49,7 +49,7 @@ export interface CursoResponse {
   accesoId: number | null
 }
 
-export interface CursoRequest {
+interface CursoRequest {
   nombre: string
   accesoId?: number | null
 }
@@ -66,7 +66,7 @@ export interface TurnoResponse {
   accesoId: number | null
 }
 
-export interface TurnoRequest {
+interface TurnoRequest {
   nombre: string
   horaEntrada: string
   horaEntradaLimite: string
@@ -77,7 +77,7 @@ export interface TurnoRequest {
 
 // ── Grado ────────────────────────────────────────────────────────────────
 
-export interface SeccionResponse {
+interface SeccionResponse {
   idGradoSeccion: number
   idSeccion: number
   nombre: string
@@ -108,14 +108,14 @@ export interface GradoRequest {
 
 // ── Nivel (filtro cascada) ──────────────────────────────────────────────
 
-export interface NivelResponse {
+interface NivelResponse {
   idNivel: number
   nombre: string
 }
 
 // ── Sección del grado (filtro cascada) ──────────────────────────────────
 
-export interface GradoSeccionItem {
+interface GradoSeccionItem {
   idGradoSeccion: number
   idSeccion: number
   nombre: string
@@ -135,7 +135,7 @@ export interface AnioEscolarResponse {
   accesoId: number | null
 }
 
-export interface AnioEscolarRequest {
+interface AnioEscolarRequest {
   anio: string
   estado?: number | null
   fechaInicio?: string | null
@@ -151,6 +151,13 @@ export const ESTADO_ANIO = {
   POR_COMENZAR: 3,
 } as const
 
+/** 1 = ACTIVO, 2 = ELIMINADO, 3 = INACTIVO. Espejo de AccesoConstants del backend. */
+export const ACCESO = {
+  ACTIVO: 1,
+  ELIMINADO: 2,
+  INACTIVO: 3,
+} as const
+
 // ── Aula ─────────────────────────────────────────────────────────────────
 
 export interface AulaResponse {
@@ -160,15 +167,15 @@ export interface AulaResponse {
   accesoId: number | null
 }
 
-export interface AulaRequest {
+interface AulaRequest {
   nombre: string
-  capacidad?: number | null
+  capacidad: number
   accesoId?: number | null
 }
 
 // ── Suspensión de Docente ────────────────────────────────────────────────
 
-export interface SuspensionResponse {
+interface SuspensionResponse {
   idSuspension: number
   idDocente: number
   docente: string
@@ -192,7 +199,7 @@ export interface SuspensionRequest {
 
 // ── Cambios de Docente ───────────────────────────────────────────────────
 
-export interface CambioDocenteResponse {
+interface CambioDocenteResponse {
   idCambio: number
   idAsignacion: number
   docenteAnterior: string
@@ -246,7 +253,7 @@ export interface AsignacionRequest {
   accesoId?: number | null
 }
 
-export interface HorasDocenteResponse {
+interface HorasDocenteResponse {
   idDocente: number
   docente: string
   horasSemana: number
@@ -325,12 +332,6 @@ export const suspensionesApi = {
   async listar(): Promise<SuspensionResponse[]> {
     return apiFetch<SuspensionResponse[]>("/suspensiones")
   },
-  async porId(id: number): Promise<SuspensionResponse> {
-    return apiFetch<SuspensionResponse>(`/suspensiones/${id}`)
-  },
-  async porDocente(idDocente: number): Promise<SuspensionResponse[]> {
-    return apiFetch<SuspensionResponse[]>(`/suspensiones/docente/${idDocente}`)
-  },
   async crear(data: SuspensionRequest): Promise<SuspensionResponse> {
     return apiFetch<SuspensionResponse>("/suspensiones", {
       method: "POST",
@@ -352,14 +353,6 @@ export const suspensionesApi = {
 export const cambiosDocenteApi = {
   async listar(): Promise<CambioDocenteResponse[]> {
     return apiFetch<CambioDocenteResponse[]>("/cambios-docente")
-  },
-  async porId(id: number): Promise<CambioDocenteResponse> {
-    return apiFetch<CambioDocenteResponse>(`/cambios-docente/${id}`)
-  },
-  async porDocente(idDocente: number): Promise<CambioDocenteResponse[]> {
-    return apiFetch<CambioDocenteResponse[]>(
-      `/cambios-docente/docente/${idDocente}`
-    )
   },
 }
 
@@ -389,19 +382,8 @@ export const recreosApi = {
   async listar(): Promise<RecreoResponse[]> {
     return apiFetch<RecreoResponse[]>("/recreos")
   },
-  async porId(id: number): Promise<RecreoResponse> {
-    return apiFetch<RecreoResponse>(`/recreos/${id}`)
-  },
   async porNivel(idNivel: number): Promise<RecreoResponse[]> {
     return apiFetch<RecreoResponse[]>(`/recreos/nivel/${idNivel}`)
-  },
-  async porNivelYDia(
-    idNivel: number,
-    dia: number
-  ): Promise<RecreoResponse[]> {
-    return apiFetch<RecreoResponse[]>(
-      `/recreos/nivel/${idNivel}/dia/${dia}`
-    )
   },
   async crear(data: RecreoRequest): Promise<RecreoResponse> {
     return apiFetch<RecreoResponse>("/recreos", {
