@@ -93,6 +93,24 @@ export function useAniosEscolares() {
   })
 }
 
+/**
+ * Cambio de estado del año escolar por PATCH. Se invalida también grados y
+ * asignaciones porque al activar un VIGENTE el backend cierra el anterior, lo
+ * que cambia qué años quedan disponibles para cargar horarios y notas.
+ */
+export function useCambiarEstadoAnioEscolar() {
+  const invalidar = useInvalidarMutacion(
+    KEYS.anios,
+    KEYS.grados,
+    KEYS.asignaciones
+  )
+  return useMutation({
+    mutationFn: ({ idAnio, estado }: { idAnio: number; estado: number }) =>
+      aniosEscolaresApi.cambiarEstado(idAnio, estado),
+    onSuccess: invalidar,
+  })
+}
+
 export function useAulas() {
   return useQuery({
     queryKey: KEYS.aulas,

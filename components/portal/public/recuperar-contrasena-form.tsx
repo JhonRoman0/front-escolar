@@ -4,14 +4,14 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { useForm } from "react-hook-form"
+import { Controller, useForm } from "react-hook-form"
 import * as z from "zod"
 import { Loader2, Mail, CheckCircle2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
-import { Field, FieldContent, FieldError, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
+import { CampoTextoAcceso, botonAcceso } from "@/components/shared/campo-texto-acceso"
 import { authApi } from "@/lib/api/auth"
+import { cn } from "@/lib/utils"
 
 const schema = z.object({
   gmail: z
@@ -50,9 +50,9 @@ export function RecuperarContrasenaForm() {
   if (enviado) {
     return (
       <div className="space-y-4 text-center">
-        <CheckCircle2 className="mx-auto h-12 w-12 text-emerald-500" />
-        <h2 className="text-xl font-semibold">Código enviado</h2>
-        <p className="text-sm text-muted-foreground">
+        <CheckCircle2 className="mx-auto h-12 w-12 text-exito" />
+        <h2 className="text-encabezado font-semibold">Código enviado</h2>
+        <p className="text-pequeno text-muted-foreground">
           Revisa tu bandeja de entrada. Se envió un código de 6 dígitos para
           restablecer tu contraseña.
         </p>
@@ -69,25 +69,36 @@ export function RecuperarContrasenaForm() {
       className="space-y-4"
       noValidate
     >
-      <Field>
-        <FieldLabel>Correo electrónico</FieldLabel>
-        <FieldContent>
-          <div className="relative">
-            <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              type="email"
-              placeholder="usuario@correo.com"
-              className="pl-10"
-              {...form.register("gmail")}
-            />
-          </div>
-          <FieldError errors={[form.formState.errors.gmail]} />
-        </FieldContent>
-      </Field>
+      <Controller
+        control={form.control}
+        name="gmail"
+        render={({ field }) => (
+          <CampoTextoAcceso
+            etiqueta="Correo electrónico"
+            icono={Mail}
+            error={form.formState.errors.gmail}
+            type="email"
+            placeholder="usuario@correo.com"
+            autoComplete="email"
+            {...field}
+          />
+        )}
+      />
 
-      <Button type="submit" className="w-full" disabled={enviando}>
-        {enviando && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-        Enviar código
+      <Button
+        type="submit"
+        size="lg"
+        className={cn(botonAcceso)}
+        disabled={enviando}
+      >
+        {enviando ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Enviando...
+          </>
+        ) : (
+          <>Enviar código</>
+        )}
       </Button>
     </form>
   )
