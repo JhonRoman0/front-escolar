@@ -1,8 +1,8 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 import { toast } from "sonner"
-import { CalendarDays, CircleHelp, Clock3, CloudSun, DoorOpen, GraduationCap, Loader2, Pencil, Sun, TriangleAlert, X, type LucideIcon } from "lucide-react"
+import { CalendarDays, CircleHelp, Clock3, CloudSun, DoorOpen, GraduationCap, Pencil, Sun, TriangleAlert, X, type LucideIcon } from "lucide-react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm, useWatch } from "react-hook-form"
 
@@ -51,10 +51,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { EstadoBadge } from "@/components/seguridad/estado-badge"
 import { ConfirmarEliminar } from "@/components/seguridad/confirmar-eliminar"
 import { BotonNuevo } from "@/components/shared/boton-nuevo"
+import { BotonReintentar } from "@/components/shared/boton-reintentar"
 import { BotonGuardar } from "@/components/shared/boton-guardar"
 import { HeaderSeccion } from "@/components/shared/header-seccion"
 import { SelectorFecha } from "@/components/shared/selector-fecha"
 import { useEliminarConToast } from "@/hooks/use-eliminar-toast"
+import { guardarConToast } from "@/hooks/guardar-con-toast"
+import { useResetAlAbrir } from "@/hooks/use-reset-al-abrir"
 import {
   AccionesFila,
   CampoAcceso,
@@ -79,14 +82,18 @@ import type {
   CursoResponse,
   TurnoResponse,
 } from "@/lib/api/academico"
-import { ESTADO_ANIO, horaCorta } from "@/lib/api/academico"
+import { ACCESO, ESTADO_ANIO, horaCorta } from "@/lib/api/academico"
 import { conflictosTurnos, type TurnoFranja } from "@/lib/turnos"
 import { rangoLectivo } from "@/lib/fechas"
 import {
   anioEscolarSchema,
-  aulaSchema,
+  CAPACIDAD_MAX,
+  CAPACIDAD_MIN,
+  crearAulaSchema,
   crearTurnoSchema,
   cursoSchema,
+  LIMITE_NOMBRE_AULA,
+  sanitizarNombreAula,
   turnoSchema,
   type AnioEscolarValues,
   type AulaValues,
@@ -189,13 +196,13 @@ export function CursosTab() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editando, setEditando] = useState<CursoResponse | null>(null)
 
-  async function handleEliminar(curso: CursoResponse) {
-    try {
-      await crud.eliminar.mutateAsync(curso.idCurso)
-      toast.success(`Curso "${curso.nombre}" eliminado`)
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Error al eliminar")
-    }
+  const eliminarConToast = useEliminarConToast()
+
+  function handleEliminar(curso: CursoResponse) {
+    return eliminarConToast(crud.eliminar.mutateAsync, {
+      id: curso.idCurso,
+      mensaje: `Curso "${curso.nombre}" eliminado`,
+    })
   }
 
   return (
@@ -258,11 +265,7 @@ export function CursosTab() {
             </TableBody>
           </Table>
         </div>
-        {isError && (
-          <Button variant="outline" size="sm" onClick={() => refetch()}>
-            Reintentar
-          </Button>
-        )}
+        {isError && <BotonReintentar refetch={refetch} />}
         <CursoDialog
           open={dialogOpen}
           onOpenChange={setDialogOpen}
@@ -292,22 +295,16 @@ function CursoDialog({
   // Primitivos y no el objeto: un refetch de React Query devuelve una referencia
   // nueva y con el objeto en las deps el reset se dispararía mientras se escribe.
   const nombre = curso?.nombre ?? ""
-  const accesoId = curso?.accesoId ?? 1
+  const accesoId = curso?.accesoId ?? ACCESO.ACTIVO
   const form = useForm<CursoValues>({
     resolver: zodResolver(cursoSchema),
     defaultValues: { nombre, accesoId },
   })
 
-  // El diálogo se renderiza siempre y solo cambia `open`, así que useForm
-  // conserva los valores entre aperturas. Resetear al abrir deja el form limpio
-  // sin depender de una key que solo remonta cuando cambia el registro.
-  useEffect(() => {
-    if (!open) return
-    form.reset({ nombre, accesoId })
-  }, [open, nombre, accesoId, form])
+  useResetAlAbrir(open, form, { nombre, accesoId }, [nombre, accesoId])
 
   async function onSubmit(values: CursoValues) {
-    try {
+    await guardarConToast(async () => {
       if (esEdicion && curso) {
         await actualizar.mutateAsync({ id: curso.idCurso, data: { nombre: values.nombre, accesoId: values.accesoId } })
         toast.success("Curso actualizado")
@@ -316,9 +313,7 @@ function CursoDialog({
         toast.success("Curso creado")
       }
       onOpenChange(false)
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Error al guardar")
-    }
+    })
   }
 
   return (
@@ -360,10 +355,7 @@ function CursoDialog({
           </FieldGroup>
           <DialogFooter>
             <DialogTrigger render={<Button variant="outline" />}>Cancelar</DialogTrigger>
-            <Button type="submit" disabled={crear.isPending || actualizar.isPending}>
-              {(crear.isPending || actualizar.isPending) && <Loader2 className="animate-spin" data-icon="inline-start" />}
-              {esEdicion ? "Guardar cambios" : "Crear curso"}
-            </Button>
+            <BotonGuardar etiqueta={esEdicion ? "Guardar cambios" : "Crear curso"} enviando={crear.isPending || actualizar.isPending} />
           </DialogFooter>
         </form>
       </DialogContent>
@@ -381,6 +373,17 @@ function AulasTab() {
   const puedeEliminar = usePuede("AULAS", "ELIMINAR")
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editando, setEditando] = useState<AulaResponse | null>(null)
+
+  // Los nombres ya registrados, sin incluir el que se está editando: el schema
+  // dinámico del diálogo compara contra esta lista, así que un aula nunca choca
+  // consigo misma al guardar, pero sí contra cualquier otra.
+  const nombresEnUso = useMemo(
+    () =>
+      (data ?? [])
+        .filter((aula) => aula.idAula !== editando?.idAula)
+        .map((aula) => aula.nombre),
+    [data, editando],
+  )
 
   const eliminarConToast = useEliminarConToast()
 
@@ -453,15 +456,12 @@ function AulasTab() {
             </TableBody>
           </Table>
         </div>
-        {isError && (
-          <Button variant="outline" size="sm" onClick={() => refetch()}>
-            Reintentar
-          </Button>
-        )}
+        {isError && <BotonReintentar refetch={refetch} />}
         <AulaDialog
           open={dialogOpen}
           onOpenChange={setDialogOpen}
           aula={editando}
+          nombresEnUso={nombresEnUso}
           crear={crud.crear}
           actualizar={crud.actualizar}
         />
@@ -496,7 +496,7 @@ function TurnosTab() {
   const franjas = useMemo<TurnoFranja[]>(
     () =>
       (data ?? [])
-        .filter((t) => (t.accesoId ?? 1) === 1)
+        .filter((t) => (t.accesoId ?? ACCESO.ACTIVO) === ACCESO.ACTIVO)
         .map((t) => ({
           id: t.idTurno,
           nombre: t.nombre,
@@ -522,8 +522,8 @@ function TurnosTab() {
           }
         />
         {conflictos.length > 0 && (
-          <div className="flex gap-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-amber-900">
-            <TriangleAlert className="mt-0.5 size-4 shrink-0 text-amber-600" />
+          <div className="flex gap-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-amber-900 dark:border-amber-700/50 dark:bg-amber-500/10 dark:text-amber-300">
+            <TriangleAlert className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
             <div className="space-y-1 text-sm">
               <p className="font-medium">Hay turnos que se pisan</p>
               {conflictos.map(({ anterior, siguiente }) => (
@@ -558,7 +558,7 @@ function TurnosTab() {
           </div>
         )}
         {isError && (
-          <div><Button variant="outline" size="sm" onClick={() => refetch()}>Reintentar</Button></div>
+          <div><BotonReintentar refetch={refetch} /></div>
         )}
         <TurnoDialog open={dialogOpen} onOpenChange={setDialogOpen} crear={crud.crear} />
       </CardContent>
@@ -604,7 +604,7 @@ function TurnoCard({
     horaEntradaLimite: horaCorta(turno.horaEntradaLimite),
     horaFaltaLimite: horaCorta(turno.horaFaltaLimite),
     horaSalida: horaCorta(turno.horaSalida),
-    accesoId: turno.accesoId ?? 1,
+    accesoId: turno.accesoId ?? ACCESO.ACTIVO,
   }
   const form = useForm<TurnoValues>({
     resolver: zodResolver(schema),
@@ -724,33 +724,23 @@ function TurnoDialog({
       horaEntradaLimite: "",
       horaFaltaLimite: "",
       horaSalida: "",
-      accesoId: 1,
+      accesoId: ACCESO.ACTIVO,
     },
   })
 
-  // El diálogo se renderiza siempre y solo cambia `open`, así que useForm
-  // conserva los valores entre aperturas. Resetear al abrir deja el form limpio
-  // sin depender de una key que solo remonta cuando cambia el registro.
-  useEffect(() => {
-    if (!open) return
-    form.reset({
-      nombre: "",
-      horaEntrada: "",
-      horaEntradaLimite: "",
-      horaFaltaLimite: "",
-      horaSalida: "",
-      accesoId: 1,
-    })
-  }, [open, form])
+  useResetAlAbrir(
+    open,
+    form,
+    { nombre: "", horaEntrada: "", horaEntradaLimite: "", horaFaltaLimite: "", horaSalida: "", accesoId: ACCESO.ACTIVO },
+    []
+  )
 
   async function onSubmit(values: TurnoValues) {
-    try {
+    await guardarConToast(async () => {
       await crear.mutateAsync(values)
       toast.success("Turno creado")
       onOpenChange(false)
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Error al guardar")
-    }
+    })
   }
 
   return (
@@ -839,14 +829,14 @@ function AniosTab() {
             </TableBody>
           </Table>
         </div>
-        {isError && <Button variant="outline" size="sm" onClick={() => refetch()}>Reintentar</Button>}
+        {isError && <BotonReintentar refetch={refetch} />}
         <AnioDialog open={dialogOpen} onOpenChange={setDialogOpen} anio={editando} anios={data} aniosExistentes={aniosExistentes} crear={crud.crear} actualizar={crud.actualizar} />
       </CardContent>
     </Card>
   )
 }
 
-export function AnioBadge({ estado }: { estado: number }) {
+function AnioBadge({ estado }: { estado: number }) {
   if (estado === ESTADO_ANIO.VIGENTE) return <Badge variant="success">Vigente</Badge>
   if (estado === ESTADO_ANIO.POR_COMENZAR)
     return <Badge variant="warning">Por comenzar</Badge>
@@ -982,22 +972,16 @@ function AnioDialog({
     [aniosExistentes, anio?.anio]
   )
 
-  // El diálogo se renderiza siempre y solo cambia `open`, así que useForm
-  // conserva los valores entre aperturas. Resetear al abrir deja el form limpio
-  // sin depender de una key que solo remonta cuando cambia el registro.
-  useEffect(() => {
-    if (!open) return
-    form.reset({
-      anio: anioTexto,
-      estado: estadoInicial,
-      fechaInicio: fechaInicioInicial,
-      fechaFin: fechaFinInicial,
-    })
-  }, [open, anioTexto, estadoInicial, fechaInicioInicial, fechaFinInicial, form])
+  useResetAlAbrir(
+    open,
+    form,
+    { anio: anioTexto, estado: estadoInicial, fechaInicio: fechaInicioInicial, fechaFin: fechaFinInicial },
+    [anioTexto, estadoInicial, fechaInicioInicial, fechaFinInicial]
+  )
 
   async function guardar(values: AnioEscolarValues) {
     const { estado, ...datos } = values
-    try {
+    await guardarConToast(async () => {
       if (esEdicion && anio) {
         // El estado viaja por su PATCH: activar un VIGENTE cierra el anterior en
         // la misma transacción y eso no lo resuelve el update general.
@@ -1011,13 +995,11 @@ function AnioDialog({
       toast.success(esEdicion ? "Año escolar actualizado" : "Año creado")
       setPendiente(null)
       onOpenChange(false)
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Error al guardar")
-    }
+    })
   }
 
   // El submit no guarda de inmediato si va a cerrar otro vigente: guarda los
-  // valores y abre la confirmación, que es la que finally llama a guardar.
+  // valores y abre la confirmación, que al confirmar llama a guardar.
   function onSubmit(values: AnioEscolarValues) {
     const activaVigente = values.estado === ESTADO_ANIO.VIGENTE
     if (activaVigente && vigenteQueSeCierra) {
@@ -1200,16 +1182,28 @@ function AnioDialog({
 
 // ── Aula dialog ──────────────────────────────────────────────────────────
 
+// Prevención antes de validación: vacío → sin valor; lo que se teclee queda en
+// enteros de hasta 50 y no puede superar el máximo. Si el número se pasa, el
+// valor se corta en 50 en lugar de esperar a que el schema lo rechace.
+function parsearCapacidad(valor: string): number | undefined {
+  if (valor === "") return undefined
+  const numero = Number(valor)
+  if (Number.isNaN(numero)) return undefined
+  return Math.min(CAPACIDAD_MAX, Math.trunc(numero))
+}
+
 function AulaDialog({
   open,
   onOpenChange,
   aula,
+  nombresEnUso,
   crear,
   actualizar,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   aula?: AulaResponse | null
+  nombresEnUso: string[]
   crear: ReturnType<typeof useCrudAulas>["crear"]
   actualizar: ReturnType<typeof useCrudAulas>["actualizar"]
 }) {
@@ -1218,29 +1212,27 @@ function AulaDialog({
   // nueva y con el objeto en las deps el reset se dispararía mientras se escribe.
   const nombre = aula?.nombre ?? ""
   const capacidad = aula?.capacidad ?? undefined
-  const accesoId = aula?.accesoId ?? 1
+  const accesoId = aula?.accesoId ?? ACCESO.ACTIVO
+  // La lista de nombres llega filtrada desde AulasTab; el schema se rearma
+  // cuando cambia, por lo que crear y editar comparan contra lo que corresponde.
+  const schema = useMemo(() => crearAulaSchema(nombresEnUso), [nombresEnUso])
   const form = useForm<AulaValues>({
-    resolver: zodResolver(aulaSchema),
+    resolver: zodResolver(schema),
+    // Con onChange el duplicado y el resto de reglas se avisan mientras se
+    // escribe, sin esperar a pulsar Guardar.
+    mode: "onChange",
     defaultValues: { nombre, capacidad, accesoId },
   })
 
-  // El diálogo se renderiza siempre y solo cambia `open`, así que useForm
-  // conserva los valores entre aperturas. Resetear al abrir deja el form limpio
-  // sin depender de una key que solo remonta cuando cambia el registro.
-  useEffect(() => {
-    if (!open) return
-    form.reset({ nombre, capacidad, accesoId })
-  }, [open, nombre, capacidad, accesoId, form])
+  useResetAlAbrir(open, form, { nombre, capacidad, accesoId }, [nombre, capacidad, accesoId])
 
   async function onSubmit(values: AulaValues) {
-    try {
+    await guardarConToast(async () => {
       if (esEdicion && aula) await actualizar.mutateAsync({ id: aula.idAula, data: values })
       else await crear.mutateAsync(values)
       toast.success(esEdicion ? "Aula actualizada" : "Aula creada")
       onOpenChange(false)
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Error al guardar")
-    }
+    })
   }
 
   return (
@@ -1249,8 +1241,8 @@ function AulaDialog({
         <DialogHeader><DialogTitle className="text-lg font-semibold tracking-tight">{esEdicion ? "Editar aula" : "Nueva aula"}</DialogTitle></DialogHeader>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5" noValidate>
           <FieldGroup>
-            <Controller control={form.control} name="nombre" render={({ field }) => (<Field><FieldLabel>Nombre del aula</FieldLabel><FieldContent><Input placeholder="Aula 101" autoFocus {...field} /><FieldError errors={[form.formState.errors.nombre]} /></FieldContent></Field>)} />
-            <Controller control={form.control} name="capacidad" render={({ field }) => (<Field><FieldLabel>Capacidad</FieldLabel><FieldContent><Input type="number" min="1" placeholder="30" value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value === "" ? undefined : Number(e.target.value))} /><FieldDescription className="text-xs">Opcional. Número de asientos.</FieldDescription><FieldError errors={[form.formState.errors.capacidad]} /></FieldContent></Field>)} />
+            <Controller control={form.control} name="nombre" render={({ field }) => (<Field><FieldLabel>Nombre del aula</FieldLabel><FieldContent><Input placeholder="Aula 101" autoFocus maxLength={LIMITE_NOMBRE_AULA} {...field} onChange={(e) => field.onChange(sanitizarNombreAula(e.target.value))} /><FieldError errors={[form.formState.errors.nombre]} /></FieldContent></Field>)} />
+            <Controller control={form.control} name="capacidad" render={({ field }) => (<Field><FieldLabel>Capacidad</FieldLabel><FieldContent><Input type="number" min={String(CAPACIDAD_MIN)} max={String(CAPACIDAD_MAX)} placeholder="30" value={field.value ?? ""} onChange={(e) => field.onChange(parsearCapacidad(e.target.value))} /><FieldDescription className="text-xs">Obligatorio. Entre {CAPACIDAD_MIN} y {CAPACIDAD_MAX} asientos.</FieldDescription><FieldError errors={[form.formState.errors.capacidad]} /></FieldContent></Field>)} />
             {esEdicion && <Controller control={form.control} name="accesoId" render={({ field }) => (<Field><FieldLabel>Estado</FieldLabel><FieldContent><CampoAcceso value={field.value} onChange={field.onChange} /></FieldContent></Field>)} />}
           </FieldGroup>
           <DialogFooter><DialogTrigger render={<Button variant="outline" />}>Cancelar</DialogTrigger><BotonGuardar etiqueta={esEdicion ? "Guardar cambios" : "Crear aula"} enviando={crear.isPending || actualizar.isPending} /></DialogFooter>

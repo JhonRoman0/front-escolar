@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -13,6 +14,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import { TableCell, TableRow } from "@/components/ui/table"
 import { ConfirmarEliminar } from "@/components/seguridad/confirmar-eliminar"
+import { ACCESO } from "@/lib/api/academico"
 
 interface CampoAccesoProps {
   value?: number
@@ -20,18 +22,23 @@ interface CampoAccesoProps {
 }
 
 export function CampoAcceso({ value, onChange }: CampoAccesoProps) {
-  const label = value === 1 ? "Activo" : "Inactivo"
+  const label = value === ACCESO.ACTIVO ? "Activo" : "Inactivo"
   return (
     <Select
-      value={String(value ?? 1)}
+      value={String(value ?? ACCESO.ACTIVO)}
       onValueChange={(v) => onChange(Number(v))}
     >
       <SelectTrigger className="w-full">
         <SelectValue>{label}</SelectValue>
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value="1">Activo</SelectItem>
-        <SelectItem value="3">Inactivo</SelectItem>
+        {/* SelectGroup no es decorativo: su p-1 deja el texto del ítem a 10px,
+            igual que el pl-2.5 del trigger, que es lo que impide que Base UI
+            desplace el desplegable 4px a la derecha al alinear ítem y valor. */}
+        <SelectGroup>
+          <SelectItem value={String(ACCESO.ACTIVO)}>Activo</SelectItem>
+          <SelectItem value={String(ACCESO.INACTIVO)}>Inactivo</SelectItem>
+        </SelectGroup>
       </SelectContent>
     </Select>
   )
