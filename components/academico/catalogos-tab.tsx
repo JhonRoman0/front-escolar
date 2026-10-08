@@ -921,6 +921,7 @@ function AnioDialog({
   // Compiler se salte el componente entero.
   const anioSeleccionado = useWatch({ control: form.control, name: "anio" })
   const fechaInicio = useWatch({ control: form.control, name: "fechaInicio" })
+  const estadoForm = useWatch({ control: form.control, name: "estado" })
   const minFechaFin = diaSiguiente(fechaInicio)
 
   // El vigente que se cerraría al guardar. Se excluye el propio año en edición:
@@ -949,6 +950,9 @@ function AnioDialog({
   // Cambiar el año mueve el rango admitido y deja obsoletas las fechas ya
   // elegidas: el calendario las mostraría seleccionadas pero deshabilitadas, sin
   // forma de ver ni de corregir el error. Se limpian en vez de dejarse.
+  // Excepción: con la fechaInicio congelada no se toca, aunque quede fuera del
+  // rango nuevo; si se limpiara en silencio, el backend rechazaría después el
+  // guardado con un mensaje que no explica nada. La fechaFin sigue saneándose.
   const saneaFechasAlCambiarAnio = useCallback(
     (nuevoAnio: string) => {
       if (!/^\d{4}$/.test(nuevoAnio)) return
@@ -956,13 +960,16 @@ function AnioDialog({
       const dentro = (fecha: string) => fecha !== "" && fecha >= min && fecha <= max
       const inicio = form.getValues("fechaInicio") ?? ""
       const fin = form.getValues("fechaFin") ?? ""
-      const nuevoInicio = dentro(inicio) ? inicio : ""
+      const congelada =
+        form.getValues("estado") === ESTADO_ANIO.VIGENTE ||
+        (esEdicion && anio?.estado === ESTADO_ANIO.VIGENTE)
+      const nuevoInicio = congelada || dentro(inicio) ? inicio : ""
       // El fin solo sobrevive si el inicio sobrevivió y sigue siendo posterior.
       const nuevoFin = nuevoInicio && dentro(fin) && fin > nuevoInicio ? fin : ""
       if (nuevoInicio !== inicio) form.setValue("fechaInicio", nuevoInicio)
       if (nuevoFin !== fin) form.setValue("fechaFin", nuevoFin)
     },
-    [form]
+    [form, esEdicion, anio?.estado]
   )
 
   // Los años ya registrados se deshabilitan para no chocar contra el UNIQUE de
@@ -971,6 +978,33 @@ function AnioDialog({
     () => new Set(aniosExistentes.filter((a) => a !== anio?.anio)),
     [aniosExistentes, anio?.anio]
   )
+
+  // Regla 1: no se puede crear un año nuevo mientras exista otro esperando en
+  // «por comenzar»: primero hay que promover el pendiente a vigente y recién
+  // entonces se registra el siguiente. El backend aplica la misma regla en
+  // create(), así que el bloqueo del diálogo solo evita el viaje de ida.
+  const anioPendiente = useMemo(
+    () =>
+      (anios ?? [])
+        .filter((a) => a.estado === ESTADO_ANIO.POR_COMENZAR)
+        .sort((a, b) => (a.anio > b.anio ? 1 : -1))[0],
+    [anios]
+  )
+  const bloqueoCreacion = !esEdicion && !!anioPendiente
+
+  // Regla 2: un año futuro no se activa como vigente hasta que el calendario
+  // llegue a su valor (espejo de validarVigenteSegunCalendario del backend).
+  const anioCalendario = new Date().getFullYear()
+  const vigenteFuturo =
+    /^\d{4}$/.test(anioSeleccionado) && Number(anioSeleccionado) > anioCalendario
+
+  // Regla 3: la fecha de inicio de un vigente se congela. Bloquea en cuanto el
+  // usuario marca Vigente en el formulario —si vuelve a Por comenzar antes de
+  // guardar se rehabilita— y también al abrir un año que ya era vigente, caso
+  // en el que no se desbloquea aunque se mueva el radio. El backend aplica la
+  // misma regla en update().
+  const yaEraVigente = esEdicion && estadoInicial === ESTADO_ANIO.VIGENTE
+  const fechaInicioBloqueada = yaEraVigente || estadoForm === ESTADO_ANIO.VIGENTE
 
   useResetAlAbrir(
     open,
@@ -983,12 +1017,15 @@ function AnioDialog({
     const { estado, ...datos } = values
     await guardarConToast(async () => {
       if (esEdicion && anio) {
-        // El estado viaja por su PATCH: activar un VIGENTE cierra el anterior en
-        // la misma transacción y eso no lo resuelve el update general.
+        // Primero fechas y luego estado. El estado viaja por su PATCH porque
+        // activar un VIGENTE cierra el anterior en la misma transacción y eso
+        // no lo resuelve el update general. Con el PATCH delante, promover a
+        // vigente en este mismo guardado dejaría el año vigente antes del PUT y
+        // la congelación de fechaInicio rechazaría la fecha recién elegida.
+        await actualizar.mutateAsync({ id: anio.idAnio, data: datos })
         if (!cerrado && estado !== anio.estado) {
           await cambiarEstado.mutateAsync({ idAnio: anio.idAnio, estado })
         }
-        await actualizar.mutateAsync({ id: anio.idAnio, data: datos })
       } else {
         await crear.mutateAsync({ ...datos, estado })
       }
@@ -1014,6 +1051,16 @@ function AnioDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader><DialogTitle className="text-lg font-semibold tracking-tight">{esEdicion ? "Editar año escolar" : "Nuevo año escolar"}</DialogTitle></DialogHeader>
+        {bloqueoCreacion && anioPendiente && (
+          <div className="flex gap-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-amber-900 dark:border-amber-700/50 dark:bg-amber-500/10 dark:text-amber-300">
+            <TriangleAlert className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
+            <p className="text-sm">
+              No se puede crear un nuevo año mientras el año {anioPendiente.anio} siga en
+              estado «Por comenzar». Cambia el año {anioPendiente.anio} a Vigente para poder
+              crear el siguiente.
+            </p>
+          </div>
+        )}
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5" noValidate>
           <FieldGroup>
             <Controller
@@ -1083,15 +1130,19 @@ function AnioDialog({
               control={form.control}
               name="estado"
               render={({ field }) => (
-                <FieldSet disabled={cerrado}>
+                <FieldSet disabled={cerrado || bloqueoCreacion}>
                   <FieldLegend>Estado del año</FieldLegend>
                   <FieldDescription className="mb-2 -mt-2 text-xs">
                     {cerrado
                       ? "Este año está cerrado y no admite cambios de estado."
-                      : "Al activar uno vigente, el anterior se cierra automáticamente."}
+                      : bloqueoCreacion
+                        ? `El año ${anioPendiente?.anio} sigue esperando en «Por comenzar»: promuévelo a Vigente para poder crear un nuevo año.`
+                        : vigenteFuturo
+                          ? `El año ${anioSeleccionado} solo se podrá marcar como vigente cuando la fecha calendario llegue al ${anioSeleccionado}.`
+                          : "Al activar uno vigente, el anterior se cierra automáticamente."}
                   </FieldDescription>
                   <RadioGroup
-                    disabled={cerrado}
+                    disabled={cerrado || bloqueoCreacion}
                     value={String(field.value)}
                     onValueChange={(valor) =>
                       field.onChange(
@@ -1105,7 +1156,7 @@ function AnioDialog({
                         Las clases aún no inician.
                       </span>
                     </RadioGroupItem>
-                    <RadioGroupItem value={String(ESTADO_ANIO.VIGENTE)}>
+                    <RadioGroupItem value={String(ESTADO_ANIO.VIGENTE)} disabled={vigenteFuturo}>
                       <span className="text-sm font-medium">Vigente</span>
                       <span className="text-xs text-muted-foreground">
                         Las clases ya están en curso.
@@ -1134,7 +1185,12 @@ function AnioDialog({
                         form.setValue("fechaFin", "")
                       }
                     }}
-                    descripcion="Primer día de clases."
+                    descripcion={
+                      fechaInicioBloqueada
+                        ? "El año vigente no admite cambios en su fecha de inicio."
+                        : "Primer día de clases."
+                    }
+                    deshabilitado={fechaInicioBloqueada}
                     min={rango?.min}
                     max={rango?.max}
                     error={form.formState.errors.fechaInicio}
@@ -1158,7 +1214,7 @@ function AnioDialog({
               />
             </div>
           </FieldGroup>
-          <DialogFooter><DialogTrigger render={<Button variant="outline" />}>Cancelar</DialogTrigger><BotonGuardar etiqueta={esEdicion ? "Guardar cambios" : "Crear año"} enviando={crear.isPending || actualizar.isPending} /></DialogFooter>
+          <DialogFooter><DialogTrigger render={<Button variant="outline" />}>Cancelar</DialogTrigger><BotonGuardar etiqueta={esEdicion ? "Guardar cambios" : "Crear año"} enviando={crear.isPending || actualizar.isPending || cambiarEstado.isPending} disabled={bloqueoCreacion} /></DialogFooter>
         </form>
         {/* El relevo se confirma después de que el formulario ya validó: por eso
             va controlado, fuera del <form>, y no como un trigger más. */}

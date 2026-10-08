@@ -25,7 +25,7 @@ function Calendar({
     <DayPicker
       showOutsideDays={showOutsideDays}
       locale={es}
-      className={cn("rdp-root bg-background p-3", className)}
+      className={cn("rdp-root bg-background", className)}
       classNames={classNames}
       components={{
         Chevron: ({ className: chevronClass, orientation, ...chevronProps }) =>

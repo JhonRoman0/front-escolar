@@ -28,11 +28,12 @@ function PopoverContent({
   side = "bottom",
   sideOffset = 4,
   alignOffset = 0,
+  collisionAvoidance,
   ...props
 }: PopoverPrimitive.Popup.Props &
   Pick<
     PopoverPrimitive.Positioner.Props,
-    "align" | "side" | "sideOffset" | "alignOffset"
+    "align" | "side" | "sideOffset" | "alignOffset" | "collisionAvoidance"
   >) {
   return (
     <PopoverPrimitive.Portal>
@@ -41,6 +42,10 @@ function PopoverContent({
         sideOffset={sideOffset}
         align={align}
         alignOffset={alignOffset}
+        // Sin especificar, Base UI usa side "flip" (voltea si no cabe). Se
+        // reenvía para que quien lo necesite pueda pedir, por ejemplo,
+        // side "none" y que el popup nunca cambie de lado.
+        collisionAvoidance={collisionAvoidance}
         className="isolate z-50"
       >
         <PopoverPrimitive.Popup
