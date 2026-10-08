@@ -1,4 +1,5 @@
 import { apiFetch, crud } from "@/lib/api"
+import { fechaHoyISO, formatearFecha } from "@/lib/fechas"
 
 // Jackson serializa LocalTime como "08:00:00"; el form y los inputs usan "HH:mm"
 export function horaCorta(hora?: string | null): string {
@@ -77,7 +78,7 @@ interface TurnoRequest {
 
 // ── Grado ────────────────────────────────────────────────────────────────
 
-interface SeccionResponse {
+export interface SeccionResponse {
   idGradoSeccion: number
   idSeccion: number
   nombre: string
@@ -115,7 +116,7 @@ export interface GradoRequest {
 
 // ── Nivel (filtro cascada) ──────────────────────────────────────────────
 
-interface NivelResponse {
+export interface NivelResponse {
   idNivel: number
   nombre: string
 }
@@ -146,15 +147,19 @@ export interface SeccionRequest {
 }
 
 /**
- * Varias secciones de una vez sobre la misma combinación de grado, turno y año
- * vigente. El backend las valida todas antes de insertar la primera, así que si
- * una se repite o ya existe no se crea ninguna.
+ * Varias secciones de una vez sobre la misma combinación de grado, turno y año.
+ * El backend las valida todas antes de insertar la primera, así que si una se
+ * repite o ya existe no se crea ninguna. La UI envía siempre idAnio explícito.
  */
 export interface SeccionesBatchRequest {
   idGrado: number
   idTurno: number
   nombres: string[]
-  /** Opcional: el backend usa el año vigente cuando no viene. */
+  /**
+   * Opcional: la UI siempre lo envía. Si no viene, el backend resuelve con su
+   * fallback (por comenzar habilitado de año más alto, si no, el vigente) y
+   * falla si no hay ninguno habilitado.
+   */
   idAnio?: number | null
 }
 
@@ -185,6 +190,80 @@ export const ESTADO_ANIO = {
   CERRADO: 2,
   POR_COMENZAR: 3,
 } as const
+
+/**
+ * Regla única de "año habilitado para secciones": está vigente, o está por
+ * comenzar y su fecha de inicio ya se cumplió. Un por comenzar sin fecha o
+ * todavía futuro deja el alta bloqueada: sería crear secciones para el ciclo
+ * siguiente en un año que nadie está usando.
+ *
+ * Espejo exacto de GradoSeccionService.habilitadoParaSecciones (backend).
+ */
+export function anioHabilitadoParaSecciones(
+  anio: AnioEscolarResponse,
+  hoy: string = fechaHoyISO()
+): boolean {
+  if (anio.estado === ESTADO_ANIO.VIGENTE) return true
+  return (
+    anio.estado === ESTADO_ANIO.POR_COMENZAR &&
+    anio.fechaInicio != null &&
+    anio.fechaInicio <= hoy
+  )
+}
+
+/** Solo los años sobre los que se puede crear secciones hoy. */
+export function aniosHabilitados(
+  anios: AnioEscolarResponse[],
+  hoy?: string
+): AnioEscolarResponse[] {
+  return anios.filter((a) => anioHabilitadoParaSecciones(a, hoy))
+}
+
+/**
+ * Selección inicial cuando hay varios habilitados: el por comenzar de año más
+ * alto (el próximo ciclo, donde conviene preparar las secciones); si no, el
+ * vigente.
+ */
+export function anioPorDefecto(
+  habilitados: AnioEscolarResponse[]
+): AnioEscolarResponse | undefined {
+  if (habilitados.length === 0) return undefined
+  const porComenzar = habilitados
+    .filter((a) => a.estado === ESTADO_ANIO.POR_COMENZAR)
+    .sort((a, b) => (a.anio < b.anio ? 1 : a.anio > b.anio ? -1 : 0))
+  return (
+    porComenzar[0] ??
+    habilitados.find((a) => a.estado === ESTADO_ANIO.VIGENTE) ??
+    habilitados[0]
+  )
+}
+
+/** Texto de estado para los contextos de diálogo ("Vigente", "Por comenzar"...). */
+export function estadoAnioTexto(estado: number): string {
+  if (estado === ESTADO_ANIO.VIGENTE) return "Vigente"
+  if (estado === ESTADO_ANIO.CERRADO) return "Cerrado"
+  if (estado === ESTADO_ANIO.POR_COMENZAR) return "Por comenzar"
+  return "Sin estado"
+}
+
+/**
+ * Motivo por el que no se puede crear en este año, o `null` si se puede. Es el
+ * mismo texto que devuelve el backend, para que el botón deshabilitado avise
+ * antes de que el backend rechace la petición.
+ */
+export function motivoAnioNoHabilitado(
+  anio: AnioEscolarResponse,
+  hoy: string = fechaHoyISO()
+): string | null {
+  if (anioHabilitadoParaSecciones(anio, hoy)) return null
+  if (anio.estado === ESTADO_ANIO.CERRADO) {
+    return `El año ${anio.anio} está cerrado y no admite secciones nuevas.`
+  }
+  if (anio.fechaInicio == null) {
+    return `El año ${anio.anio} no tiene fecha de inicio configurada: no admite secciones todavía.`
+  }
+  return `El año ${anio.anio} se habilita desde el ${formatearFecha(anio.fechaInicio)}.`
+}
 
 /** 1 = ACTIVO, 2 = ELIMINADO, 3 = INACTIVO. Espejo de AccesoConstants del backend. */
 export const ACCESO = {

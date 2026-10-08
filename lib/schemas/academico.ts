@@ -194,9 +194,11 @@ export function duplicadosDeSeccion(
 
 /**
  * Alta de varias secciones sobre un grado que ya existe, todas de la misma
- * combinacion de turno, nivel y grado. El año no viaja en el formulario: el
- * backend usa el vigente. Mandarlo abriría la puerta a colgar las secciones de
- * un año que el usuario no está viendo.
+ * combinacion de turno, nivel y grado y del mismo año escolar. El año viaja en
+ * el formulario porque el dialogo lo deja elegido entre los habilitados (o lo
+ * fija si solo hay uno): mandarlo explícito evita que el backend tenga que
+ * adivinar y evita que las secciones caigan en un año que el usuario no está
+ * viendo.
  *
  * `existentes` son las letras que ya tiene ese grado en ese turno y año. Se
  * pasan desde el formulario porque el backend responde el lote entero con un
@@ -210,6 +212,7 @@ export const crearSeccionSchema = (existentes: string[] = []) =>
       idTurno: z.number().int().min(1, "Selecciona un turno"),
       idNivel: z.number().int().min(1, "Selecciona un nivel"),
       idGrado: z.number().int().min(1, "Selecciona un grado"),
+      idAnio: z.number().int().min(1, "Selecciona un año escolar"),
       secciones: z
         .array(z.string())
         .min(1, "Indica al menos una sección")
