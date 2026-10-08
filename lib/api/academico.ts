@@ -81,6 +81,12 @@ interface SeccionResponse {
   idGradoSeccion: number
   idSeccion: number
   nombre: string
+  idTurno: number
+  turno: string
+  idAnio: number
+  anio: string
+  tieneMatriculas: boolean
+  tieneAsignaciones: boolean
 }
 
 export interface GradoResponse {
@@ -100,8 +106,9 @@ export interface GradoResponse {
 export interface GradoRequest {
   nombre: string
   idNivel: number
-  idAnio: number
   idTurno: number
+  /** Opcional: el backend usa el año vigente cuando no viene. */
+  idAnio?: number | null
   secciones?: string[]
   accesoId?: number | null
 }
@@ -121,6 +128,34 @@ interface GradoSeccionItem {
   nombre: string
   idTurno: number
   turno: string
+  idAnio: number
+  anio: string
+  /**
+   * El backend los calcula en cada listado. La UI los usa para deshabilitar la
+   * papelera: si hay matriculas o asignaciones, la seccion ya no se puede tocar.
+   */
+  tieneMatriculas: boolean
+  tieneAsignaciones: boolean
+}
+
+export interface SeccionRequest {
+  idGrado: number
+  idTurno: number
+  nombre: string
+  idAnio?: number | null
+}
+
+/**
+ * Varias secciones de una vez sobre la misma combinación de grado, turno y año
+ * vigente. El backend las valida todas antes de insertar la primera, así que si
+ * una se repite o ya existe no se crea ninguna.
+ */
+export interface SeccionesBatchRequest {
+  idGrado: number
+  idTurno: number
+  nombres: string[]
+  /** Opcional: el backend usa el año vigente cuando no viene. */
+  idAnio?: number | null
 }
 
 // ── Año escolar ──────────────────────────────────────────────────────────
@@ -281,8 +316,10 @@ export const cursosApi = crud<CursoResponse, CursoRequest>("/cursos")
 export const turnosApi = crud<TurnoResponse, TurnoRequest>("/turnos")
 export const gradosApi = {
   ...crud<GradoResponse, GradoRequest>("/grados"),
-  async porNivel(idNivel: number): Promise<GradoResponse[]> {
-    return apiFetch<GradoResponse[]>(`/grados?idNivel=${idNivel}`)
+  async porNivel(idNivel: number, idAnio?: number | null): Promise<GradoResponse[]> {
+    const params = new URLSearchParams({ idNivel: String(idNivel) })
+    if (idAnio) params.set("idAnio", String(idAnio))
+    return apiFetch<GradoResponse[]>(`/grados?${params.toString()}`)
   },
 }
 export const aniosEscolaresApi = {
@@ -308,6 +345,22 @@ export const nivelesApi = {
 export const gradoSeccionApi = {
   porGrado: (idGrado: number) =>
     apiFetch<GradoSeccionItem[]>(`/secciones?idGrado=${idGrado}`),
+  async crear(request: SeccionRequest): Promise<GradoSeccionItem> {
+    return apiFetch<GradoSeccionItem>("/secciones", {
+      method: "POST",
+      body: JSON.stringify(request),
+    })
+  },
+  /** Lote atómico: o se crean todas las secciones o ninguna. */
+  async crearLote(request: SeccionesBatchRequest): Promise<GradoSeccionItem[]> {
+    return apiFetch<GradoSeccionItem[]>("/secciones/lote", {
+      method: "POST",
+      body: JSON.stringify(request),
+    })
+  },
+  async eliminar(idGradoSeccion: number): Promise<void> {
+    return apiFetch<void>(`/secciones/${idGradoSeccion}`, { method: "DELETE" })
+  },
 }
 
 export const asignacionesApi = {

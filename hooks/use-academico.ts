@@ -2,6 +2,7 @@ import {
   keepPreviousData,
   useMutation,
   useQuery,
+  useQueryClient,
 } from "@tanstack/react-query"
 
 import { useCrud } from "@/hooks/use-crud"
@@ -19,6 +20,8 @@ import {
   recreosApi,
   suspensionesApi,
   turnosApi,
+  type SeccionRequest,
+  type SeccionesBatchRequest,
   type SuspensionRequest,
 } from "@/lib/api/academico"
 
@@ -148,6 +151,54 @@ export function useSeccionesPorGrado(idGrado: number | null) {
     queryFn: () => gradoSeccionApi.porGrado(idGrado as number),
     enabled: !!idGrado,
     staleTime: 1000 * 60 * 10,
+  })
+}
+
+/**
+ * Alta y baja de una seccion suelta sobre un grado existente. Se invalidan
+ * grados y asignaciones porque las dos listas muestran el nombre de la seccion
+ * y, ademas, crear una seccion con el anio vigente suma un turno nuevo en la
+ * cascada de matricula.
+ */
+export function useCrearSeccion() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (data: SeccionRequest) => gradoSeccionApi.crear(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: KEYS.grados })
+      queryClient.invalidateQueries({ queryKey: KEYS.secciones })
+      queryClient.invalidateQueries({ queryKey: KEYS.asignaciones })
+    },
+  })
+}
+
+/**
+ * Alta de varias secciones de golpe sobre la misma combinacion de grado, turno
+ * y anio. Se invalidan las mismas tres listas que la alta simple: grados porque
+ * es la tabla que las muestra, secciones porque las lista el dialogo de editar,
+ * y asignaciones porque courses quedan colgados de ellas.
+ */
+export function useCrearSeccionesLote() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (data: SeccionesBatchRequest) => gradoSeccionApi.crearLote(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: KEYS.grados })
+      queryClient.invalidateQueries({ queryKey: KEYS.secciones })
+      queryClient.invalidateQueries({ queryKey: KEYS.asignaciones })
+    },
+  })
+}
+
+export function useEliminarSeccion() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (idGradoSeccion: number) => gradoSeccionApi.eliminar(idGradoSeccion),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: KEYS.grados })
+      queryClient.invalidateQueries({ queryKey: KEYS.secciones })
+      queryClient.invalidateQueries({ queryKey: KEYS.asignaciones })
+    },
   })
 }
 

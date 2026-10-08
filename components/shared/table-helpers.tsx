@@ -113,9 +113,11 @@ export function AccionesFila({
   puedeActualizar: boolean
   puedeEliminar: boolean
   onEditar: () => void
-  onEliminar: () => Promise<void>
-  tituloEliminar: string
-  descripcionEliminar: string
+  /** Solo se usa si `puedeEliminar` es true, por eso es opcional. */
+  onEliminar?: () => Promise<void>
+  /** Solo se usan si `puedeEliminar` es true, por eso son opcionales. */
+  tituloEliminar?: string
+  descripcionEliminar?: string
   ariaEditar: string
 }) {
   return (
@@ -130,10 +132,10 @@ export function AccionesFila({
           <Pencil />
         </Button>
       )}
-      {puedeEliminar && (
+      {puedeEliminar && onEliminar && (
         <ConfirmarEliminar
-          titulo={tituloEliminar}
-          descripcion={descripcionEliminar}
+          titulo={tituloEliminar ?? ""}
+          descripcion={descripcionEliminar ?? ""}
           onConfirm={onEliminar}
         />
       )}
