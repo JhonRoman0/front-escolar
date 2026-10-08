@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 import {
   ArrowRight,
@@ -287,7 +287,6 @@ function EditarSeccionesDialog({
   const [editId, setEditId] = useState<number | null>(null)
   const [editNombre, setEditNombre] = useState("")
   const [editError, setEditError] = useState<string | null>(null)
-  const [modoSeleccion, setModoSeleccion] = useState(false)
   const [seleccionados, setSeleccionados] = useState<Set<number>>(new Set())
   const [confirmarEliminar, setConfirmarEliminar] = useState<{
     open: boolean
@@ -313,6 +312,37 @@ function EditarSeccionesDialog({
 
   const enUso = (s: (typeof seccionesConLetra)[number]) =>
     s.tieneMatriculas || s.tieneAsignaciones
+
+  // Una sección solo se puede marcar si se puede eliminar: el estado de uso de
+  // la sección, el permiso y el bloqueo del año valen para todo el diálogo.
+  const esSeleccionable = (s: (typeof seccionesConLetra)[number]) =>
+    puedeEliminar && !enUso(s) && motivoBloqueo === null
+
+  const seleccionables = seccionesConLetra.filter(esSeleccionable)
+  const idsSeleccionables = seleccionables.map((s) => s.idGradoSeccion)
+  const todasSeleccionadas =
+    idsSeleccionables.length > 0 &&
+    idsSeleccionables.every((id) => seleccionados.has(id))
+  const seleccionParcial = seleccionados.size > 0 && !todasSeleccionadas
+
+  // El checkbox "Seleccionar todas" muestra el estado intermedio cuando hay
+  // selección parcial: `indeterminate` solo se puede fijar por ref.
+  const refTodas = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    if (refTodas.current) refTodas.current.indeterminate = seleccionParcial
+  }, [seleccionParcial])
+
+  function alternarTodas() {
+    setSeleccionados((prev) => {
+      const next = new Set(prev)
+      if (todasSeleccionadas) {
+        idsSeleccionables.forEach((id) => next.delete(id))
+      } else {
+        idsSeleccionables.forEach((id) => next.add(id))
+      }
+      return next
+    })
+  }
 
   async function borrar(idGradoSeccion: number, nombre: string) {
     try {
@@ -383,7 +413,7 @@ function EditarSeccionesDialog({
               <ul className="flex flex-col gap-2">
                 {seccionesConLetra.map((s) => {
                   const bloqueada = enUso(s)
-                  const editandoFila = editId === s.idGradoSeccion && !modoSeleccion
+                  const editandoFila = editId === s.idGradoSeccion
                   const anioBloqueado = motivoBloqueo !== null
                   return (
                     <li
@@ -391,32 +421,22 @@ function EditarSeccionesDialog({
                       className="flex items-center justify-between gap-3 rounded-md border p-2"
                     >
                       <div className="flex min-w-0 flex-1 items-center gap-2">
-                        {modoSeleccion ? (
-                          <>
-                            <input
-                              type="checkbox"
-                              checked={seleccionados.has(s.idGradoSeccion)}
-                              disabled={bloqueada}
-                              onChange={(e) => {
-                                const setSel = new Set(seleccionados)
-                                if (e.target.checked) {
-                                  setSel.add(s.idGradoSeccion)
-                                } else {
-                                  setSel.delete(s.idGradoSeccion)
-                                }
-                                setSeleccionados(setSel)
-                              }}
-                            />
-                            <div className="min-w-0">
-                              <p className="text-sm font-medium">{s.nombre}</p>
-                              {bloqueada && (
-                                <p className="text-xs text-muted-foreground">
-                                  {s.tieneMatriculas ? "con alumnos" : "con cursos"}
-                                </p>
-                              )}
-                            </div>
-                          </>
-                        ) : editandoFila ? (
+                        <input
+                          type="checkbox"
+                          checked={seleccionados.has(s.idGradoSeccion)}
+                          disabled={!esSeleccionable(s)}
+                          onChange={(e) => {
+                            const setSel = new Set(seleccionados)
+                            if (e.target.checked) {
+                              setSel.add(s.idGradoSeccion)
+                            } else {
+                              setSel.delete(s.idGradoSeccion)
+                            }
+                            setSeleccionados(setSel)
+                          }}
+                          aria-label={`Seleccionar sección ${s.nombre}`}
+                        />
+                        {editandoFila ? (
                           <div className="flex w-full flex-col gap-1">
                             <Input
                               value={editNombre}
@@ -465,7 +485,7 @@ function EditarSeccionesDialog({
                         )}
                       </div>
 
-                      {modoSeleccion ? null : editandoFila ? (
+                      {editandoFila ? (
                         <div className="flex gap-1">
                           <Button
                             variant="ghost"
@@ -497,6 +517,9 @@ function EditarSeccionesDialog({
                                   idGradoSeccion: s.idGradoSeccion,
                                   nombre: nombreEdit,
                                 })
+                                toast.success(
+                                  `Sección ${s.nombre} actualizada a ${nombreEdit}`,
+                                )
                                 setEditId(null)
                                 setEditNombre("")
                                 setEditError(null)
@@ -564,6 +587,28 @@ function EditarSeccionesDialog({
             )}
           </div>
 
+          {!isLoading && seccionesConLetra.length > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <label className="flex items-center gap-2 text-[13px] text-muted-foreground">
+                <input
+                  type="checkbox"
+                  ref={refTodas}
+                  checked={todasSeleccionadas}
+                  disabled={seleccionables.length === 0}
+                  onChange={alternarTodas}
+                />
+                Seleccionar todas
+              </label>
+              {seleccionados.size > 0 && (
+                <span className="text-[13px] text-muted-foreground">
+                  {seleccionados.size === 1
+                    ? "1 sección seleccionada"
+                    : `${seleccionados.size} secciones seleccionadas`}
+                </span>
+              )}
+            </div>
+          )}
+
           {agregar && (
             <div className="flex flex-col gap-3 rounded-md border p-3">
               {/*
@@ -612,8 +657,8 @@ function EditarSeccionesDialog({
         </div>
 
         <DialogFooter className="flex flex-wrap justify-between gap-2 sm:justify-between">
-          {!agregar && !modoSeleccion ? (
-            <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2">
+            {!agregar && (
               <Button
                 type="button"
                 variant="outline"
@@ -623,44 +668,11 @@ function EditarSeccionesDialog({
               >
                 <Plus className="mr-1 size-4" /> Agregar otra sección
               </Button>
-              <Button
-                type="button"
-                variant="outline"
-                disabled={!puedeEliminar || motivoBloqueo !== null}
-                title={motivoBloqueo ?? undefined}
-                onClick={() => {
-                  setModoSeleccion(true)
-                  setSeleccionados(new Set())
-                  setEditId(null)
-                  setEditNombre("")
-                  setEditError(null)
-                }}
-              >
-                Seleccionar secciones
-              </Button>
-            </div>
-          ) : modoSeleccion ? (
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[13px] text-muted-foreground">
-                {seleccionados.size} seccion{seleccionados.size === 1 ? "" : "es"} seleccionada
-                {seleccionados.size === 1 ? "" : "s"}
-              </span>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setModoSeleccion(false)
-                  setSeleccionados(new Set())
-                }}
-              >
-                Cancelar selección
-              </Button>
+            )}
+            {seleccionados.size > 0 && (
               <Button
                 type="button"
                 variant="destructive"
-                size="sm"
-                disabled={seleccionados.size === 0}
                 onClick={() => {
                   const ids = Array.from(seleccionados)
                   const nombres = seccionesConLetra
@@ -669,10 +681,12 @@ function EditarSeccionesDialog({
                   setConfirmarLote({ open: true, ids, nombres })
                 }}
               >
-                Eliminar seleccionadas
+                {seleccionados.size === 1
+                  ? "Eliminar seleccionada"
+                  : "Eliminar seleccionadas"}
               </Button>
-            </div>
-          ) : null}
+            )}
+          </div>
           <DialogTrigger render={<Button variant="outline" />}>Cerrar</DialogTrigger>
         </DialogFooter>
       </DialogContent>
@@ -745,8 +759,9 @@ function EditarSeccionesDialog({
           <DialogHeader>
             <DialogTitle>Eliminar secciones seleccionadas</DialogTitle>
             <DialogDescription>
-              Se eliminarán {confirmarLote.ids.length} seccion
-              {confirmarLote.ids.length === 1 ? "" : "es"} ({confirmarLote.nombres.join(", ")}) de{" "}
+              Se eliminarán {confirmarLote.ids.length} secci
+              {confirmarLote.ids.length === 1 ? "ó" : "ones"}
+              ({confirmarLote.nombres.join(", ")}) de{" "}
               {grado.nombre} en {contexto}.
             </DialogDescription>
           </DialogHeader>
@@ -772,7 +787,6 @@ function EditarSeccionesDialog({
                 try {
                   await eliminarLote.mutateAsync(confirmarLote.ids)
                   setSeleccionados(new Set())
-                  setModoSeleccion(false)
                   setConfirmarLote({ open: false, ids: [], nombres: [] })
                   refetch()
                 } catch (error) {
