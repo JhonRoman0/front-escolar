@@ -41,7 +41,14 @@ import {
   useCrearSeccionesLote,
   useGrados,
 } from "@/hooks/use-academico"
-import type { GradoResponse, NivelResponse, TurnoResponse } from "@/lib/api/academico"
+import {
+  anioPorDefecto,
+  aniosHabilitados,
+  estadoAnioTexto,
+  type GradoResponse,
+  type NivelResponse,
+  type TurnoResponse,
+} from "@/lib/api/academico"
 import {
   crearSeccionSchema,
   duplicadosDeSeccion,
@@ -78,9 +85,10 @@ function letrasExistentes(
  * Alta de varias secciones de una sola vez.
  *
  * Turno, nivel y grado se eligen una vez y todas las secciones colgantes
- * comparten esa combinacion y el anio vigente. Antes el formulario aceptaba una
- * sola letra por envio, asi que escribir A, B y C era elegir el mismo trio tres
- * veces.
+ * comparten esa combinacion y el anio elegido entre los habilitados (vigente
+ * o por comenzar ya iniciado; por defecto el por comenzar, que es el proximo
+ * ciclo). Antes el formulario aceptaba una sola letra por envio, asi que
+ * escribir A, B y C era elegir el mismo trio tres veces.
  */
 export function NuevaSeccionDialog({
   open,
@@ -98,8 +106,10 @@ export function NuevaSeccionDialog({
   const { data: anios = [] } = useAniosEscolares()
   const crearLote = useCrearSeccionesLote()
 
-  const anioVigente = anios.find((a) => a.estado === 1) ?? null
-  const idAnioVigente = anioVigente?.idAnio ?? 0
+  // Solo se puede crear en un año habilitado (vigente o por comenzar ya
+  // iniciado); si no hay ninguno la pantalla lo bloquea antes de llegar acá.
+  const habilitados = useMemo(() => aniosHabilitados(anios), [anios])
+  const anioInicial = anioPorDefecto(habilitados)?.idAnio ?? 0
 
   const form = useForm<SeccionValues>({
     /*
@@ -112,13 +122,14 @@ export function NuevaSeccionDialog({
     resolver: (values, context, options) =>
       zodResolver(
         crearSeccionSchema(
-          letrasExistentes(grados, values.idGrado, values.idTurno, idAnioVigente),
+          letrasExistentes(grados, values.idGrado, values.idTurno, values.idAnio),
         ),
       )(values, context, options),
     defaultValues: {
       idTurno: turnoPorDefecto?.idTurno ?? 0,
       idNivel: 0,
       idGrado: 0,
+      idAnio: anioInicial,
       secciones: [""],
     },
   })
@@ -126,8 +137,10 @@ export function NuevaSeccionDialog({
   const idNivel = useWatch({ control: form.control, name: "idNivel" })
   const idGrado = useWatch({ control: form.control, name: "idGrado" })
   const idTurno = useWatch({ control: form.control, name: "idTurno" })
+  const idAnio = useWatch({ control: form.control, name: "idAnio" })
   const secciones = useWatch({ control: form.control, name: "secciones" })
   const gradosNivel = idNivel ? grados.filter((g) => g.idNivel === idNivel) : []
+  const anioSel = habilitados.find((a) => a.idAnio === idAnio) ?? null
 
   /*
    * Las secciones cuelgan de la combinacion turno + nivel + grado, asi que sin
@@ -137,7 +150,7 @@ export function NuevaSeccionDialog({
    * el input y el boton no se puedan desalinear. El select de grado no la usa: el
    * depende solo de nivel, que es una regla mas estrecha.
    */
-  const faltaDestino = !idTurno || !idNivel || !idGrado
+  const faltaDestino = !idTurno || !idNivel || !idGrado || !idAnio
 
   /*
    * Los choques se calculan en cada render en vez de:setError al escribir. Asi el
@@ -150,23 +163,36 @@ export function NuevaSeccionDialog({
     () =>
       duplicadosDeSeccion(
         secciones,
-        letrasExistentes(grados, idGrado, idTurno, idAnioVigente),
+        letrasExistentes(grados, idGrado, idTurno, idAnio),
       ),
-    [secciones, grados, idGrado, idTurno, idAnioVigente],
+    [secciones, grados, idGrado, idTurno, idAnio],
   )
 
   // El dialogo se renderiza siempre y solo cambia `open`, asi que useForm
   // conserva los valores entre aperturas. Resetear al abrir deja el formulario
-  // limpio, con un solo input de seccion y el turno que ya estaba activo.
+  // limpio, con un solo input de seccion, el turno que ya estaba activo y el
+  // anio habilitado por defecto.
   useEffect(() => {
     if (!open) return
     form.reset({
       idTurno: turnoPorDefecto?.idTurno ?? 0,
       idNivel: 0,
       idGrado: 0,
+      idAnio: anioInicial,
       secciones: [""],
     })
-  }, [open, turnoPorDefecto, form])
+  }, [open, turnoPorDefecto, anioInicial, form])
+
+  /*
+   * Los años pueden terminar de cargar después de abrir: si el form quedó sin
+   * año (o con 0) se adopta el por defecto sin pisar lo demás que el usuario ya
+   * eligió.
+   */
+  useEffect(() => {
+    if (open && !idAnio && anioInicial) {
+      form.setValue("idAnio", anioInicial)
+    }
+  }, [open, idAnio, anioInicial, form])
 
   /*
    * En `errors.secciones` conviven dos cosas: un error por indice, cuando la
@@ -191,6 +217,7 @@ export function NuevaSeccionDialog({
         idGrado: values.idGrado,
         idTurno: values.idTurno,
         nombres,
+        idAnio: values.idAnio,
       })
       const detalle = nombres.join(", ")
       toast.success(
@@ -215,13 +242,62 @@ export function NuevaSeccionDialog({
           </DialogTitle>
           <DialogDescription>
             Elige turno, nivel y grado una sola vez y agrega todas las secciones
-            que los comparten. Se crean en el año escolar vigente
-            {anioVigente ? ` ${anioVigente.anio}` : ""}.
+            que los comparten.{" "}
+            {anioSel
+              ? `Se crean en el año escolar ${anioSel.anio} · ${estadoAnioTexto(anioSel.estado)}.`
+              : "Selecciona un año escolar habilitado para continuar."}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5" noValidate>
           <FieldGroup>
+            {/*
+              El año es contexto de la alta, no una opción más del formulario:
+              con un solo habilitado queda fijo a la vista y con varios se
+              muestra un select que solo contiene los habilitados. El backend
+              vuelve a validar igual: esto es para que el error no llegue tarde.
+            */}
+            <Controller
+              control={form.control}
+              name="idAnio"
+              render={({ field }) => (
+                <Field>
+                  <FieldLabel>Año escolar</FieldLabel>
+                  <FieldContent>
+                    {habilitados.length > 1 ? (
+                      <Select
+                        value={field.value ? String(field.value) : ""}
+                        onValueChange={(v) => field.onChange(Number(v))}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue>
+                            {habilitados.find((a) => a.idAnio === field.value)?.anio ??
+                              "Selecciona"}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectGroup>
+                            {habilitados.map((a) => (
+                              <SelectItem key={a.idAnio} value={String(a.idAnio)}>
+                                {a.anio} · {estadoAnioTexto(a.estado)}
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <p className="rounded-md bg-muted/60 px-2.5 py-1.5 text-sm text-muted-foreground">
+                        {anioSel
+                          ? `${anioSel.anio} · ${estadoAnioTexto(anioSel.estado)}`
+                          : "No hay un año escolar habilitado"}
+                      </p>
+                    )}
+                    <FieldError errors={[form.formState.errors.idAnio]} />
+                  </FieldContent>
+                </Field>
+              )}
+            />
+
             <FieldSet>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Controller

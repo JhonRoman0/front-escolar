@@ -25,14 +25,6 @@ import {
 } from "@/components/ui/dialog"
 import { Field, FieldContent, FieldDescription, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { BotonNuevo } from "@/components/shared/boton-nuevo"
 import { HeaderSeccion } from "@/components/shared/header-seccion"
 import { SeccionesPorNivel } from "@/components/academico/secciones-por-nivel"
@@ -47,7 +39,16 @@ import {
   useTurnos,
 } from "@/hooks/use-academico"
 import { usePuede } from "@/hooks/use-permisos"
-import type { GradoResponse, TurnoResponse } from "@/lib/api/academico"
+import {
+  ESTADO_ANIO,
+  aniosHabilitados,
+  estadoAnioTexto,
+  motivoAnioNoHabilitado,
+  type AnioEscolarResponse,
+  type GradoResponse,
+  type TurnoResponse,
+} from "@/lib/api/academico"
+import { formatearFecha } from "@/lib/fechas"
 
 interface SeccionesEstructuraProps {
   onIrATurnos?: () => void
@@ -65,21 +66,49 @@ export function SeccionesEstructura({
   const puedeCrear = usePuede("GRADOS", "CREAR")
   const puedeActualizar = usePuede("GRADOS", "ACTUALIZAR")
   const [nuevaAbierto, setNuevaAbierto] = useState(false)
-  const [editando, setEditando] = useState<{ grado: GradoResponse; idTurno: number } | null>(
-    null,
-  )
+  const [editando, setEditando] = useState<{
+    grado: GradoResponse
+    idTurno: number
+    idAnio: number
+  } | null>(null)
 
   const turnoActivo = turnos.find((t) => t.accesoId === 1) ?? null
-  const anioVigente = anios.find((a) => a.estado === 1) ?? null
+  const habilitados = aniosHabilitados(anios)
   const faltaTurno = !turnoActivo
-  const faltaAnio = !anioVigente
+  // No alcanza con que exista un año: tiene que ser uno sobre el que se pueda
+  // crear hoy (vigente o por comenzar ya iniciado).
+  const faltaAnio = habilitados.length === 0
   const bloqueado = (faltaTurno || faltaAnio) && !cargandoTurnos && !cargandoAnios
+
+  /*
+   * Por qué se bloquea cuando hay años pero ninguno habilitado: el caso
+   * esperado es un único por comenzar cuya fecha de inicio todavía no llegó.
+   */
+  const anioPendiente =
+    anios
+      .filter((a) => a.estado === ESTADO_ANIO.POR_COMENZAR)
+      .sort((a, b) => (a.anio < b.anio ? 1 : -1))[0] ?? null
+  const detalleAnio = !faltaAnio
+    ? undefined
+    : anioPendiente
+      ? anioPendiente.fechaInicio
+        ? `El año ${anioPendiente.anio} estará disponible desde el ${formatearFecha(anioPendiente.fechaInicio)}.`
+        : `El año ${anioPendiente.anio} está por comenzar pero no tiene fecha de inicio: configúralo en Año escolar.`
+      : anios.length > 0
+        ? "Solo hay años cerrados. Crea el nuevo año escolar para poder registrar secciones."
+        : undefined
+
+  // La fila que se pidió editar define todo: grado + turno + año. Si el año
+  // dejó de existir (borrado en otra pestaña), no hay contexto y no se abre.
+  const anioEditando = editando ? (anios.find((a) => a.idAnio === editando.idAnio) ?? null) : null
+  const turnoEditando = editando ? (turnos.find((t) => t.idTurno === editando.idTurno) ?? null) : null
 
   if (bloqueado) {
     return (
       <RequisitosPendientes
         faltaTurno={faltaTurno}
         faltaAnio={faltaAnio}
+        detalleAnio={detalleAnio}
         onIrATurnos={onIrATurnos}
         onIrAAnios={onIrAAnios}
       />
@@ -91,7 +120,7 @@ export function SeccionesEstructura({
       <CardContent className="flex flex-col gap-4 p-4">
         <HeaderSeccion
           titulo="Secciones"
-          descripcion="Cada sección pertenece a un grado, un turno y el año vigente."
+          descripcion="Cada sección pertenece a un grado, un turno y un año escolar habilitado (vigente o por comenzar ya iniciado)."
           acciones={
             <BotonNuevo
               texto="Nueva sección"
@@ -107,7 +136,7 @@ export function SeccionesEstructura({
           isLoading={isLoading}
           isError={isError}
           puedeActualizar={puedeActualizar}
-          onEditar={(grado, idTurno) => setEditando({ grado, idTurno })}
+          onEditar={(grado, idTurno, idAnio) => setEditando({ grado, idTurno, idAnio })}
         />
         {isError && (
           <Button variant="outline" size="sm" onClick={() => refetch()}>
@@ -121,15 +150,16 @@ export function SeccionesEstructura({
           turnos={turnos}
           turnoPorDefecto={turnoActivo}
         />
-        {editando && (
+        {editando && anioEditando && (
           <EditarSeccionesDialog
-            key={`${editando.grado.idGrado}-${editando.idTurno}`}
+            key={`${editando.grado.idGrado}-${editando.idTurno}-${editando.idAnio}`}
             grado={editando.grado}
-            turnoInicial={editando.idTurno}
+            idTurno={editando.idTurno}
+            turno={turnoEditando}
+            anio={anioEditando}
             onOpenChange={(abierto) => {
               if (!abierto) setEditando(null)
             }}
-            turnos={turnos}
           />
         )}
       </CardContent>
@@ -139,6 +169,8 @@ export function SeccionesEstructura({
 interface RequisitosPendientesProps {
   faltaTurno: boolean
   faltaAnio: boolean
+  /** Por qué el año (o años) existente no alcanza: falta de fecha, futuro, cerrado... */
+  detalleAnio?: string
   onIrATurnos?: () => void
   onIrAAnios?: () => void
 }
@@ -146,6 +178,7 @@ interface RequisitosPendientesProps {
 function RequisitosPendientes({
   faltaTurno,
   faltaAnio,
+  detalleAnio,
   onIrATurnos,
   onIrAAnios,
 }: RequisitosPendientesProps) {
@@ -167,8 +200,10 @@ function RequisitosPendientes({
     },
     {
       falta: faltaAnio,
-      titulo: "No hay un año escolar vigente",
-      descripcion: "Cada sección nueva se registra en el año vigente. Activa uno o crea el nuevo.",
+      titulo: "No hay un año escolar habilitado",
+      descripcion:
+        "Cada sección nueva se registra en un año habilitado: el vigente o el que está por comenzar y ya inició. " +
+        (detalleAnio ?? "Crea uno o actívalo."),
       icono: CalendarDays,
       accion: onIrAAnios,
       etiqueta: "Ir a Año escolar",
@@ -182,7 +217,7 @@ function RequisitosPendientes({
       <CardContent className="flex flex-col gap-5 p-6">
         <HeaderSeccion
           titulo="Secciones"
-          descripcion="Una sección necesita un turno y un año escolar vigente, así que ambos deben existir antes de registrarla."
+          descripcion="Una sección necesita un turno y un año escolar habilitado (vigente o por comenzar ya iniciado), así que ambos deben existir antes de registrarla."
           icono={GraduationCap}
         />
         <ul className="flex flex-col gap-3">
@@ -225,25 +260,35 @@ function RequisitosPendientes({
 }
 function EditarSeccionesDialog({
   grado,
-  turnoInicial,
+  idTurno,
+  turno,
+  anio,
   onOpenChange,
-  turnos,
 }: {
   grado: GradoResponse
-  turnoInicial?: number
+  /** Turno de la fila que se abrió: las secciones de aquí son de ese turno. */
+  idTurno: number
+  turno: TurnoResponse | null
+  /** Año de la fila que se abrió: idAnio explícito en cada alta. */
+  anio: AnioEscolarResponse
   onOpenChange: (open: boolean) => void
-  turnos: TurnoResponse[]
 }) {
   const eliminar = useEliminarSeccion()
   const crear = useCrearSeccion()
   const { data: secciones = [], isLoading, refetch } = useSeccionesPorGrado(grado.idGrado)
   const [agregar, setAgregar] = useState(false)
   const [nombreNuevo, setNombreNuevo] = useState("")
-  const [turnoNuevo, setTurnoNuevo] = useState<number | null>(turnoInicial ?? grado.idTurno ?? null)
   const puedeEliminar = usePuede("GRADOS", "ELIMINAR")
   const puedeActualizar = usePuede("GRADOS", "ACTUALIZAR")
 
-  const seccionesConLetra = secciones.filter((s) => s.nombre)
+  // Cada fila de la tabla es grado + turno + año: este diálogo gestiona solo
+  // la combinación exacta que se pidió, no las demás.
+  const seccionesConLetra = secciones.filter(
+    (s) => s.nombre && s.idTurno === idTurno && s.idAnio === anio.idAnio,
+  )
+
+  const contexto = `${turno?.nombre ?? "Turno"} · ${anio.anio} · ${estadoAnioTexto(anio.estado)}`
+  const motivoBloqueo = motivoAnioNoHabilitado(anio)
 
   const enUso = (s: (typeof seccionesConLetra)[number]) =>
     s.tieneMatriculas || s.tieneAsignaciones
@@ -263,7 +308,7 @@ function EditarSeccionesDialog({
   }
 
   async function guardarNueva() {
-    if (!turnoNuevo || !nombreNuevo.trim()) return
+    if (!nombreNuevo.trim()) return
 
     const nombre = nombreNuevo.trim().toUpperCase()
 
@@ -275,8 +320,9 @@ function EditarSeccionesDialog({
     try {
       await crear.mutateAsync({
         idGrado: grado.idGrado,
-        idTurno: turnoNuevo,
+        idTurno,
         nombre,
+        idAnio: anio.idAnio,
       })
 
       toast.success(`Sección ${nombre} agregada`)
@@ -305,7 +351,7 @@ function EditarSeccionesDialog({
             Secciones de {grado.nombre}
           </DialogTitle>
           <DialogDescription>
-            Gestiona las secciones de {grado.nombre}.
+            Gestiona las secciones de {grado.nombre} en {contexto}.
           </DialogDescription>
         </DialogHeader>
 
@@ -315,7 +361,7 @@ function EditarSeccionesDialog({
               <p className="text-[13px] text-muted-foreground">Cargando...</p>
             ) : seccionesConLetra.length === 0 ? (
               <p className="text-[13px] text-muted-foreground">
-                Este grado todavía no tiene secciones. Agrega la primera.
+                Este grado todavía no tiene secciones en {contexto}. Agrega la primera.
               </p>
             ) : (
               <ul className="flex flex-col gap-2">
@@ -329,16 +375,11 @@ function EditarSeccionesDialog({
                       <div className="min-w-0">
                         <p className="text-sm font-medium">{s.nombre}</p>
 
-                        <p className="text-xs text-muted-foreground">
-                          {s.turno} · {s.anio}
-
-                          {bloqueada && (
-                            <>
-                              {" · "}
-                              {s.tieneMatriculas ? "con alumnos" : "con cursos"}
-                            </>
-                          )}
-                        </p>
+                        {bloqueada && (
+                          <p className="text-xs text-muted-foreground">
+                            {s.tieneMatriculas ? "con alumnos" : "con cursos"}
+                          </p>
+                        )}
                       </div>
 
                       <Button
@@ -364,6 +405,14 @@ function EditarSeccionesDialog({
 
           {agregar && (
             <div className="flex flex-col gap-3 rounded-md border p-3">
+              {/*
+                Turno y año no se eligen acá: los define la fila que se abrió.
+                El mismo texto queda a la vista para que el usuario sepa dónde
+                va a caer la letra que escriba.
+              */}
+              <p className="rounded-md bg-muted/60 px-2.5 py-1.5 text-xs text-muted-foreground">
+                {contexto}
+              </p>
               <Field>
                 <FieldLabel>Sección</FieldLabel>
                 <FieldContent>
@@ -384,30 +433,6 @@ function EditarSeccionesDialog({
                   </FieldDescription>
                 </FieldContent>
               </Field>
-              <Field>
-                <FieldLabel>Turno</FieldLabel>
-                <FieldContent>
-                  <Select
-                    value={turnoNuevo ? String(turnoNuevo) : ""}
-                    onValueChange={(v) => setTurnoNuevo(Number(v))}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue>
-                        {turnos.find((t) => t.idTurno === turnoNuevo)?.nombre ?? "Selecciona"}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        {turnos.map((t) => (
-                          <SelectItem key={t.idTurno} value={String(t.idTurno)}>
-                            {t.nombre}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                </FieldContent>
-              </Field>
               <div className="flex justify-end gap-2">
                 <Button type="button" variant="ghost" size="sm" onClick={() => { setAgregar(false); setNombreNuevo("") }}>
                   Cancelar
@@ -415,7 +440,7 @@ function EditarSeccionesDialog({
                 <Button
                   type="button"
                   size="sm"
-                  disabled={!nombreNuevo || !turnoNuevo || crear.isPending}
+                  disabled={!nombreNuevo || crear.isPending}
                   onClick={guardarNueva}
                 >
                   Agregar
@@ -430,7 +455,8 @@ function EditarSeccionesDialog({
             <Button
               type="button"
               variant="outline"
-              disabled={!puedeActualizar}
+              disabled={!puedeActualizar || motivoBloqueo !== null}
+              title={motivoBloqueo ?? undefined}
               onClick={() => setAgregar(true)}
             >
               <Plus className="mr-1 size-4" /> Agregar otra sección

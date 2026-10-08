@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import {
   Baby,
   BookOpen,
@@ -44,6 +44,8 @@ interface GrupoGrado {
 interface FilaTurno {
   idTurno: number
   turno: string
+  /** id del año de ESTA fila: cada combinación turno|año es una fila distinta. */
+  idAnio: number
   anio: string
   secciones: SeccionResponse[]
 }
@@ -160,6 +162,7 @@ export function agruparPorNivel(
         secciones: [...lista].sort((a, b) => a.nombre.localeCompare(b.nombre, "es")),
         idTurno: lista[0].idTurno,
         turno: lista[0].turno,
+        idAnio: lista[0].idAnio,
         anio: lista[0].anio,
       }))
       .sort(
@@ -198,7 +201,8 @@ interface SeccionesPorNivelProps {
   isLoading: boolean
   isError: boolean
   puedeActualizar: boolean
-  onEditar: (grado: GradoResponse, idTurno: number) => void
+  /** La fila editada define grado + turno + año: los tres van juntos. */
+  onEditar: (grado: GradoResponse, idTurno: number, idAnio: number) => void
 }
 
 export function SeccionesPorNivel({
@@ -215,12 +219,33 @@ export function SeccionesPorNivel({
     [grados, niveles, turnos],
   )
 
+  const ids = useMemo(() => bloques.map((b) => `nivel-${b.idNivel}`), [bloques])
+
+  /*
+   * El acordeón va controlado y el estado es SOLO qué niveles están cerrados.
+   * Con `defaultValue` derivado de `bloques`, crear la primera sección de un
+   * nivel lo hacía aparecer en la lista y cambiaba el default después de
+   * montar, lo que Base UI rechaza (warning de useControlled) y, encima, el
+   * nivel nuevo quedaba cerrado porque el estado interno guardaba la lista
+   * vieja. Así los abiertos/cerrados del usuario solo cambian cuando él
+   * alterna, un nivel que aparece después no está en `cerrados` y arranca
+   * abierto (como todo al cargar), y los ids de niveles que ya no existen se
+   * descartan al recalcular `cerrados` en cada toggle.
+   */
+  const [cerrados, setCerrados] = useState<ReadonlySet<string>>(() => new Set())
+
   return (
     <div className="flex flex-col gap-3">
       {isLoading || isError || !bloques.length ? (
         <EstadoTabla isLoading={isLoading} isError={isError} />
       ) : (
-        <Accordion multiple defaultValue={bloques.map((b) => `nivel-${b.idNivel}`)}>
+        <Accordion
+          multiple
+          value={ids.filter((id) => !cerrados.has(id))}
+          onValueChange={(abiertos) =>
+            setCerrados(new Set(ids.filter((id) => !abiertos.includes(id))))
+          }
+        >
           {bloques.map((bloque) => (
             <NivelTabla
               key={bloque.idNivel}
@@ -280,7 +305,7 @@ function EstadoTabla({ isLoading, isError }: { isLoading: boolean; isError: bool
 interface NivelTablaProps {
   bloque: BloqueNivel
   puedeActualizar: boolean
-  onEditar: (grado: GradoResponse, idTurno: number) => void
+  onEditar: (grado: GradoResponse, idTurno: number, idAnio: number) => void
 }
 
 function NivelTabla({ bloque, puedeActualizar, onEditar }: NivelTablaProps) {
@@ -402,8 +427,8 @@ function NivelTabla({ bloque, puedeActualizar, onEditar }: NivelTablaProps) {
                       <AccionesFila
                         puedeActualizar={puedeActualizar}
                         puedeEliminar={false}
-                        onEditar={() => onEditar(grupo.grado, fila.idTurno)}
-                        ariaEditar={`Editar secciones de ${grupo.grado.nombre} en ${fila.turno}`}
+                        onEditar={() => onEditar(grupo.grado, fila.idTurno, fila.idAnio)}
+                        ariaEditar={`Editar secciones de ${grupo.grado.nombre} en ${fila.turno} ${fila.anio}`}
                       />
                     </TableCell>
                   </TableRow>

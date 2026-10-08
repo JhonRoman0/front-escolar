@@ -157,7 +157,7 @@ export function useSeccionesPorGrado(idGrado: number | null) {
 /**
  * Alta y baja de una seccion suelta sobre un grado existente. Se invalidan
  * grados y asignaciones porque las dos listas muestran el nombre de la seccion
- * y, ademas, crear una seccion con el anio vigente suma un turno nuevo en la
+ * y, ademas, crear una seccion en el anio vigente suma un turno nuevo en la
  * cascada de matricula.
  */
 export function useCrearSeccion() {
