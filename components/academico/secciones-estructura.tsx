@@ -5,10 +5,12 @@ import { toast } from "sonner"
 import {
   ArrowRight,
   CalendarDays,
+  Check,
   Clock3,
   GraduationCap,
   Plus,
   Trash2,
+  X,
   type LucideIcon,
 } from "lucide-react"
 
@@ -33,6 +35,8 @@ import {
   useAniosEscolares,
   useCrearSeccion,
   useEliminarSeccion,
+  useActualizarSeccion,
+  useEliminarSeccionesLote,
   useGrados,
   useNiveles,
   useSeccionesPorGrado,
@@ -275,9 +279,26 @@ function EditarSeccionesDialog({
 }) {
   const eliminar = useEliminarSeccion()
   const crear = useCrearSeccion()
+  const actualizar = useActualizarSeccion()
+  const eliminarLote = useEliminarSeccionesLote()
   const { data: secciones = [], isLoading, refetch } = useSeccionesPorGrado(grado.idGrado)
   const [agregar, setAgregar] = useState(false)
   const [nombreNuevo, setNombreNuevo] = useState("")
+  const [editId, setEditId] = useState<number | null>(null)
+  const [editNombre, setEditNombre] = useState("")
+  const [editError, setEditError] = useState<string | null>(null)
+  const [modoSeleccion, setModoSeleccion] = useState(false)
+  const [seleccionados, setSeleccionados] = useState<Set<number>>(new Set())
+  const [confirmarEliminar, setConfirmarEliminar] = useState<{
+    open: boolean
+    id: number | null
+    nombre: string
+  }>({ open: false, id: null, nombre: "" })
+  const [confirmarLote, setConfirmarLote] = useState<{
+    open: boolean
+    ids: number[]
+    nombres: string[]
+  }>({ open: false, ids: [], nombres: [] })
   const puedeEliminar = usePuede("GRADOS", "ELIMINAR")
   const puedeActualizar = usePuede("GRADOS", "ACTUALIZAR")
 
@@ -339,16 +360,11 @@ function EditarSeccionesDialog({
   }
 
   return (
-    <Dialog
-      open
-      onOpenChange={(abierto) => {
-        if (!abierto) onOpenChange(false)
-      }}
-    >
+    <Dialog open onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-lg font-semibold tracking-tight">
-            Secciones de {grado.nombre}
+            Editar secciones
           </DialogTitle>
           <DialogDescription>
             Gestiona las secciones de {grado.nombre} en {contexto}.
@@ -367,35 +383,180 @@ function EditarSeccionesDialog({
               <ul className="flex flex-col gap-2">
                 {seccionesConLetra.map((s) => {
                   const bloqueada = enUso(s)
+                  const editandoFila = editId === s.idGradoSeccion && !modoSeleccion
+                  const anioBloqueado = motivoBloqueo !== null
                   return (
                     <li
                       key={s.idGradoSeccion}
                       className="flex items-center justify-between gap-3 rounded-md border p-2"
                     >
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium">{s.nombre}</p>
-
-                        {bloqueada && (
-                          <p className="text-xs text-muted-foreground">
-                            {s.tieneMatriculas ? "con alumnos" : "con cursos"}
-                          </p>
+                      <div className="flex min-w-0 flex-1 items-center gap-2">
+                        {modoSeleccion ? (
+                          <>
+                            <input
+                              type="checkbox"
+                              checked={seleccionados.has(s.idGradoSeccion)}
+                              disabled={bloqueada}
+                              onChange={(e) => {
+                                const setSel = new Set(seleccionados)
+                                if (e.target.checked) {
+                                  setSel.add(s.idGradoSeccion)
+                                } else {
+                                  setSel.delete(s.idGradoSeccion)
+                                }
+                                setSeleccionados(setSel)
+                              }}
+                            />
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium">{s.nombre}</p>
+                              {bloqueada && (
+                                <p className="text-xs text-muted-foreground">
+                                  {s.tieneMatriculas ? "con alumnos" : "con cursos"}
+                                </p>
+                              )}
+                            </div>
+                          </>
+                        ) : editandoFila ? (
+                          <div className="flex w-full flex-col gap-1">
+                            <Input
+                              value={editNombre}
+                              onChange={(e) => {
+                                let v = e.target.value.toUpperCase()
+                                if (v.length > 1) v = v[0] ?? ""
+                                if (v && !/^[A-Z]$/.test(v)) v = ""
+                                setEditNombre(v)
+                                setEditError(null)
+                              }}
+                              autoFocus
+                              maxLength={1}
+                              disabled={anioBloqueado}
+                              className="h-8"
+                            />
+                            {editError && (
+                              <p className="text-xs text-destructive">{editError}</p>
+                            )}
+                          </div>
+                        ) : (
+                          <div
+                            className="min-w-0 flex-1 cursor-text"
+                            onClick={() => {
+                              if (!puedeActualizar || anioBloqueado) return
+                              setEditId(s.idGradoSeccion)
+                              setEditNombre(s.nombre)
+                              setEditError(null)
+                            }}
+                            onFocus={() => {
+                              if (!puedeActualizar || anioBloqueado) return
+                              setEditId(s.idGradoSeccion)
+                              setEditNombre(s.nombre)
+                              setEditError(null)
+                            }}
+                            tabIndex={0}
+                            role="textbox"
+                            aria-label={`Editar sección ${s.nombre}`}
+                          >
+                            <p className="text-sm font-medium">{s.nombre}</p>
+                            {bloqueada && (
+                              <p className="text-xs text-muted-foreground">
+                                {s.tieneMatriculas ? "con alumnos" : "con cursos"}
+                              </p>
+                            )}
+                          </div>
                         )}
                       </div>
 
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        disabled={!puedeEliminar || bloqueada || eliminar.isPending}
-                        onClick={() => borrar(s.idGradoSeccion, s.nombre)}
-                        aria-label={`Eliminar sección ${s.nombre}`}
-                        title={
-                          bloqueada
-                            ? "No se puede eliminar: tiene alumnos matriculados o cursos asignados"
-                            : `Eliminar sección ${s.nombre}`
-                        }
-                      >
-                        <Trash2 />
-                      </Button>
+                      {modoSeleccion ? null : editandoFila ? (
+                        <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            disabled={anioBloqueado || actualizar.isPending}
+                            onClick={async () => {
+                              const nombreEdit = editNombre.trim().toUpperCase()
+                              if (nombreEdit === s.nombre) {
+                                setEditId(null)
+                                setEditNombre("")
+                                setEditError(null)
+                                return
+                              }
+                              if (nombreEdit.length !== 1 || !/^[A-Z]$/.test(nombreEdit)) {
+                                setEditError("La sección debe ser una sola letra (A-Z)")
+                                return
+                              }
+                              const duplicado = seccionesConLetra.some(
+                                (sec) =>
+                                  sec.idGradoSeccion !== s.idGradoSeccion &&
+                                  sec.nombre.toUpperCase() === nombreEdit,
+                              )
+                              if (duplicado) {
+                                setEditError("Ya existe otra sección con esa letra")
+                                return
+                              }
+                              try {
+                                await actualizar.mutateAsync({
+                                  idGradoSeccion: s.idGradoSeccion,
+                                  nombre: nombreEdit,
+                                })
+                                setEditId(null)
+                                setEditNombre("")
+                                setEditError(null)
+                                refetch()
+                              } catch (error) {
+                                setEditError(
+                                  error instanceof Error
+                                    ? error.message
+                                    : "Error al actualizar la sección",
+                                )
+                              }
+                            }}
+                            aria-label="Guardar sección"
+                            title="Guardar"
+                          >
+                            <Check />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() => {
+                              setEditId(null)
+                              setEditNombre("")
+                              setEditError(null)
+                            }}
+                            aria-label="Cancelar edición"
+                            title="Cancelar"
+                          >
+                            <X />
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          disabled={
+                            !puedeEliminar ||
+                            bloqueada ||
+                            eliminar.isPending ||
+                            motivoBloqueo !== null
+                          }
+                          onClick={() =>
+                            setConfirmarEliminar({
+                              open: true,
+                              id: s.idGradoSeccion,
+                              nombre: s.nombre,
+                            })
+                          }
+                          aria-label={`Eliminar sección ${s.nombre}`}
+                          title={
+                            bloqueada
+                              ? "No se puede eliminar: tiene alumnos matriculados o cursos asignados"
+                              : motivoBloqueo
+                                ? motivoBloqueo
+                                : `Eliminar sección ${s.nombre}`
+                          }
+                        >
+                          <Trash2 />
+                        </Button>
+                      )}
                     </li>
                   )
                 })}
@@ -450,21 +611,185 @@ function EditarSeccionesDialog({
           )}
         </div>
 
-        <DialogFooter>
-          {!agregar && (
-            <Button
-              type="button"
-              variant="outline"
-              disabled={!puedeActualizar || motivoBloqueo !== null}
-              title={motivoBloqueo ?? undefined}
-              onClick={() => setAgregar(true)}
-            >
-              <Plus className="mr-1 size-4" /> Agregar otra sección
-            </Button>
-          )}
+        <DialogFooter className="flex flex-wrap justify-between gap-2 sm:justify-between">
+          {!agregar && !modoSeleccion ? (
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!puedeActualizar || motivoBloqueo !== null}
+                title={motivoBloqueo ?? undefined}
+                onClick={() => setAgregar(true)}
+              >
+                <Plus className="mr-1 size-4" /> Agregar otra sección
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!puedeEliminar || motivoBloqueo !== null}
+                title={motivoBloqueo ?? undefined}
+                onClick={() => {
+                  setModoSeleccion(true)
+                  setSeleccionados(new Set())
+                  setEditId(null)
+                  setEditNombre("")
+                  setEditError(null)
+                }}
+              >
+                Seleccionar secciones
+              </Button>
+            </div>
+          ) : modoSeleccion ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[13px] text-muted-foreground">
+                {seleccionados.size} seccion{seleccionados.size === 1 ? "" : "es"} seleccionada
+                {seleccionados.size === 1 ? "" : "s"}
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setModoSeleccion(false)
+                  setSeleccionados(new Set())
+                }}
+              >
+                Cancelar selección
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                disabled={seleccionados.size === 0}
+                onClick={() => {
+                  const ids = Array.from(seleccionados)
+                  const nombres = seccionesConLetra
+                    .filter((s) => ids.includes(s.idGradoSeccion))
+                    .map((s) => s.nombre)
+                  setConfirmarLote({ open: true, ids, nombres })
+                }}
+              >
+                Eliminar seleccionadas
+              </Button>
+            </div>
+          ) : null}
           <DialogTrigger render={<Button variant="outline" />}>Cerrar</DialogTrigger>
         </DialogFooter>
       </DialogContent>
+
+      <Dialog
+        open={confirmarEliminar.open}
+        onOpenChange={(abierto) => {
+          if (!abierto) {
+            setConfirmarEliminar({ open: false, id: null, nombre: "" })
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Eliminar sección</DialogTitle>
+            <DialogDescription>
+              ¿Eliminar la sección {confirmarEliminar.nombre} de {grado.nombre} en {contexto}?
+            </DialogDescription>
+          </DialogHeader>
+          {(() => {
+            const sec = seccionesConLetra.find(
+              (s) => s.idGradoSeccion === confirmarEliminar.id,
+            )
+            if (sec && enUso(sec)) {
+              return (
+                <p className="text-xs text-muted-foreground">
+                  {sec.tieneMatriculas
+                    ? "Esta sección tiene alumnos matriculados y no se puede eliminar."
+                    : "Esta sección tiene cursos asignados y no se puede eliminar."}
+                </p>
+              )
+            }
+            return null
+          })()}
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() =>
+                setConfirmarEliminar({ open: false, id: null, nombre: "" })
+              }
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={eliminar.isPending}
+              onClick={async () => {
+                if (confirmarEliminar.id === null) return
+                await borrar(confirmarEliminar.id, confirmarEliminar.nombre)
+                setConfirmarEliminar({ open: false, id: null, nombre: "" })
+              }}
+            >
+              Eliminar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={confirmarLote.open}
+        onOpenChange={(abierto) => {
+          if (!abierto) {
+            setConfirmarLote({ open: false, ids: [], nombres: [] })
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Eliminar secciones seleccionadas</DialogTitle>
+            <DialogDescription>
+              Se eliminarán {confirmarLote.ids.length} seccion
+              {confirmarLote.ids.length === 1 ? "" : "es"} ({confirmarLote.nombres.join(", ")}) de{" "}
+              {grado.nombre} en {contexto}.
+            </DialogDescription>
+          </DialogHeader>
+          <p className="text-xs text-muted-foreground">
+            Esta acción no se puede deshacer.
+          </p>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() =>
+                setConfirmarLote({ open: false, ids: [], nombres: [] })
+              }
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={eliminarLote.isPending}
+              onClick={async () => {
+                if (confirmarLote.ids.length === 0) return
+                try {
+                  await eliminarLote.mutateAsync(confirmarLote.ids)
+                  setSeleccionados(new Set())
+                  setModoSeleccion(false)
+                  setConfirmarLote({ open: false, ids: [], nombres: [] })
+                  refetch()
+                } catch (error) {
+                  toast.error(
+                    error instanceof Error
+                      ? error.message
+                      : "Error al eliminar las secciones",
+                  )
+                }
+              }}
+            >
+              Eliminar seleccionadas
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   )
 }
+
