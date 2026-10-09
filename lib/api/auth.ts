@@ -92,6 +92,17 @@ export const authApi = {
     })
   },
 
+  async verifyResetCode(
+    gmail: string,
+    codigo: string
+  ): Promise<{ mensaje: string }> {
+    return apiFetch<{ mensaje: string }>("/auth/verify-reset-code", {
+      method: "POST",
+      body: JSON.stringify({ gmail, codigo }),
+      skipLogout: true,
+    })
+  },
+
   async resetPassword(
     gmail: string,
     codigo: string,
