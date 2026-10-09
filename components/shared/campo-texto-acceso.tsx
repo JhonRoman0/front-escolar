@@ -41,9 +41,9 @@ interface CampoTextoAccesoProps extends React.ComponentProps<"input"> {
   icono?: LucideIcon
   /** Texto de ayuda bajo el campo, antes del error. */
   auxiliar?: string
-  /** Muestra el botÃ³n de ojo para alternar entre texto y contraseÃ±a. */
+  /** Muestra el botón de ojo para alternar entre texto y contraseña. */
   alternable?: boolean
-  /** Estado actual del botÃ³n de ojo. */
+  /** Estado actual del botón de ojo. */
   alternando?: boolean
   onAlternar?: () => void
 }

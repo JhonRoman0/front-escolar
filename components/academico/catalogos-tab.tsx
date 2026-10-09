@@ -469,7 +469,7 @@ function AulasTab() {
                         }}
                         onEliminar={() => handleEliminar(aula)}
                         tituloEliminar="Eliminar aula"
-                        descripcionEliminar={`Se eliminará el aula "${aula.nombre}".`}
+                        descripcionEliminar={`¿Seguro que quieres eliminar el aula "${aula.nombre}"?`}
                         ariaEditar={`Editar ${aula.nombre}`}
                       />
                     </TableCell>
@@ -846,7 +846,7 @@ function AniosTab() {
                   <TableCell className="text-xs">{anio.fechaInicio || "—"}</TableCell>
                   <TableCell className="text-xs">{anio.fechaFin || "—"}</TableCell>
                   <TableCell><AnioBadge estado={anio.estado} /></TableCell>
-                  <TableCell className="text-right"><AccionesFila puedeActualizar={puedeActualizar && anio.estado !== ESTADO_ANIO.CERRADO} puedeEliminar={puedeEliminar} onEditar={() => { setEditando(anio); setDialogOpen(true) }} onEliminar={() => handleEliminar(anio)} tituloEliminar="Eliminar año escolar" descripcionEliminar={`Se marcará el año ${anio.anio} como eliminado.`} ariaEditar={`Editar año ${anio.anio}`} /></TableCell>
+                  <TableCell className="text-right"><AccionesFila puedeActualizar={puedeActualizar && anio.estado !== ESTADO_ANIO.CERRADO} puedeEliminar={puedeEliminar} onEditar={() => { setEditando(anio); setDialogOpen(true) }} onEliminar={() => handleEliminar(anio)} tituloEliminar="Eliminar año escolar" descripcionEliminar={`¿Seguro que quieres eliminar el año ${anio.anio}?`} ariaEditar={`Editar año ${anio.anio}`} /></TableCell>
                 </TableRow>
               ))}
             </TableBody>

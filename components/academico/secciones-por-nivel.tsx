@@ -287,7 +287,7 @@ function EstadoTabla({
           <TableBody>
             <MensajeSinDatos
               columnas={COLUMNAS}
-              mensaje={mensajeVacio ?? "Aún no hay secciones. Usá Nueva sección para empezar."}
+              mensaje={mensajeVacio ?? "Aún no hay secciones, debes crear una."}
             />
           </TableBody>
         </Table>
