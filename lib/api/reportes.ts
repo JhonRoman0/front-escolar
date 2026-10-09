@@ -212,10 +212,13 @@ export const reportesApi = {
   async usuarios(
     inicio: string,
     fin: string,
-    filtros?: { idRol?: number }
+    filtros?: { q?: string; idRol?: number; idAcceso?: number }
   ): Promise<UsuarioReporteItem[]> {
     const params = rango(inicio, fin)
+    if (filtros?.q) params.set("q", filtros.q)
     if (filtros?.idRol != null) params.set("idRol", String(filtros.idRol))
+    if (filtros?.idAcceso != null)
+      params.set("idAcceso", String(filtros.idAcceso))
     return apiFetch<UsuarioReporteItem[]>(
       `/usuarios/reporte?${params.toString()}`
     )

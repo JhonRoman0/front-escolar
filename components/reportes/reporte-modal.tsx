@@ -27,6 +27,14 @@ type Formato = "pdf" | "excel" | "csv"
 
 export type Preset = "hoy" | "ayer" | "ultimos_7" | "este_mes" | "personalizado"
 
+const ETIQUETA_PRESET: Record<Preset, string> = {
+  hoy: "Hoy",
+  ayer: "Ayer",
+  ultimos_7: "Últimos 7 días",
+  este_mes: "Este mes",
+  personalizado: "Personalizado",
+}
+
 export interface FiltroDef {
   id: string
   label: string
@@ -145,7 +153,7 @@ export function ReporteModal({
             <p className="text-sm font-medium">Rango de fechas</p>
             <Select value={preset} onValueChange={cambiaPreset}>
               <SelectTrigger className="w-full">
-                <SelectValue />
+                <SelectValue>{ETIQUETA_PRESET[preset]}</SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {presets.includes("hoy") && (
@@ -208,7 +216,10 @@ export function ReporteModal({
                       <p className="text-sm font-medium">{f.label}</p>
                       <Select value={f.valor ?? ""} onValueChange={(v) => f.onChange?.(v ?? "")}>
                         <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Todos" />
+                          <SelectValue>
+                            {f.opciones?.find((o) => o.value === f.valor)?.label ??
+                              "Todos"}
+                          </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="">Todos</SelectItem>
