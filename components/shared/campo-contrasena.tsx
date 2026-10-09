@@ -66,7 +66,7 @@ export function CampoContrasena({
           </button>
         </div>
         {descripcion && (
-          <p className="text-xs text-muted-foreground">{descripcion}</p>
+          <p className="mt-2 text-xs leading-4 text-muted-foreground">{descripcion}</p>
         )}
         <FieldError errors={error ? [error] : []} />
       </FieldContent>

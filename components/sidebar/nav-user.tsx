@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import { toast } from "sonner"
 import { Bell, CircleUserRound, EllipsisVertical, LogOut } from "lucide-react"
 
@@ -96,7 +97,7 @@ export default function NavUser({ user }: NavUserProps) {
             <DropdownMenuSeparator />
 
             <DropdownMenuGroup>
-              <DropdownMenuItem>
+              <DropdownMenuItem render={<Link href="/cuenta" />}>
                 <CircleUserRound />
                 Cuenta
               </DropdownMenuItem>
