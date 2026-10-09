@@ -41,10 +41,12 @@ export function crud<T, R>(base: string) {
 
 export class ApiError extends Error {
   status: number
-  constructor(message: string, status: number) {
+  body?: Record<string, unknown>
+  constructor(message: string, status: number, body?: Record<string, unknown>) {
     super(message)
     this.name = "ApiError"
     this.status = status
+    this.body = body
   }
 }
 
@@ -129,17 +131,22 @@ export async function apiFetch<T>(
   if (!response.ok) {
     const contentType = response.headers.get("content-type")
     let message = `Error ${response.status}`
+    let body: Record<string, unknown> | undefined
     if (contentType?.includes("application/json")) {
       try {
-        const body = await response.json()
-        message = body?.mensaje ?? body?.message ?? message
+        body = (await response.json()) as Record<string, unknown>
+        const serverMessage =
+          typeof body?.mensaje === "string" ? body.mensaje : undefined
+        message =
+          serverMessage ??
+          (typeof body?.message === "string" ? body.message : message)
       } catch {
       }
     } else {
       const text = await response.text()
       if (text) message = text
     }
-    throw new ApiError(message, response.status)
+    throw new ApiError(message, response.status, body)
   }
 
   if (options.responseType === "blob") {

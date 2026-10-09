@@ -183,16 +183,16 @@ export function generarExcelDocentes({
     Código: d.codigo,
     Nombre: d.nombre,
     DNI: d.documentoIdentidad ?? "",
-    Especialidad: d.especialidad ?? "",
     "Grado académico": d.gradoAcademico ?? "",
     "Tipo contrato": d.tipoContrato ?? "",
+    Niveles: d.niveles.join(", "),
     "Fecha contratación": d.fechaContratacion ? fechaCorta(d.fechaContratacion) : "",
   }))
 
   const ws = XLSX.utils.json_to_sheet(filas)
   ws["!cols"] = [
-    { wch: 12 }, { wch: 28 }, { wch: 12 }, { wch: 20 },
-    { wch: 18 }, { wch: 16 }, { wch: 16 },
+    { wch: 12 }, { wch: 28 }, { wch: 12 }, { wch: 18 },
+    { wch: 16 }, { wch: 20 }, { wch: 16 },
   ]
 
   const wb = XLSX.utils.book_new()

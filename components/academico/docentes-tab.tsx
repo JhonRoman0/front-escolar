@@ -1,8 +1,8 @@
 "use client"
 
-import { useMemo, useRef, useState } from "react"
+import { useMemo, useState } from "react"
 import { toast } from "sonner"
-import { Camera, FileDown, Loader2, Pencil, Plus, Trash2 } from "lucide-react"
+import { FileDown, Loader2, Pencil } from "lucide-react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm } from "react-hook-form"
 
@@ -21,6 +21,14 @@ import {
 import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
   Table,
   TableBody,
   TableCell,
@@ -36,11 +44,20 @@ import {
   FilasCargando,
   MensajeSinDatos,
 } from "@/components/shared/table-helpers"
+import { BloqueFoto } from "@/components/shared/bloque-foto"
+import { CampoChip } from "@/components/shared/campo-chip"
+import { CampoContrasena } from "@/components/shared/campo-contrasena"
+import { CamposNombres } from "@/components/shared/campos-nombres"
+import { TarjetaSeccion } from "@/components/shared/tarjeta-seccion"
 import {
-  useCrudDocentes,
+  useActualizarDocente,
   useDocentes,
+  useEliminarDocente,
   useEliminarFotoDocente,
+  useGradosAcademicos,
+  useNiveles,
   useSubirFotoDocente,
+  useTiposContrato,
 } from "@/hooks/use-academico"
 import { useConsultarDni } from "@/hooks/use-reniec"
 import type {
@@ -56,12 +73,10 @@ import { generarExcelDocentes } from "@/lib/reportes/generar-excel"
 import { generarCsvDocentes } from "@/lib/reportes/generar-csv"
 import { ReporteModal } from "@/components/reportes/reporte-modal"
 
-const TIPOS_CONTRATO = ["Nombrado", "Contratado", "CAS"]
-
 export default function DocentesTab() {
   const { data, isLoading, isError, refetch } = useDocentes()
-  const crud = useCrudDocentes()
-  const puedeCrear = usePuede("DOCENTES", "CREAR")
+  const eliminar = useEliminarDocente()
+  const { data: tiposContrato = [] } = useTiposContrato()
   const puedeActualizar = usePuede("DOCENTES", "ACTUALIZAR")
   const puedeEliminar = usePuede("DOCENTES", "ELIMINAR")
   const puedeExportar = usePuede("DOCENTES", "IMPRIMIR_EXPORTAR")
@@ -69,24 +84,16 @@ export default function DocentesTab() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editando, setEditando] = useState<DocenteResponse | null>(null)
   const [reporteOpen, setReporteOpen] = useState(false)
-  const [filtroEspecialidad, setFiltroEspecialidad] = useState("")
   const [filtroContrato, setFiltroContrato] = useState("")
 
-  const opcionesEspecialidad = useMemo(() => {
-    const vals = new Set<string>()
-    for (const d of data ?? []) {
-      if (d.especialidad) vals.add(d.especialidad)
-    }
-    return [...vals].sort().map((v) => ({ value: v, label: v }))
-  }, [data])
-
-  const opcionesContrato = useMemo(() => {
-    const vals = new Set<string>()
-    for (const d of data ?? []) {
-      if (d.tipoContrato) vals.add(d.tipoContrato)
-    }
-    return [...vals].sort().map((v) => ({ value: v, label: v }))
-  }, [data])
+  const opcionesContrato = useMemo(
+    () =>
+      tiposContrato.map((t) => ({
+        value: String(t.idTipoContrato),
+        label: t.nombre,
+      })),
+    [tiposContrato]
+  )
 
   async function handleDescargarReporte(
     formato: "pdf" | "excel" | "csv",
@@ -95,8 +102,9 @@ export default function DocentesTab() {
     filtros: Record<string, string>
   ) {
     const datos = await reportesApi.docentes(inicio, fin, {
-      especialidad: filtros.especialidad || undefined,
-      tipoContrato: filtros.tipoContrato || undefined,
+      tipoContratoId: filtros.tipoContrato
+        ? Number(filtros.tipoContrato)
+        : undefined,
     })
     if (datos.length === 0) {
       toast.warning("No hay docentes en el rango y filtros seleccionados")
@@ -110,7 +118,7 @@ export default function DocentesTab() {
 
   async function handleEliminar(docente: DocenteResponse) {
     try {
-      await crud.eliminar.mutateAsync(docente.idDocente)
+      await eliminar.mutateAsync(docente.idDocente)
       toast.success(
         `Docente "${docente.nombre} ${docente.apellidoPat}" eliminado`
       )
@@ -129,23 +137,11 @@ export default function DocentesTab() {
               Gestión de docentes y su información de contacto.
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+<div className="flex flex-wrap items-center gap-2">
             {puedeExportar && (
               <Button variant="outline" size="sm" onClick={() => setReporteOpen(true)}>
                 <FileDown data-icon="inline-start" />
                 Generar reporte
-              </Button>
-            )}
-            {puedeCrear && (
-            <Button
-              variant="brand"
-              onClick={() => {
-                setEditando(null)
-                setDialogOpen(true)
-              }}
-            >
-                <Plus data-icon="inline-start" />
-                Nuevo docente
               </Button>
             )}
           </div>
@@ -159,17 +155,18 @@ export default function DocentesTab() {
               <TableHead>Código</TableHead>
               <TableHead>Correo</TableHead>
               <TableHead>Contrato</TableHead>
+              <TableHead>Nivel</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <FilasCargando columnas={6} />
+              <FilasCargando columnas={7} />
             ) : isError ? (
-              <MensajeSinDatos columnas={6} mensaje="No se pudo cargar. Recarga la pantalla." />
+              <MensajeSinDatos columnas={7} mensaje="No se pudo cargar. Recarga la pantalla." />
             ) : !data?.length ? (
-              <MensajeSinDatos columnas={6} mensaje="Aún no hay docentes." />
+              <MensajeSinDatos columnas={7} mensaje="Aún no hay docentes." />
             ) : (
               data.map((docente) => {
                 const nombreCompleto = `${docente.nombre} ${docente.apellidoPat} ${docente.apellidoMat}`.trim()
@@ -206,8 +203,15 @@ export default function DocentesTab() {
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline">
-                        {docente.tipoContrato || "—"}
+                        {docente.tipoContratoNombre || "—"}
                       </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-xs text-muted-foreground">
+                        {docente.niveles.length > 0
+                          ? docente.niveles.map((n) => n.nombre).join(", ")
+                          : "—"}
+                      </span>
                     </TableCell>
                     <TableCell>
                       <EstadoBadge accesoId={docente.accesoId} />
@@ -270,13 +274,6 @@ export default function DocentesTab() {
           presets={["ultimos_7", "este_mes", "personalizado"]}
           filtros={[
             {
-              id: "especialidad",
-              label: "Especialidad",
-              opciones: opcionesEspecialidad,
-              valor: filtroEspecialidad,
-              onChange: setFiltroEspecialidad,
-            },
-            {
               id: "tipoContrato",
               label: "Tipo de contrato",
               opciones: opcionesContrato,
@@ -300,17 +297,19 @@ function DocenteFormDialog({
   onOpenChange: (open: boolean) => void
   docente?: DocenteResponse | null
 }) {
-  const crud = useCrudDocentes()
+  const actualizar = useActualizarDocente()
   const subirFoto = useSubirFotoDocente()
   const eliminarFoto = useEliminarFotoDocente()
   const consultarDni = useConsultarDni()
+  const { data: tiposContrato = [] } = useTiposContrato()
+  const { data: gradosAcademicos = [] } = useGradosAcademicos()
+  const { data: niveles = [] } = useNiveles()
   const esEdicion = !!docente
 
   const [fotoNueva, setFotoNueva] = useState<File | null>(null)
   const [preview, setPreview] = useState<string | null>(
     docente?.urlFoto ?? null
   )
-  const inputFotoRef = useRef<HTMLInputElement>(null)
 
   const form = useForm<DocenteValues>({
     resolver: zodResolver(docenteSchema),
@@ -322,10 +321,10 @@ function DocenteFormDialog({
       contraseña: "",
       gmail: docente?.gmail ?? "",
       fechaNaci: docente?.fechaNaci ?? "",
-      tipoContrato: docente?.tipoContrato ?? "",
+      tipoContratoId: docente?.tipoContratoId ?? null,
       fechaContratacion: docente?.fechaContratacion ?? "",
-      especialidad: docente?.especialidad ?? "",
-      gradoAcademico: docente?.gradoAcademico ?? "",
+      gradoAcademicoId: docente?.gradoAcademicoId ?? null,
+      niveles: docente?.niveles.map((n) => n.idNivel) ?? [],
       accesoId: docente?.accesoId ?? 1,
     },
   })
@@ -338,9 +337,9 @@ function DocenteFormDialog({
       documentoIdentidad: values.documentoIdentidad || null,
       gmail: values.gmail || null,
       fechaNaci: values.fechaNaci,
-      tipoContrato: values.tipoContrato || null,
-      especialidad: values.especialidad || null,
-      gradoAcademico: values.gradoAcademico || null,
+      tipoContratoId: values.tipoContratoId ?? null,
+      gradoAcademicoId: values.gradoAcademicoId ?? null,
+      niveles: values.niveles,
     }
     if (values.fechaContratacion) data.fechaContratacion = values.fechaContratacion
     if (esEdicion) {
@@ -352,9 +351,7 @@ function DocenteFormDialog({
     return data
   }
 
-  function handleArchivo(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0]
-    if (!file) return
+  function handleArchivo(file: File) {
     setFotoNueva(file)
     setPreview(URL.createObjectURL(file))
   }
@@ -365,7 +362,6 @@ function DocenteFormDialog({
       await eliminarFoto.mutateAsync(docente.idUsuario)
       setPreview(null)
       setFotoNueva(null)
-      if (inputFotoRef.current) inputFotoRef.current.value = ""
       toast.success("Foto eliminada")
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Error al quitar la foto")
@@ -391,43 +387,20 @@ function DocenteFormDialog({
   }
 
   async function onSubmit(values: DocenteValues) {
-    if (!esEdicion && !values.contraseña) {
-      toast.error("La contraseña es obligatoria (mín 8: mayúscula, número y símbolo)")
-      return
-    }
-    const guardando = toast.loading(
-      esEdicion ? "Guardando docente..." : "Creando docente..."
-    )
+    if (!docente) return
+    const guardando = toast.loading("Guardando docente...")
     try {
-      if (esEdicion && docente) {
-        await crud.actualizar.mutateAsync({
-          id: docente.idDocente,
-          data: buildRequest(values),
+      await actualizar.mutateAsync({
+        id: docente.idDocente,
+        data: buildRequest(values),
+      })
+      if (fotoNueva) {
+        await subirFoto.mutateAsync({
+          idUsuario: docente.idUsuario,
+          file: fotoNueva,
         })
-        if (fotoNueva) {
-          await subirFoto.mutateAsync({
-            idUsuario: docente.idUsuario,
-            file: fotoNueva,
-          })
-        }
-        toast.success("Docente actualizado", { id: guardando })
-      } else {
-        const creado = await crud.crear.mutateAsync(buildRequest(values))
-        if (fotoNueva) {
-          try {
-            await subirFoto.mutateAsync({
-              idUsuario: creado.idUsuario,
-              file: fotoNueva,
-            })
-          } catch {
-            toast.warning("Docente creado, pero no se pudo subir la foto.", {
-              id: guardando,
-            })
-          }
-        } else {
-          toast.success("Docente creado", { id: guardando })
-        }
       }
+      toast.success("Docente actualizado", { id: guardando })
       onOpenChange(false)
     } catch (error) {
       toast.error(
@@ -437,147 +410,142 @@ function DocenteFormDialog({
     }
   }
 
-  const enviando =
-    crud.crear.isPending ||
-    crud.actualizar.isPending ||
-    subirFoto.isPending
+  const enviando = actualizar.isPending || subirFoto.isPending
 
   const iniciales = `${form.getValues("nombre")[0] ?? ""}${form.getValues("apellidoPat")[0] ?? ""}`.toUpperCase()
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-xl">
-        <DialogHeader>
+      <DialogContent className="flex max-h-[85vh] flex-col sm:max-w-4xl">
+        <DialogHeader className="shrink-0">
           <DialogTitle className="text-lg font-semibold tracking-tight">
-            {esEdicion ? "Editar docente" : "Nuevo docente"}
+            Editar docente
           </DialogTitle>
         </DialogHeader>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5" noValidate>
-          <FieldGroup>
-            <div className="flex items-center gap-4 rounded-lg border bg-muted/20 p-3">
-              <Avatar className="size-16 rounded-full">
-                {preview ? (
-                  <AvatarImage src={preview} alt="Foto del docente" />
-                ) : (
-                  <AvatarFallback className="rounded-full text-lg">{iniciales || "D"}</AvatarFallback>
-                )}
-              </Avatar>
-              <div className="flex flex-wrap gap-2">
-                <input ref={inputFotoRef} type="file" accept="image/*" className="hidden" onChange={handleArchivo} />
-                <Button type="button" variant="outline" size="sm" onClick={() => inputFotoRef.current?.click()}>
-                  <Camera data-icon="inline-start" />
-                  {fotoNueva || preview ? "Cambiar foto" : "Subir foto"}
-                </Button>
-                {(fotoNueva || (esEdicion && docente?.urlFoto)) && (
-                  <Button type="button" variant="ghost" size="sm" onClick={handleQuitarFoto} disabled={eliminarFoto.isPending}>
-                    <Trash2 className="text-destructive" data-icon="inline-start" />
-                    Quitar
-                  </Button>
-                )}
-              </div>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="flex min-h-0 flex-1 flex-col" noValidate>
+          <FieldGroup className="min-h-0 flex-1 gap-4 overflow-y-auto">
+            <TarjetaSeccion>
+              <FieldSet>
+                <FieldLegend>Identidad</FieldLegend>
+                <div className="flex flex-col gap-4 sm:flex-row">
+                  <BloqueFoto
+                    preview={preview}
+                    alt="Foto del docente"
+                    iniciales={iniciales}
+                    fallback="D"
+                    hayFotoNueva={!!fotoNueva}
+                    mostrarQuitar={!!(fotoNueva || (esEdicion && docente?.urlFoto))}
+                    quitarDisabled={eliminarFoto.isPending}
+                    notaSinFoto={esEdicion && docente && !docente.urlFoto ? "Sin foto" : null}
+                    onChangeArchivo={handleArchivo}
+                    onQuitar={handleQuitarFoto}
+                  />
+                  <div className="grid min-w-0 flex-1 gap-4">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <Controller
+                        control={form.control}
+                        name="documentoIdentidad"
+                        render={({ field }) => (
+                          <CampoDni
+                            value={field.value}
+                            onChange={field.onChange}
+                            onBlur={field.onBlur}
+                            name={field.name}
+                            inputRef={field.ref}
+                            cargando={consultarDni.isPending}
+                            onBuscar={handleBuscarDni}
+                            error={form.formState.errors.documentoIdentidad}
+                            autoFocus
+                            label="DNI *"
+                            placeholder="12345678"
+                          />
+                        )}
+                      />
+                      <Controller
+                        control={form.control}
+                        name="fechaNaci"
+                        render={({ field }) => (
+                          <Field>
+                            <FieldLabel>Fecha de nacimiento *</FieldLabel>
+                            <FieldContent>
+                              <Input type="date" {...field} />
+                              <FieldError errors={[form.formState.errors.fechaNaci]} />
+                            </FieldContent>
+                          </Field>
+                        )}
+                      />
+                    </div>
+                    <CamposNombres control={form.control} errors={form.formState.errors} />
+                  </div>
+                </div>
+              </FieldSet>
+            </TarjetaSeccion>
+
+            <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2">
+              <TarjetaSeccion className="min-w-0">
+                <FieldSet>
+                  <FieldLegend>Contacto</FieldLegend>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-1">
+                    <Controller
+                      control={form.control}
+                      name="gmail"
+                      render={({ field }) => (
+                        <Field>
+                          <FieldLabel>Correo electrónico *</FieldLabel>
+                          <FieldContent>
+                            <Input type="email" placeholder="docente@correo.com" {...field} />
+                            <FieldDescription className="text-xs">Obligatorio para notificaciones.</FieldDescription>
+                            <FieldError errors={[form.formState.errors.gmail]} />
+                          </FieldContent>
+                        </Field>
+                      )}
+                    />
+                  </div>
+                </FieldSet>
+              </TarjetaSeccion>
+
+              <TarjetaSeccion className="min-w-0">
+                <FieldSet>
+                  <FieldLegend>Acceso</FieldLegend>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <Controller
+                      control={form.control}
+                      name="contraseña"
+                      render={({ field }) => (
+                        <CampoContrasena
+                          value={field.value}
+                          onChange={field.onChange}
+                          onBlur={field.onBlur}
+                          name={field.name}
+                          inputRef={field.ref}
+                          error={form.formState.errors.contraseña}
+                          label="Contraseña (opcional)"
+                          descripcion="Si la dejas vacía, se conserva la contraseña actual."
+                        />
+                      )}
+                    />
+                    {esEdicion && (
+                      <Controller
+                        control={form.control}
+                        name="accesoId"
+                        render={({ field }) => (
+                          <Field>
+                            <FieldLabel>Estado</FieldLabel>
+                            <FieldContent>
+                              <CampoAcceso value={field.value} onChange={field.onChange} />
+                            </FieldContent>
+                          </Field>
+                        )}
+                      />
+                    )}
+                  </div>
+                </FieldSet>
+              </TarjetaSeccion>
             </div>
 
-            <FieldSet>
-              <FieldLegend>Datos personales</FieldLegend>
-              <div className="flex flex-col gap-4">
-                <Controller
-                  control={form.control}
-                  name="documentoIdentidad"
-                  render={({ field }) => (
-                    <CampoDni
-                      value={field.value}
-                      onChange={field.onChange}
-                      onBlur={field.onBlur}
-                      name={field.name}
-                      inputRef={field.ref}
-                      cargando={consultarDni.isPending}
-                      onBuscar={handleBuscarDni}
-                      error={form.formState.errors.documentoIdentidad}
-                      autoFocus
-                      label="DNI"
-                      placeholder="12345678"
-                    />
-                  )}
-                />
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                  <Controller
-                    control={form.control}
-                    name="nombre"
-                    render={({ field }) => (
-                      <Field>
-                        <FieldLabel>Nombres *</FieldLabel>
-                        <FieldContent>
-                          <Input placeholder="María" {...field} />
-                          <FieldError errors={[form.formState.errors.nombre]} />
-                        </FieldContent>
-                      </Field>
-                    )}
-                  />
-                  <Controller
-                    control={form.control}
-                    name="apellidoPat"
-                    render={({ field }) => (
-                      <Field>
-                        <FieldLabel>Ap. paterno *</FieldLabel>
-                        <FieldContent>
-                          <Input placeholder="López" {...field} />
-                          <FieldError errors={[form.formState.errors.apellidoPat]} />
-                        </FieldContent>
-                      </Field>
-                    )}
-                  />
-                  <Controller
-                    control={form.control}
-                    name="apellidoMat"
-                    render={({ field }) => (
-                      <Field>
-                        <FieldLabel>Ap. materno *</FieldLabel>
-                        <FieldContent>
-                          <Input placeholder="Ramírez" {...field} />
-                          <FieldError errors={[form.formState.errors.apellidoMat]} />
-                        </FieldContent>
-                      </Field>
-                    )}
-                  />
-                </div>
-                <Controller
-                  control={form.control}
-                  name="fechaNaci"
-                  render={({ field }) => (
-                    <Field className="sm:max-w-[240px]">
-                      <FieldLabel>Fecha de nacimiento *</FieldLabel>
-                      <FieldContent>
-                        <Input type="date" {...field} />
-                        <FieldError errors={[form.formState.errors.fechaNaci]} />
-                      </FieldContent>
-                    </Field>
-                  )}
-                />
-              </div>
-            </FieldSet>
-
-            <FieldSet>
-              <FieldLegend>Contacto</FieldLegend>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-1">
-                <Controller
-                  control={form.control}
-                  name="gmail"
-                  render={({ field }) => (
-                    <Field>
-                      <FieldLabel>Correo electrónico *</FieldLabel>
-                      <FieldContent>
-                        <Input type="email" placeholder="docente@correo.com" {...field} />
-                        <FieldDescription className="text-xs">Obligatorio para notificaciones.</FieldDescription>
-                        <FieldError errors={[form.formState.errors.gmail]} />
-                      </FieldContent>
-                    </Field>
-                  )}
-                />
-              </div>
-            </FieldSet>
-
-            <FieldSet>
-              <FieldLegend>Datos laborales</FieldLegend>
+            <TarjetaSeccion destacada>
+              <FieldSet>
+                <FieldLegend>Datos laborales</FieldLegend>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <Controller
                   control={form.control}
@@ -594,89 +562,117 @@ function DocenteFormDialog({
                 />
                 <Controller
                   control={form.control}
-                  name="tipoContrato"
+                  name="tipoContratoId"
                   render={({ field }) => (
                     <Field>
                       <FieldLabel>Tipo de contrato</FieldLabel>
                       <FieldContent>
-                        <Input placeholder="Nombrado" list="tipos-contrato" {...field} />
-                        <datalist id="tipos-contrato">
-                          {TIPOS_CONTRATO.map((t) => (
-                            <option key={t} value={t} />
-                          ))}
-                        </datalist>
-                        <FieldError errors={[form.formState.errors.tipoContrato]} />
+                        <Select
+                          value={field.value ? String(field.value) : "none"}
+                          onValueChange={(v) =>
+                            field.onChange(v === "none" ? null : Number(v))
+                          }
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue>
+                              {tiposContrato.find((t) => t.idTipoContrato === field.value)?.nombre ?? "Selecciona..."}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectGroup>
+                              {tiposContrato.map((t) => (
+                                <SelectItem key={t.idTipoContrato} value={String(t.idTipoContrato)}>
+                                  {t.nombre}
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
+                        <FieldError errors={[form.formState.errors.tipoContratoId]} />
                       </FieldContent>
                     </Field>
                   )}
                 />
                 <Controller
                   control={form.control}
-                  name="especialidad"
-                  render={({ field }) => (
-                    <Field>
-                      <FieldLabel>Especialidad</FieldLabel>
-                      <FieldContent>
-                        <Input placeholder="Matemática" {...field} />
-                        <FieldError errors={[form.formState.errors.especialidad]} />
-                      </FieldContent>
-                    </Field>
-                  )}
-                />
-                <Controller
-                  control={form.control}
-                  name="gradoAcademico"
+                  name="gradoAcademicoId"
                   render={({ field }) => (
                     <Field>
                       <FieldLabel>Grado académico</FieldLabel>
                       <FieldContent>
-                        <Input placeholder="Licenciatura" {...field} />
-                        <FieldError errors={[form.formState.errors.gradoAcademico]} />
+                        <Select
+                          value={field.value ? String(field.value) : "none"}
+                          onValueChange={(v) =>
+                            field.onChange(v === "none" ? null : Number(v))
+                          }
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue>
+                              {gradosAcademicos.find((g) => g.idGradoAcademico === field.value)?.nombre ?? "Selecciona..."}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectGroup>
+                              {gradosAcademicos.map((g) => (
+                                <SelectItem key={g.idGradoAcademico} value={String(g.idGradoAcademico)}>
+                                  {g.nombre}
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
+                        <FieldError errors={[form.formState.errors.gradoAcademicoId]} />
                       </FieldContent>
                     </Field>
                   )}
                 />
               </div>
-            </FieldSet>
-
-            <FieldSet>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <Controller
-                  control={form.control}
-                  name="contraseña"
-                  render={({ field }) => (
-                    <Field>
-                      <FieldLabel>Contraseña</FieldLabel>
-                      <FieldContent>
-                        <Input
-                          type="password"
-                          placeholder={esEdicion ? "Dejar en blanco para no cambiar" : "Mín 8: mayúscula, número y símbolo"}
-                          {...field}
-                        />
-                        <FieldError errors={[form.formState.errors.contraseña]} />
-                      </FieldContent>
-                    </Field>
-                  )}
-                />
-                {esEdicion && (
-                  <Controller
-                    control={form.control}
-                    name="accesoId"
-                    render={({ field }) => (
-                      <Field>
-                        <FieldLabel>Estado</FieldLabel>
-                        <FieldContent>
-                          <CampoAcceso value={field.value} onChange={field.onChange} />
-                        </FieldContent>
-                      </Field>
-                    )}
-                  />
+              <Controller
+                control={form.control}
+                name="niveles"
+                render={({ field }) => (
+                  <Field>
+                    <FieldLabel>Niveles que atiende *</FieldLabel>
+                    <FieldDescription className="text-xs">
+                      Selecciona al menos un nivel.
+                    </FieldDescription>
+                    <FieldContent>
+                      {!niveles.length ? (
+                        <p className="text-sm text-muted-foreground">
+                          No hay niveles registrados.
+                        </p>
+                      ) : (
+                        <div className="grid gap-2 sm:grid-cols-3">
+                          {niveles.map((nivel) => {
+                            const checked = field.value.includes(nivel.idNivel)
+                            return (
+                              <CampoChip
+                                key={nivel.idNivel}
+                                checked={checked}
+                                onCheckedChange={(v) =>
+                                  field.onChange(
+                                    v
+                                      ? [...field.value, nivel.idNivel]
+                                      : field.value.filter((id: number) => id !== nivel.idNivel)
+                                  )
+                                }
+                              >
+                                {nivel.nombre}
+                              </CampoChip>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </FieldContent>
+                    <FieldError errors={[form.formState.errors.niveles]} />
+                  </Field>
                 )}
-              </div>
+              />
             </FieldSet>
+            </TarjetaSeccion>
           </FieldGroup>
 
-          <DialogFooter>
+          <DialogFooter className="shrink-0">
             <DialogTrigger render={<Button variant="outline" />}>Cancelar</DialogTrigger>
             <Button type="submit" disabled={enviando}>
               {enviando && <Loader2 className="animate-spin" data-icon="inline-start" />}

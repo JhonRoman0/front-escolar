@@ -20,10 +20,12 @@ export interface DocenteResponse {
   fechaNaci: string
   urlFoto: string | null
   accesoId: number | null
-  tipoContrato: string | null
+  tipoContratoId: number | null
+  tipoContratoNombre: string | null
   fechaContratacion: string | null
-  especialidad: string | null
-  gradoAcademico: string | null
+  gradoAcademicoId: number | null
+  gradoAcademicoNombre: string | null
+  niveles: NivelResponse[]
   roles: { idRol: number; nombre: string; accesoId: number | null }[]
 }
 
@@ -35,11 +37,23 @@ export interface DocenteRequest {
   contraseña?: string
   gmail?: string | null
   fechaNaci: string
-  tipoContrato?: string | null
+  tipoContratoId?: number | null
   fechaContratacion?: string | null
-  especialidad?: string | null
-  gradoAcademico?: string | null
+  gradoAcademicoId?: number | null
+  niveles?: number[]
   accesoId?: number | null
+}
+
+// ── Catálogos del docente (solo lectura) ────────────────────────────────
+
+export interface GradoAcademicoResponse {
+  idGradoAcademico: number
+  nombre: string
+}
+
+export interface TipoContratoResponse {
+  idTipoContrato: number
+  nombre: string
 }
 
 // ── Curso ────────────────────────────────────────────────────────────────
@@ -377,7 +391,21 @@ interface HorasDocenteResponse {
 // ── API ──────────────────────────────────────────────────────────────────
 
 export const docentesApi = {
-  ...crud<DocenteResponse, DocenteRequest>("/docentes"),
+  async listar(): Promise<DocenteResponse[]> {
+    return apiFetch<DocenteResponse[]>("/docentes")
+  },
+  async actualizar(
+    id: number,
+    data: DocenteRequest
+  ): Promise<DocenteResponse> {
+    return apiFetch<DocenteResponse>(`/docentes/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    })
+  },
+  async eliminar(id: number): Promise<void> {
+    return apiFetch<void>(`/docentes/${id}`, { method: "DELETE" })
+  },
   async subirFoto(idUsuario: number, file: File): Promise<DocenteResponse> {
     const formData = new FormData()
     formData.append("foto", file)
@@ -388,6 +416,18 @@ export const docentesApi = {
   },
   async eliminarFoto(idUsuario: number): Promise<void> {
     return apiFetch<void>(`/usuarios/${idUsuario}/foto`, { method: "DELETE" })
+  },
+}
+
+export const gradosAcademicosApi = {
+  async listar(): Promise<GradoAcademicoResponse[]> {
+    return apiFetch<GradoAcademicoResponse[]>("/grados-academicos")
+  },
+}
+
+export const tiposContratoApi = {
+  async listar(): Promise<TipoContratoResponse[]> {
+    return apiFetch<TipoContratoResponse[]>("/tipos-contrato")
   },
 }
 
