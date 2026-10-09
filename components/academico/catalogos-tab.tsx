@@ -1111,17 +1111,11 @@ function AnioDialog({
                         >
                           <SelectValue>{field.value || "Selecciona"}</SelectValue>
                         </SelectTrigger>
-                        {/* Este `SelectContent` va sin props, como los otros 44 del repo, y hay que
-                            dejarlo así. `alignItemWithTrigger` no es un fix de ancho: es lo
-                            que decide si la lista se alinea con el trigger o cuelga debajo.
-                            Con `true`, que es el default, Base UI descarta las coordenadas
-                            de floating-ui y recalcula para que el ítem elegido, o el
-                            primero si no hay nada elegido, quede a la altura del valor del
-                            trigger (SelectPopup.js:253-256). Con `false` el desplegable
-                            simplemente queda `sideOffset` debajo, y se nota como un hueco.
-                            No volver a agregar `min-w-0 w-[var(--anchor-width)]`: en un
-                            diálogo `sm:max-w-md` el trigger es más ancho que `min-w-36`,
-                            así que ninguna de las dos reglas llega a mandar. */}
+                        {/* Sin props: SelectContent ya usa por defecto
+                            alignItemWithTrigger={false}, align="start" y
+                            sideOffset={0} (components/ui/select.tsx), así que la
+                            lista cuelga debajo del trigger en vez de alinear el
+                            ítem elegido a la altura del valor. */}
                         <SelectContent>
                           <SelectGroup>
                             {aniosSugeridos(anio?.anio).map((valor) => (

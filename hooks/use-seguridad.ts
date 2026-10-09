@@ -13,6 +13,7 @@ import {
   type RolPermisoRequest,
   type RolRequest,
   type UsuarioRequest,
+  type UsuariosFiltros,
 } from "@/lib/api/seguridad"
 import { useInvalidarMutacion } from "@/hooks/use-invalidar"
 
@@ -32,10 +33,15 @@ const KEYS_DOCENTES = ["docentes"] as const
 
 // ── Queries ──────────────────────────────────────────────────────────────
 
-export function useUsuarios(page: number, size = 10, sort = "idUsuario,asc") {
+export function useUsuarios(
+  page: number,
+  size = 10,
+  filtros: UsuariosFiltros = {},
+  sort = "idUsuario,asc"
+) {
   return useQuery({
-    queryKey: [...KEYS.usuarios, page, size, sort],
-    queryFn: () => usuariosApi.listar(page, size, sort),
+    queryKey: [...KEYS.usuarios, page, size, sort, filtros],
+    queryFn: () => usuariosApi.listar(page, size, sort, filtros),
     placeholderData: keepPreviousData,
   })
 }

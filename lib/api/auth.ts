@@ -85,6 +85,12 @@ export const authApi = {
     return apiFetch<UsuarioResponse>("/auth/me", { skipLogout: true })
   },
 
+  // Permisos actuales del usuario conectado, recalculados en vivo desde la BD.
+  // Sin skipLogout: si la sesión ya expiró, apiFetch ejecuta el logout normal.
+  async mePermisos(): Promise<PermisosRolResponse> {
+    return apiFetch<PermisosRolResponse>("/auth/permisos")
+  },
+
   async logout(): Promise<void> {
     return apiFetch<void>("/auth/logout", { method: "POST", skipLogout: true })
   },
