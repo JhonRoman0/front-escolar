@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
-import { Loader2, Pencil, Plus } from "lucide-react"
+import { EllipsisVertical, Loader2, Pencil, Plus, ShieldCheck, Trash2 } from "lucide-react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm } from "react-hook-form"
 
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import {
@@ -16,45 +17,44 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Field, FieldContent, FieldError, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 
+import { FilterSelect } from "@/components/shared/filter-select"
 import {
   useActualizarRol,
   useCrearRol,
   useEliminarRol,
   useRoles,
+  useRolesPermiso,
 } from "@/hooks/use-seguridad"
 import type { RolResponse } from "@/lib/api/seguridad"
 import { rolSchema, type RolValues } from "@/lib/schemas/seguridad"
 import { usePuede } from "@/hooks/use-permisos"
 import { cn } from "@/lib/utils"
+import { COLOR_ROL_ADMIN, COLOR_ROL_FALLBACK, PALETA_COLORES, esRolAdmin } from "@/lib/roles"
 import { ConfirmarEliminar } from "./confirmar-eliminar"
 import { CampoAcceso, CargandoTarjetas } from "./shared"
 
-const COLORES_FALLBACK = [
-  { bg: "bg-[#D1FAE5]", text: "text-[#065F46]", darkBg: "dark:bg-emerald-900/40", darkText: "dark:text-emerald-300" },
-  { bg: "bg-[#FEF3C7]", text: "text-[#92400E]", darkBg: "dark:bg-amber-900/40", darkText: "dark:text-amber-300" },
-  { bg: "bg-[#DC2626]/10", text: "text-[#DC2626]", darkBg: "dark:bg-rose-900/40", darkText: "dark:text-rose-300" },
-  { bg: "bg-[#F5F3FF]", text: "text-[#8427FE]", darkBg: "dark:bg-violet-900/40", darkText: "dark:text-violet-300" },
+const ESTADO_OPCIONES = [
+  { value: "1", label: "Activo" },
+  { value: "3", label: "Inactivo" },
 ]
 
-function getRolColor(color: string | null, index: number) {
-  if (color) {
-    return {
-      bg: "",
-      text: "",
-      darkBg: "",
-      darkText: "",
-      inline: { backgroundColor: `${color}20`, color },
-    }
-  }
-  const fallback = COLORES_FALLBACK[index % COLORES_FALLBACK.length]
-  return { ...fallback, inline: null }
+function pesoRol(rol: RolResponse) {
+  if (esRolAdmin(rol.nombre)) return 0
+  return rol.accesoId === 1 ? 1 : 2
 }
 
 export default function RolesTab() {
   const { data, isLoading, isError, refetch } = useRoles()
+  const { data: rolesPermisos = [] } = useRolesPermiso()
   const eliminar = useEliminarRol()
   const puedeCrear = usePuede("ROLES", "CREAR")
   const puedeActualizar = usePuede("ROLES", "ACTUALIZAR")
@@ -62,8 +62,18 @@ export default function RolesTab() {
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editando, setEditando] = useState<RolResponse | null>(null)
+  const [filtroEstado, setFiltroEstado] = useState("")
+  const [rolAEliminar, setRolAEliminar] = useState<RolResponse | null>(null)
 
-  const rolesActivos = data?.filter((r) => r.accesoId === 1) ?? []
+  const roles = data ?? []
+  const rolesFiltrados = filtroEstado
+    ? roles.filter((r) => String(r.accesoId) === filtroEstado)
+    : roles
+  const rolesOrdenados = [...rolesFiltrados].sort((a, b) => pesoRol(a) - pesoRol(b))
+
+  function conteoPermisos(idRol: number) {
+    return rolesPermisos.filter((rp) => rp.rol?.idRol === idRol).length
+  }
 
   async function handleEliminar(rol: RolResponse) {
     try {
@@ -82,84 +92,158 @@ export default function RolesTab() {
             <h2 className="text-[20px] font-semibold tracking-tight">Roles</h2>
             <p className="text-[14px] leading-5 text-muted-foreground">Roles que se asignan a cada usuario para definir sus accesos.</p>
           </div>
-          {puedeCrear && (
-            <Button variant="brand" onClick={() => { setEditando(null); setDialogOpen(true) }}>
-              <Plus data-icon="inline-start" />
-              Nuevo rol
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            <FilterSelect
+              label="Estado"
+              value={filtroEstado}
+              onValueChange={setFiltroEstado}
+              options={ESTADO_OPCIONES}
+              allLabel="Todos los estados"
+            />
+            {puedeCrear && (
+              <Button variant="brand" onClick={() => { setEditando(null); setDialogOpen(true) }}>
+                <Plus data-icon="inline-start" />
+                Nuevo rol
+              </Button>
+            )}
+          </div>
         </div>
 
         {isLoading ? (
-            <CargandoTarjetas filas={2} />
-          ) : isError ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">
-              No se pudo cargar. Recarga la pantalla.
-            </p>
-          ) : !rolesActivos.length ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">
-              Aún no hay roles activos.
-            </p>
-          ) : (
-            <div className="flex flex-wrap gap-x-12 gap-y-6">
-              {rolesActivos.map((rol, i) => {
-                const color = getRolColor(rol.color, i)
-                return (
-                  <div
-                    key={rol.idRol}
-                    className={cn(
-                      "group relative flex h-[105px] w-[210px] shrink-0 items-center justify-center rounded-2xl px-4 py-3 transition-shadow hover:shadow-md",
-                      color.inline ? "" : color.bg,
-                      color.inline ? "" : color.darkBg
+          <CargandoTarjetas filas={2} />
+        ) : isError ? (
+          <p className="py-8 text-center text-sm text-muted-foreground">
+            No se pudo cargar. Recarga la pantalla.
+          </p>
+        ) : !roles.length ? (
+          <p className="py-8 text-center text-sm text-muted-foreground">
+            Aún no hay roles.
+          </p>
+        ) : !rolesFiltrados.length ? (
+          <p className="py-8 text-center text-sm text-muted-foreground">
+            No hay roles con este estado.
+          </p>
+        ) : (
+          <div className="flex flex-wrap gap-4">
+            {rolesOrdenados.map((rol) => {
+              const admin = esRolAdmin(rol.nombre)
+              const inactivo = rol.accesoId === 3
+              const puedeGestionar = !admin && (puedeActualizar || puedeEliminar)
+              const permisos = conteoPermisos(rol.idRol)
+
+              return (
+                <div
+                  key={rol.idRol}
+                  className={cn(
+                    "relative flex h-[116px] w-[220px] shrink-0 flex-col justify-between overflow-hidden rounded-2xl px-4 py-3 transition-shadow hover:shadow-md",
+                    inactivo ? "bg-muted" : "text-white"
+                  )}
+                  style={
+                    inactivo
+                      ? undefined
+                      : { backgroundColor: admin ? COLOR_ROL_ADMIN : (rol.color ?? COLOR_ROL_FALLBACK) }
+                  }
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    {admin ? (
+                      <Badge variant="outline" className="border-white/20 bg-white/10 text-white">
+                        <ShieldCheck />
+                        Protegido
+                      </Badge>
+                    ) : inactivo ? (
+                      <Badge variant="secondary">Inactivo</Badge>
+                    ) : (
+                      <Badge variant="outline" className="border-transparent bg-white/20 text-white">
+                        Activo
+                      </Badge>
                     )}
-                    style={color.inline ?? undefined}
-                  >
-                    <span
-                      className={cn(
-                        "text-[16px] font-normal",
-                        color.inline ? "" : color.text,
-                        color.inline ? "" : color.darkText
-                      )}
-                      style={color.inline ? { color: color.inline.color } : undefined}
-                    >
-                      {rol.nombre}
-                    </span>
-                    {(puedeActualizar || puedeEliminar) && (
-                      <div className="absolute top-2 right-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                        {puedeActualizar && (
-                          <Button
-                            variant="outline"
-                            size="icon-xs"
-                            className="size-6 rounded-lg border-transparent bg-white/70 hover:bg-white dark:bg-white/20 dark:hover:bg-white/30"
-                            aria-label={`Editar ${rol.nombre}`}
-                            onClick={() => {
-                              setEditando(rol)
-                              setDialogOpen(true)
-                            }}
-                          >
-                            <Pencil />
-                          </Button>
-                        )}
-                        {puedeEliminar && (
-                          <ConfirmarEliminar
-                            titulo="Eliminar rol"
-                            descripcion={`Se marcará "${rol.nombre}" como eliminado. No podrá asignarse a nuevos usuarios.`}
-                            onConfirm={() => handleEliminar(rol)}
-                            className="size-6 rounded-lg border-transparent bg-white/70 hover:bg-white dark:bg-white/20 dark:hover:bg-white/30"
-                          />
-                        )}
-                      </div>
+
+                    {puedeGestionar && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger
+                          render={
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              aria-label={`Acciones de ${rol.nombre}`}
+                              className={cn(
+                                "size-6 rounded-lg",
+                                inactivo
+                                  ? "text-muted-foreground hover:bg-black/5 hover:text-foreground"
+                                  : "text-white/90 hover:bg-white/20 hover:text-white"
+                              )}
+                            />
+                          }
+                        >
+                          <EllipsisVertical />
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          {puedeActualizar && (
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setEditando(rol)
+                                setDialogOpen(true)
+                              }}
+                            >
+                              <Pencil />
+                              Editar
+                            </DropdownMenuItem>
+                          )}
+                          {puedeEliminar && (
+                            <DropdownMenuItem
+                              variant="destructive"
+                              onClick={() => setRolAEliminar(rol)}
+                            >
+                              <Trash2 />
+                              Eliminar
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     )}
                   </div>
-                )
-              })}
-            </div>
-          )}
+
+                  <div className="min-w-0">
+                    <p className="truncate text-[15px] font-medium" title={rol.nombre}>
+                      {rol.nombre}
+                    </p>
+                    <p
+                      className={cn(
+                        "truncate text-[12px]",
+                        inactivo ? "text-muted-foreground" : "text-white/80"
+                      )}
+                    >
+                      {admin
+                        ? "Acceso total al sistema"
+                        : `${permisos} ${permisos === 1 ? "permiso" : "permisos"}`}
+                    </p>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
 
         {isError && (
           <Button variant="outline" size="sm" onClick={() => refetch()}>
             Reintentar
           </Button>
+        )}
+
+        {rolAEliminar && (
+          <ConfirmarEliminar
+            open={!!rolAEliminar}
+            onOpenChange={(v) => {
+              if (!v) setRolAEliminar(null)
+            }}
+            titulo="Eliminar rol"
+            descripcion={`Se marcará "${rolAEliminar.nombre}" como eliminado. No podrá asignarse a nuevos usuarios.`}
+            disabled={eliminar.isPending}
+            onConfirm={async () => {
+              await handleEliminar(rolAEliminar)
+              setRolAEliminar(null)
+            }}
+          />
         )}
 
         <RolFormDialog
@@ -187,14 +271,14 @@ function RolFormDialog({
 
   const form = useForm<RolValues>({
     resolver: zodResolver(rolSchema),
-    defaultValues: { nombre: "", color: "", accesoId: 1 },
+    defaultValues: { nombre: "", color: COLOR_ROL_FALLBACK, accesoId: 1 },
   })
 
   useEffect(() => {
     if (open) {
       form.reset({
         nombre: rol?.nombre ?? "",
-        color: rol?.color ?? "",
+        color: rol?.color ?? COLOR_ROL_FALLBACK,
         accesoId: rol?.accesoId ?? 1,
       })
     }
@@ -242,19 +326,27 @@ function RolFormDialog({
               <Field>
                 <FieldLabel>Color del rol</FieldLabel>
                 <FieldContent>
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="color"
-                      value={field.value || "#3B82F6"}
-                      onChange={(e) => field.onChange(e.target.value)}
-                      className="h-10 w-14 cursor-pointer rounded border-0 p-0"
-                    />
-                    <Input
-                      placeholder="#FF5733"
-                      value={field.value ?? ""}
-                      onChange={(e) => field.onChange(e.target.value)}
-                      className="flex-1"
-                    />
+                  <div className="flex flex-wrap gap-2">
+                    {PALETA_COLORES.map((color) => {
+                      const seleccionado =
+                        (field.value ?? "").toUpperCase() === color.toUpperCase()
+                      return (
+                        <button
+                          key={color}
+                          type="button"
+                          aria-label={`Color ${color}`}
+                          aria-pressed={seleccionado}
+                          onClick={() => field.onChange(color)}
+                          className={cn(
+                            "size-8 rounded-full ring-offset-2 ring-offset-background transition-shadow",
+                            seleccionado
+                              ? "ring-2 ring-foreground"
+                              : "ring-1 ring-border hover:ring-foreground/40"
+                          )}
+                          style={{ backgroundColor: color }}
+                        />
+                      )
+                    })}
                   </div>
                   <FieldError errors={[form.formState.errors.color]} />
                 </FieldContent>

@@ -89,7 +89,7 @@ export default function UsuarioFormDialog({
   const subirFoto = useSubirFotoUsuario()
   const eliminarFoto = useEliminarFotoUsuario()
 
-  const { data: roles = [] } = useRoles()
+  const { data: roles = [] } = useRoles(true)
   const {
     data: gradosAcademicos = [],
     isLoading: gradosAcademicosCargando,

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react"
 import { toast } from "sonner"
-import { Lock, LockOpen, FileDown, Pencil, Plus, RotateCcw } from "lucide-react"
+import { Lock, LockOpen, FileDown, Pencil, Plus, RotateCcw, ShieldCheck } from "lucide-react"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -33,6 +33,7 @@ import { ConfirmarEliminar } from "./confirmar-eliminar"
 import { EstadoBadge } from "./estado-badge"
 import { FilasCargando, MensajeSinDatos } from "./shared"
 import UsuarioFormDialog from "./usuario-form-dialog"
+import { COLOR_ROL_ADMIN, COLOR_ROL_FALLBACK, esRolAdmin } from "@/lib/roles"
 
 const TAMANIO_PAGINA = 10
 
@@ -281,11 +282,22 @@ export default function UsuariosTab() {
                     <TableCell>{usuario.codigo}</TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
-                        {usuario.roles.map((rol) => (
-                          <Badge key={rol.idRol} variant="rol">
-                            {rol.nombre}
-                          </Badge>
-                        ))}
+                        {usuario.roles.map((rol) => {
+                          const admin = esRolAdmin(rol.nombre)
+                          const bg = admin ? COLOR_ROL_ADMIN : (rol.color ?? COLOR_ROL_FALLBACK)
+                          return (
+                            <Badge
+                              key={rol.idRol}
+                              className="border-transparent text-white"
+                              style={{ backgroundColor: bg }}
+                            >
+                              {admin && (
+                                <ShieldCheck data-icon="inline-start" />
+                              )}
+                              {rol.nombre}
+                            </Badge>
+                          )
+                        })}
                       </div>
                     </TableCell>
                     <TableCell>{usuario.gmail || "—"}</TableCell>
