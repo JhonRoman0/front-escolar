@@ -699,7 +699,7 @@ function EditarSeccionesDialog({
           }
         }}
       >
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md" forceOverlay>
           <DialogHeader>
             <DialogTitle>Eliminar sección</DialogTitle>
             <DialogDescription>
@@ -755,7 +755,7 @@ function EditarSeccionesDialog({
           }
         }}
       >
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md" forceOverlay>
           <DialogHeader>
             <DialogTitle>Eliminar secciones seleccionadas</DialogTitle>
             <DialogDescription>
