@@ -95,7 +95,6 @@ import {
   cursoSchema,
   LIMITE_NOMBRE_AULA,
   sanitizarNombreAula,
-  turnoSchema,
   type AnioEscolarValues,
   type AulaValues,
   type CursoValues,
@@ -509,9 +508,7 @@ const CAMPOS_TURNO: {
 function TurnosTab() {
   const { data, isLoading, isError, refetch } = useTurnos()
   const crud = useCrudTurnos()
-  const puedeCrear = usePuede("TURNOS", "CREAR")
   const puedeActualizar = usePuede("TURNOS", "ACTUALIZAR")
-  const [dialogOpen, setDialogOpen] = useState(false)
   const [editandoId, setEditandoId] = useState<number | null>(null)
 
   // El solapamiento se calcula sobre lo guardado, así que la franja aparece
@@ -536,13 +533,6 @@ function TurnosTab() {
         <HeaderSeccion
           titulo="Turnos"
           descripcion="Horarios de entrada y tardanza por turno"
-          acciones={
-            <BotonNuevo
-              texto="Nuevo turno"
-              puedeCrear={puedeCrear}
-              onClick={() => setDialogOpen(true)}
-            />
-          }
         />
         {conflictos.length > 0 && (
           <div className="flex gap-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-amber-900 dark:border-amber-700/50 dark:bg-amber-500/10 dark:text-amber-300">
@@ -583,7 +573,6 @@ function TurnosTab() {
         {isError && (
           <div><BotonReintentar refetch={refetch} /></div>
         )}
-        <TurnoDialog open={dialogOpen} onOpenChange={setDialogOpen} crear={crud.crear} />
       </CardContent>
     </Card>
   )
@@ -727,60 +716,6 @@ function TurnoCard({
         </div>
       )}
     </div>
-  )
-}
-
-function TurnoDialog({
-  open,
-  onOpenChange,
-  crear,
-}: {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  crear: ReturnType<typeof useCrudTurnos>["crear"]
-}) {
-  const form = useForm<TurnoValues>({
-    resolver: zodResolver(turnoSchema),
-    defaultValues: {
-      nombre: "",
-      horaEntrada: "",
-      horaEntradaLimite: "",
-      horaFaltaLimite: "",
-      horaSalida: "",
-      accesoId: ACCESO.ACTIVO,
-    },
-  })
-
-  useResetAlAbrir(
-    open,
-    form,
-    { nombre: "", horaEntrada: "", horaEntradaLimite: "", horaFaltaLimite: "", horaSalida: "", accesoId: ACCESO.ACTIVO },
-    []
-  )
-
-  async function onSubmit(values: TurnoValues) {
-    await guardarConToast(async () => {
-      await crear.mutateAsync(values)
-      toast.success("Turno creado")
-      onOpenChange(false)
-    })
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader><DialogTitle className="text-lg font-semibold tracking-tight">Nuevo turno</DialogTitle></DialogHeader>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5" noValidate>
-          <FieldGroup>
-            <Controller control={form.control} name="nombre" render={({ field }) => (<Field><FieldLabel>Nombre del turno</FieldLabel><FieldContent><Input placeholder="Mañana" autoFocus {...field} /><FieldError errors={[form.formState.errors.nombre]} /></FieldContent></Field>)} />
-            <TooltipProvider delay={0}>
-              <FieldSet><div className="grid grid-cols-1 gap-4 sm:grid-cols-2">{CAMPOS_TURNO.map((campo) => (<Controller key={campo.name} control={form.control} name={campo.name} render={({ field }) => (<Field><div className="flex items-center gap-1.5"><FieldLabel>{campo.label}</FieldLabel><Tooltip><TooltipTrigger aria-label={`Info ${campo.label}`} className="inline-flex size-5 items-center justify-center rounded-full p-0.5 hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"><CircleHelp className="size-3 text-brand" /></TooltipTrigger><TooltipContent side="top" sideOffset={6} className="max-w-[220px] text-xs leading-snug"><p>{campo.descripcion}</p></TooltipContent></Tooltip></div><FieldContent><Input type="time" {...field} /><FieldError errors={[form.formState.errors[campo.name]]} /></FieldContent></Field>)} />))}</div></FieldSet>
-            </TooltipProvider>
-          </FieldGroup>
-          <DialogFooter><DialogTrigger render={<Button variant="outline" />}>Cancelar</DialogTrigger><BotonGuardar etiqueta="Crear turno" enviando={crear.isPending} /></DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
   )
 }
 

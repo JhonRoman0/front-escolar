@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react"
 import { toast } from "sonner"
-import { FileDown, Loader2, Pencil } from "lucide-react"
+import { FileDown, Loader2, Pencil, RotateCcw } from "lucide-react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm } from "react-hook-form"
 
@@ -49,6 +49,8 @@ import { CampoChip } from "@/components/shared/campo-chip"
 import { CampoContrasena } from "@/components/shared/campo-contrasena"
 import { CamposNombres } from "@/components/shared/campos-nombres"
 import { TarjetaSeccion } from "@/components/shared/tarjeta-seccion"
+import { BuscadorTabla } from "@/components/shared/buscador-tabla"
+import { FilterSelect } from "@/components/shared/filter-select"
 import {
   useActualizarDocente,
   useDocentes,
@@ -60,6 +62,7 @@ import {
   useTiposContrato,
 } from "@/hooks/use-academico"
 import { useConsultarDni } from "@/hooks/use-reniec"
+import { useDebouncedValue } from "@/hooks/use-debounce"
 import type {
   DocenteRequest,
   DocenteResponse,
@@ -67,16 +70,22 @@ import type {
 import { docenteSchema, type DocenteValues } from "@/lib/schemas/academico"
 import { CampoDni } from "@/components/shared/campo-dni"
 import { usePuede } from "@/hooks/use-permisos"
-import { reportesApi } from "@/lib/api/reportes"
+import type { DocenteReporteItem } from "@/lib/api/reportes"
 import { generarPdfDocentes } from "@/lib/reportes/generar-pdf"
 import { generarExcelDocentes } from "@/lib/reportes/generar-excel"
 import { generarCsvDocentes } from "@/lib/reportes/generar-csv"
 import { ReporteModal } from "@/components/reportes/reporte-modal"
 
+const ESTADO_OPCIONES = [
+  { value: "1", label: "Activo" },
+  { value: "3", label: "Inactivo" },
+]
+
 export default function DocentesTab() {
   const { data, isLoading, isError, refetch } = useDocentes()
   const eliminar = useEliminarDocente()
   const { data: tiposContrato = [] } = useTiposContrato()
+  const { data: niveles = [] } = useNiveles()
   const puedeActualizar = usePuede("DOCENTES", "ACTUALIZAR")
   const puedeEliminar = usePuede("DOCENTES", "ELIMINAR")
   const puedeExportar = usePuede("DOCENTES", "IMPRIMIR_EXPORTAR")
@@ -84,7 +93,11 @@ export default function DocentesTab() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editando, setEditando] = useState<DocenteResponse | null>(null)
   const [reporteOpen, setReporteOpen] = useState(false)
-  const [filtroContrato, setFiltroContrato] = useState("")
+  const [busqueda, setBusqueda] = useState("")
+  const [filtroEstado, setFiltroEstado] = useState("")
+  const [filtroTipoContrato, setFiltroTipoContrato] = useState("")
+  const [filtroNivel, setFiltroNivel] = useState("")
+  const busquedaDebounced = useDebouncedValue(busqueda, 400)
 
   const opcionesContrato = useMemo(
     () =>
@@ -95,17 +108,74 @@ export default function DocentesTab() {
     [tiposContrato]
   )
 
+  const opcionesNivel = useMemo(
+    () =>
+      niveles.map((n) => ({
+        value: String(n.idNivel),
+        label: n.nombre,
+      })),
+    [niveles]
+  )
+
+  const hayFiltros =
+    busquedaDebounced.trim() !== "" ||
+    filtroEstado !== "" ||
+    filtroTipoContrato !== "" ||
+    filtroNivel !== ""
+
+  const docentesFiltrados = useMemo(() => {
+    const q = busquedaDebounced.trim().toLowerCase()
+    return (data ?? []).filter((d) => {
+      if (filtroEstado && String(d.accesoId) !== filtroEstado) return false
+      if (filtroTipoContrato && String(d.tipoContratoId) !== filtroTipoContrato)
+        return false
+      if (filtroNivel && !d.niveles.some((n) => String(n.idNivel) === filtroNivel))
+        return false
+      if (!q) return true
+      const nombreCompleto =
+        `${d.nombre} ${d.apellidoPat} ${d.apellidoMat}`.toLowerCase()
+      return (
+        nombreCompleto.includes(q) ||
+        d.codigo.toLowerCase().includes(q) ||
+        (d.documentoIdentidad ?? "").toLowerCase().includes(q)
+      )
+    })
+  }, [
+    data,
+    busquedaDebounced,
+    filtroEstado,
+    filtroTipoContrato,
+    filtroNivel,
+  ])
+
+  function limpiarFiltros() {
+    setBusqueda("")
+    setFiltroEstado("")
+    setFiltroTipoContrato("")
+    setFiltroNivel("")
+  }
+
   async function handleDescargarReporte(
     formato: "pdf" | "excel" | "csv",
     inicio: string,
-    fin: string,
-    filtros: Record<string, string>
+    fin: string
   ) {
-    const datos = await reportesApi.docentes(inicio, fin, {
-      tipoContratoId: filtros.tipoContrato
-        ? Number(filtros.tipoContrato)
-        : undefined,
-    })
+    const datos: DocenteReporteItem[] = docentesFiltrados
+      .filter(
+        (d) =>
+          d.fechaContratacion != null &&
+          d.fechaContratacion >= inicio &&
+          d.fechaContratacion <= fin
+      )
+      .map((d) => ({
+        codigo: d.codigo,
+        nombre: `${d.nombre} ${d.apellidoPat} ${d.apellidoMat}`.trim(),
+        documentoIdentidad: d.documentoIdentidad,
+        gradoAcademico: d.gradoAcademicoNombre,
+        tipoContrato: d.tipoContratoNombre,
+        niveles: d.niveles.map((n) => n.nombre),
+        fechaContratacion: d.fechaContratacion,
+      }))
     if (datos.length === 0) {
       toast.warning("No hay docentes en el rango y filtros seleccionados")
       return
@@ -147,6 +217,47 @@ export default function DocentesTab() {
           </div>
         </div>
 
+        <div className="flex flex-wrap items-center gap-2">
+          <BuscadorTabla
+            value={busqueda}
+            onValueChange={setBusqueda}
+            placeholder="Buscar por nombre, DNI o código..."
+            className="min-w-[200px] flex-1 max-w-[358px]"
+          />
+          <FilterSelect
+            value={filtroEstado}
+            onValueChange={setFiltroEstado}
+            options={ESTADO_OPCIONES}
+            allLabel="Todos los estados"
+            className="w-[180px]"
+          />
+          <FilterSelect
+            value={filtroTipoContrato}
+            onValueChange={setFiltroTipoContrato}
+            options={opcionesContrato}
+            allLabel="Todos los contratos"
+            className="w-[210px]"
+          />
+          <FilterSelect
+            value={filtroNivel}
+            onValueChange={setFiltroNivel}
+            options={opcionesNivel}
+            allLabel="Todos los niveles"
+            className="w-[180px]"
+          />
+          {hayFiltros && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="ml-auto text-muted-foreground"
+              onClick={limpiarFiltros}
+            >
+              <RotateCcw className="mr-1 size-3.5" />
+              Limpiar filtros
+            </Button>
+          )}
+        </div>
+
         <div className="overflow-x-auto rounded-lg border">
           <Table>
           <TableHeader>
@@ -165,10 +276,17 @@ export default function DocentesTab() {
               <FilasCargando columnas={7} />
             ) : isError ? (
               <MensajeSinDatos columnas={7} mensaje="No se pudo cargar. Recarga la pantalla." />
-            ) : !data?.length ? (
-              <MensajeSinDatos columnas={7} mensaje="Aún no hay docentes." />
+            ) : !docentesFiltrados.length ? (
+              <MensajeSinDatos
+                columnas={7}
+                mensaje={
+                  hayFiltros
+                    ? "Sin resultados para los filtros seleccionados."
+                    : "Aún no hay docentes."
+                }
+              />
             ) : (
-              data.map((docente) => {
+              docentesFiltrados.map((docente) => {
                 const nombreCompleto = `${docente.nombre} ${docente.apellidoPat} ${docente.apellidoMat}`.trim()
                 const iniciales = `${docente.nombre[0] ?? ""}${docente.apellidoPat[0] ?? ""}`.toUpperCase()
                 return (
@@ -272,15 +390,6 @@ export default function DocentesTab() {
           titulo="Reporte de docentes"
           descripcion="Descarga el listado de docentes del rango en PDF, Excel o CSV."
           presets={["ultimos_7", "este_mes", "personalizado"]}
-          filtros={[
-            {
-              id: "tipoContrato",
-              label: "Tipo de contrato",
-              opciones: opcionesContrato,
-              valor: filtroContrato,
-              onChange: setFiltroContrato,
-            },
-          ]}
           onDescargar={handleDescargarReporte}
         />
       </CardContent>
