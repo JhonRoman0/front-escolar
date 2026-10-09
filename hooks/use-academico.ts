@@ -14,12 +14,15 @@ import {
   cambiosDocenteApi,
   cursosApi,
   docentesApi,
+  gradosAcademicosApi,
   gradosApi,
   gradoSeccionApi,
   nivelesApi,
   recreosApi,
   suspensionesApi,
+  tiposContratoApi,
   turnosApi,
+  type DocenteRequest,
   type SeccionRequest,
   type SeccionesBatchRequest,
   type SuspensionRequest,
@@ -27,6 +30,8 @@ import {
 
 const KEYS = {
   docentes: ["docentes"] as const,
+  gradosAcademicos: ["grados-academicos"] as const,
+  tiposContrato: ["tipos-contrato"] as const,
   cursos: ["cursos"] as const,
   turnos: ["turnos"] as const,
   grados: ["grados"] as const,
@@ -51,6 +56,22 @@ export function useDocentes() {
     queryKey: KEYS.docentes,
     queryFn: docentesApi.listar,
     placeholderData: keepPreviousData,
+    staleTime: 1000 * 60 * 30,
+  })
+}
+
+export function useGradosAcademicos() {
+  return useQuery({
+    queryKey: KEYS.gradosAcademicos,
+    queryFn: gradosAcademicosApi.listar,
+    staleTime: 1000 * 60 * 30,
+  })
+}
+
+export function useTiposContrato() {
+  return useQuery({
+    queryKey: KEYS.tiposContrato,
+    queryFn: tiposContratoApi.listar,
     staleTime: 1000 * 60 * 30,
   })
 }
@@ -296,14 +317,25 @@ export function useCrudRecreos() {
 
 // ── Mutaciones ───────────────────────────────────────────────────────────
 
-export function useCrudDocentes() {
-  return useCrud(
+export function useActualizarDocente() {
+  const invalidar = useInvalidarMutacion(KEYS.docentes)
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: DocenteRequest }) =>
+      docentesApi.actualizar(id, data),
+    onSuccess: invalidar,
+  })
+}
+
+export function useEliminarDocente() {
+  const invalidar = useInvalidarMutacion(
     KEYS.docentes,
-    [],
-    docentesApi.crear,
-    ({ id, data }) => docentesApi.actualizar(id, data),
-    (id) => docentesApi.eliminar(id)
+    KEYS.asignaciones,
+    KEYS.suspensiones
   )
+  return useMutation({
+    mutationFn: (id: number) => docentesApi.eliminar(id),
+    onSuccess: invalidar,
+  })
 }
 
 export function useSubirFotoDocente() {

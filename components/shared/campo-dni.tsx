@@ -41,7 +41,7 @@ export function CampoDni({
             maxLength={8}
             autoFocus={autoFocus}
             value={value ?? ""}
-            onChange={(e) => onChange(e.target.value)}
+            onChange={(e) => onChange(e.target.value.replace(/\D/g, ""))}
             onBlur={onBlur}
             name={name}
             ref={inputRef as React.Ref<HTMLInputElement>}
@@ -50,7 +50,7 @@ export function CampoDni({
           />
           <BuscarDniButton dni={value ?? ""} cargando={cargando} onBuscar={onBuscar} />
         </div>
-        <p className="text-xs text-muted-foreground">Escribe el DNI y pulsa Buscar para completar el nombre automáticamente.</p>
+        <p className="text-xs text-muted-foreground">Escribe el DNI.</p>
         <FieldError errors={error ? [error] : []} />
       </FieldContent>
     </Field>

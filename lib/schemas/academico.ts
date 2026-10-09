@@ -1,6 +1,6 @@
 import * as z from "zod"
 
-import { contrasenaSeguraOpcional } from "@/lib/schemas/comun"
+import { contrasenaSeguraOpcional, emailRequerido, MENSAJE_DNI, MENSAJE_SOLO_LETRAS_Y_ESPACIOS, REGEX_DNI, REGEX_SOLO_LETRAS_Y_ESPACIOS } from "@/lib/schemas/comun"
 import { esHoraValida, turnoAnterior, type TurnoFranja } from "@/lib/turnos"
 
 const accesoId = z.number().int().min(1, "Selecciona un estado").max(3)
@@ -14,28 +14,55 @@ const hora = z
 
 // ── Docente ──────────────────────────────────────────────────────────────
 
-export const docenteSchema = z.object({
-  nombre: z.string().min(1, "El nombre es requerido").max(30),
-  apellidoPat: z.string().min(1, "El apellido paterno es requerido").max(30),
-  apellidoMat: z.string().min(1, "El apellido materno es requerido").max(30),
-  documentoIdentidad: z
-    .string()
-    .regex(/^\d{8}$/, "El DNI debe contener exactamente 8 dígitos")
-    .optional()
-    .or(z.literal("")),
-  contraseña: contrasenaSeguraOpcional,
-  gmail: z
-    .string()
-    .min(1, "El email es obligatorio")
-    .email("Correo inválido")
-    .max(60),
-  fechaNaci: fecha,
-  tipoContrato: z.string().max(30).optional().or(z.literal("")),
-  fechaContratacion: z.string().optional().or(z.literal("")),
-  especialidad: z.string().max(60).optional().or(z.literal("")),
-  gradoAcademico: z.string().max(60).optional().or(z.literal("")),
-  accesoId: accesoId.optional(),
-})
+export const docenteSchema = z
+  .object({
+    nombre: z
+      .string()
+      .trim()
+      .min(1, "El nombre es requerido")
+      .max(30)
+      .regex(REGEX_SOLO_LETRAS_Y_ESPACIOS, MENSAJE_SOLO_LETRAS_Y_ESPACIOS),
+    apellidoPat: z
+      .string()
+      .trim()
+      .min(1, "El apellido paterno es requerido")
+      .max(30)
+      .regex(REGEX_SOLO_LETRAS_Y_ESPACIOS, MENSAJE_SOLO_LETRAS_Y_ESPACIOS),
+    apellidoMat: z
+      .string()
+      .trim()
+      .min(1, "El apellido materno es requerido")
+      .max(30)
+      .regex(REGEX_SOLO_LETRAS_Y_ESPACIOS, MENSAJE_SOLO_LETRAS_Y_ESPACIOS),
+    documentoIdentidad: z.string().regex(REGEX_DNI, MENSAJE_DNI),
+    contraseña: contrasenaSeguraOpcional,
+    gmail: emailRequerido.max(60),
+    fechaNaci: fecha,
+    tipoContratoId: z
+      .number({ error: "Selecciona el tipo de contrato" })
+      .int()
+      .min(1, "Selecciona el tipo de contrato")
+      .nullable()
+      .optional(),
+    fechaContratacion: z.string().optional().or(z.literal("")),
+    gradoAcademicoId: z
+      .number({ error: "Selecciona el grado académico" })
+      .int()
+      .min(1, "Selecciona el grado académico")
+      .nullable()
+      .optional(),
+    niveles: z.array(z.number()),
+    accesoId: accesoId.optional(),
+  })
+  .superRefine((valores, ctx) => {
+    if (valores.niveles.length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["niveles"],
+        message: "Asigna al menos un nivel al docente",
+      })
+    }
+  })
 export type DocenteValues = z.infer<typeof docenteSchema>
 
 // ── Curso ────────────────────────────────────────────────────────────────
