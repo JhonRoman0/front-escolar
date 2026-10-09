@@ -46,10 +46,10 @@ export function useUsuarios(
   })
 }
 
-export function useRoles() {
+export function useRoles(soloActivos = false) {
   return useQuery({
-    queryKey: KEYS.roles,
-    queryFn: rolesApi.listar,
+    queryKey: [...KEYS.roles, soloActivos],
+    queryFn: () => rolesApi.listar(soloActivos),
     staleTime: 1000 * 60 * 30,
   })
 }

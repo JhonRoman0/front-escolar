@@ -24,8 +24,9 @@ export interface RolRequest {
 }
 
 export const rolesApi = {
-  async listar(): Promise<RolResponse[]> {
-    return apiFetch<RolResponse[]>("/roles")
+  async listar(soloActivos = false): Promise<RolResponse[]> {
+    const params = new URLSearchParams({ soloActivos: String(soloActivos) })
+    return apiFetch<RolResponse[]>(`/roles?${params.toString()}`)
   },
   async crear(data: RolRequest): Promise<RolResponse> {
     return apiFetch<RolResponse>("/roles", {
