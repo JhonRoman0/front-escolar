@@ -173,11 +173,7 @@ export default function AccesosTab() {
                   {rolSeleccionado?.nombre}
                 </SelectValue>
               </SelectTrigger>
-              <SelectContent
-                alignItemWithTrigger={false}
-                align="start"
-                sideOffset={0}
-              >
+              <SelectContent>
                 {rolesActivos.map((rol) => (
                   <SelectItem key={rol.idRol} value={String(rol.idRol)}>
                     {rol.nombre}
