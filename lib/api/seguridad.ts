@@ -153,6 +153,7 @@ export interface UsuarioResponse {
   pkUrlFoto: string | null
   intentosFallidos: number | null
   fechaBloqueo: string | null
+  credencialesEnviadas?: boolean | null
   roles: RolResponse[]
 }
 

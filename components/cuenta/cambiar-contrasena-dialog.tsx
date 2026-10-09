@@ -60,7 +60,7 @@ export function CambiarContrasenaDialog({
         nuevaContrasena: values.nuevaContrasena,
       })
       form.reset()
-      toast.success("Contraseña actualizada correctamente")
+      toast.success("Contraseña actualizada correctamente. Por seguridad, te recomendamos cerrar sesión y volver a ingresar.")
       onOpenChange(false)
     } catch (error) {
       toast.error(
