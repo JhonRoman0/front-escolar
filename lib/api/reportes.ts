@@ -70,14 +70,14 @@ export interface AlumnoReporteItem {
   apoderado: string
 }
 
-// ≡ GET /docentes/reporte?inicio=&fin=&especialidad?=&tipoContrato? → List.
+// ≡ GET /docentes/reporte?inicio=&fin=&tipoContratoId? → List.
 export interface DocenteReporteItem {
   codigo: string
   nombre: string
   documentoIdentidad: string | null
-  especialidad: string | null
   gradoAcademico: string | null
   tipoContrato: string | null
+  niveles: string[]
   fechaContratacion: string | null
 }
 
@@ -199,11 +199,11 @@ export const reportesApi = {
   async docentes(
     inicio: string,
     fin: string,
-    filtros?: { especialidad?: string; tipoContrato?: string }
+    filtros?: { tipoContratoId?: number }
   ): Promise<DocenteReporteItem[]> {
     const params = rango(inicio, fin)
-    if (filtros?.especialidad) params.set("especialidad", filtros.especialidad)
-    if (filtros?.tipoContrato) params.set("tipoContrato", filtros.tipoContrato)
+    if (filtros?.tipoContratoId != null)
+      params.set("tipoContratoId", String(filtros.tipoContratoId))
     return apiFetch<DocenteReporteItem[]>(
       `/docentes/reporte?${params.toString()}`
     )

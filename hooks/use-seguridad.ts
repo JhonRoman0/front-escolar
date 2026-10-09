@@ -24,6 +24,12 @@ const KEYS = {
   rolesPermiso: ["roles-permiso"] as const,
 }
 
+// La lista de docentes se invalida junto con la de usuarios: al crear o editar
+// un usuario con rol DOCENTE el backend crea/reactiva/elimina el registro del
+// docente, y useDocenteDeUsuario se apoya en esa lista para saber si un usuario
+// ya tiene docente sin recargar la página.
+const KEYS_DOCENTES = ["docentes"] as const
+
 // ── Queries ──────────────────────────────────────────────────────────────
 
 export function useUsuarios(page: number, size = 10, sort = "idUsuario,asc") {
@@ -77,7 +83,7 @@ export function useRolesPermisoDeRol(idRol: number | null) {
 // ── Mutaciones ───────────────────────────────────────────────────────────
 
 export function useCrearUsuario() {
-  const invalidar = useInvalidarMutacion(KEYS.usuarios)
+  const invalidar = useInvalidarMutacion(KEYS.usuarios, KEYS_DOCENTES)
   return useMutation({
     mutationFn: (data: UsuarioRequest) => usuariosApi.crear(data),
     onSuccess: invalidar,
@@ -85,7 +91,7 @@ export function useCrearUsuario() {
 }
 
 export function useActualizarUsuario() {
-  const invalidar = useInvalidarMutacion(KEYS.usuarios)
+  const invalidar = useInvalidarMutacion(KEYS.usuarios, KEYS_DOCENTES)
   return useMutation({
     mutationFn: ({ id, data }: { id: number; data: UsuarioRequest }) =>
       usuariosApi.actualizar(id, data),
@@ -94,9 +100,23 @@ export function useActualizarUsuario() {
 }
 
 export function useEliminarUsuario() {
-  const invalidar = useInvalidarMutacion(KEYS.usuarios)
+  const invalidar = useInvalidarMutacion(KEYS.usuarios, KEYS_DOCENTES)
   return useMutation({
     mutationFn: (id: number) => usuariosApi.eliminar(id),
+    onSuccess: invalidar,
+  })
+}
+
+export function useReactivarUsuario() {
+  const invalidar = useInvalidarMutacion(KEYS.usuarios, KEYS_DOCENTES)
+  return useMutation({
+    mutationFn: ({
+      id,
+      data,
+    }: {
+      id: number
+      data: UsuarioRequest
+    }) => usuariosApi.reactivar(id, data),
     onSuccess: invalidar,
   })
 }

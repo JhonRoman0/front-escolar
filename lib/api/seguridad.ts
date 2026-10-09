@@ -147,6 +147,7 @@ export interface UsuarioResponse {
   documentoIdentidad: string | null
   accesoId: number | null
   gmail: string | null
+  celular: string | null
   fechaNaci: string
   urlFoto: string | null
   pkUrlFoto: string | null
@@ -168,6 +169,12 @@ export interface UsuarioRequest {
   urlFoto?: string | null
   pkUrlFoto?: string | null
   rolIds: number[]
+  // Datos específicos del docente: solo se usan cuando el rol DOCENTE está
+  // seleccionado y el usuario aún no tiene un docente activo.
+  gradoAcademicoId?: number | null
+  tipoContratoId?: number | null
+  fechaContratacion?: string | null
+  niveles?: number[]
 }
 
 export const usuariosApi = {
@@ -191,6 +198,15 @@ export const usuariosApi = {
     data: UsuarioRequest
   ): Promise<UsuarioResponse> {
     return apiFetch<UsuarioResponse>(`/usuarios/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    })
+  },
+  async reactivar(
+    id: number,
+    data: UsuarioRequest
+  ): Promise<UsuarioResponse> {
+    return apiFetch<UsuarioResponse>(`/usuarios/${id}/reactivar`, {
       method: "PUT",
       body: JSON.stringify(data),
     })

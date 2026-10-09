@@ -14,9 +14,8 @@ interface BuscarDniButtonProps {
 export function BuscarDniButton({ dni, cargando, disabled, onBuscar }: BuscarDniButtonProps) {
   const dniValido = !!dni && /^\d{8}$/.test(dni.trim())
   return (
-    <Button type="button" variant="outline" size="sm" disabled={!dniValido || cargando || disabled} onClick={onBuscar}>
+    <Button type="button" variant="outline" size="icon" aria-label="Buscar DNI" disabled={!dniValido || cargando || disabled} onClick={onBuscar}>
       {cargando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-      Buscar
     </Button>
   )
 }

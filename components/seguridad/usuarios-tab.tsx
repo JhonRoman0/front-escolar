@@ -241,7 +241,7 @@ export default function UsuariosTab() {
                         {puedeEliminar && (
                           <ConfirmarEliminar
                             titulo="Eliminar usuario"
-                            descripcion={`Se marcará a "${nombreCompleto}" como eliminado. Perderá el acceso al sistema.`}
+                            descripcion={`¿Estás seguro de eliminar a "${nombreCompleto}"? Perderá el acceso al sistema.`}
                             onConfirm={() => handleEliminar(usuario)}
                           />
                         )}
