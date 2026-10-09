@@ -50,7 +50,7 @@ export function CampoDni({
           />
           <BuscarDniButton dni={value ?? ""} cargando={cargando} onBuscar={onBuscar} />
         </div>
-        <p className="text-xs text-muted-foreground">Escribe el DNI.</p>
+        {!error && <p className="text-xs text-muted-foreground">Escribe el DNI.</p>}
         <FieldError errors={error ? [error] : []} />
       </FieldContent>
     </Field>

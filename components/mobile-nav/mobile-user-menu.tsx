@@ -1,7 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import { LogOut } from "lucide-react"
+import Link from "next/link"
+import { CircleUserRound, LogOut } from "lucide-react"
 import { toast } from "sonner"
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -66,6 +67,14 @@ export default function MobileUserMenu({ isOpen, onClose }: MobileUserMenuProps)
               <p className="truncate text-xs text-muted-foreground">{rol}</p>
             </div>
           </div>
+
+          {/* Acceso a Cuenta */}
+          <Link href="/cuenta" onClick={onClose} className="block">
+            <Button variant="outline" className="w-full">
+              <CircleUserRound className="mr-2 h-4 w-4" />
+              Cuenta
+            </Button>
+          </Link>
 
           {/* Botón logout */}
           <Button

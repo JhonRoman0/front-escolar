@@ -8,6 +8,7 @@ import { ThemeToggle } from "@/components/theme-toggle"
 
 const TITULOS: Record<string, string> = {
   "/": "Panel de Control",
+  "/cuenta": "Cuenta",
   "/seguridad": "Seguridad",
   "/academico": "Académico",
   "/estudiantes": "Estudiantes",

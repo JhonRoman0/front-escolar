@@ -72,6 +72,12 @@ interface UsuarioFormDialogProps {
   usuario?: UsuarioResponse | null
 }
 
+function mensajeConCredenciales(respuesta: UsuarioResponse, textoExito: string): string {
+  return respuesta.credencialesEnviadas === true
+    ? `${textoExito}. Las credenciales de acceso fueron enviadas a su correo electrónico.`
+    : `${textoExito}.`
+}
+
 export default function UsuarioFormDialog({
   open,
   onOpenChange,
@@ -256,10 +262,14 @@ export default function UsuarioFormDialog({
         toast.success("Usuario actualizado", { id: guardando })
       } else {
         const creado = await crear.mutateAsync(buildRequest(values))
+        const mensaje = mensajeConCredenciales(creado, "Usuario creado correctamente")
         if (fotoNueva) {
-          await subirFotoConAviso(creado.idUsuario, fotoNueva, guardando, "Usuario creado")
+          await subirFotoConAviso(creado.idUsuario, fotoNueva, guardando, mensaje)
         } else {
-          toast.success("Usuario creado", { id: guardando })
+          toast.success(mensaje, { id: guardando })
+        }
+        if (creado.credencialesEnviadas === false) {
+          toast.warning("No se pudieron enviar las credenciales al correo del usuario", { id: guardando })
         }
       }
       onOpenChange(false)
@@ -301,10 +311,14 @@ export default function UsuarioFormDialog({
         id: reactivacion.idUsuario,
         data: reactivacion.request,
       })
+      const mensaje = mensajeConCredenciales(reactivado, "Usuario reactivado correctamente")
       if (reactivacion.foto) {
-        await subirFotoConAviso(reactivado.idUsuario, reactivacion.foto, guardando, "Usuario reactivado")
+        await subirFotoConAviso(reactivado.idUsuario, reactivacion.foto, guardando, mensaje)
       } else {
-        toast.success("Usuario reactivado", { id: guardando })
+        toast.success(mensaje, { id: guardando })
+      }
+      if (reactivado.credencialesEnviadas === false) {
+        toast.warning("No se pudieron enviar las credenciales al correo del usuario", { id: guardando })
       }
       setReactivacion(null)
       onOpenChange(false)

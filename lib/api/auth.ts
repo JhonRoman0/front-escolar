@@ -59,6 +59,11 @@ export interface LoginResponse {
   esAdmin: boolean
 }
 
+export interface CambiarContrasenaRequest {
+  contrasenaActual: string
+  nuevaContrasena: string
+}
+
 // ─────────── API ───────────
 
 export const authApi = {
@@ -118,6 +123,16 @@ export const authApi = {
       method: "POST",
       body: JSON.stringify({ gmail, codigo, nuevaContrasena }),
       skipLogout: true,
+    })
+  },
+
+  // El backend identifica al usuario por el token de sesión; este request no
+  // lleva idUsuario. Una contraseña actual incorrecta responde 400 (no 401),
+  // así el frontend no la interpreta como sesión caducada.
+  async cambiarContrasena(data: CambiarContrasenaRequest): Promise<{ mensaje: string }> {
+    return apiFetch<{ mensaje: string }>("/auth/change-password", {
+      method: "POST",
+      body: JSON.stringify(data),
     })
   },
 }

@@ -65,8 +65,8 @@ export function CampoContrasena({
             {visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </button>
         </div>
-        {descripcion && (
-          <p className="text-xs text-muted-foreground">{descripcion}</p>
+        {descripcion && !error && (
+          <p className="mt-2 text-xs leading-4 text-muted-foreground">{descripcion}</p>
         )}
         <FieldError errors={error ? [error] : []} />
       </FieldContent>

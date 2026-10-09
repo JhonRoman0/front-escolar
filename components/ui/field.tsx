@@ -90,7 +90,7 @@ function FieldContent({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="field-content"
       className={cn(
-        "group/field-content flex flex-1 flex-col gap-0.5 leading-snug",
+        "group/field-content flex flex-1 flex-col gap-0.5 leading-snug has-[[data-slot=field-error]]:[&_[data-slot=field-description]]:hidden",
         className
       )}
       {...props}
