@@ -1,5 +1,8 @@
+import type { PermisosRolResponse } from "@/lib/api/auth"
+
 const ES_ADMIN_KEY = "escolar_es_admin"
 const PERMISOS_KEY = "escolar_permisos"
+const PERMISOS_HASH_KEY = "escolar_permisos_hash"
 
 // Página estándar de Spring Data (Page<T>) que devuelven los endpoints paginados.
 export interface Paginated<T> {
@@ -95,11 +98,44 @@ export function setPermisos<T>(permisos: T): void {
   localStorage.setItem(PERMISOS_KEY, JSON.stringify(permisos))
 }
 
+export function getPermisosHash(): string | null {
+  if (typeof window === "undefined") return null
+  return localStorage.getItem(PERMISOS_HASH_KEY)
+}
+
+export function setPermisosHash(hash: string): void {
+  localStorage.setItem(PERMISOS_HASH_KEY, hash)
+}
+
+// Forma canónica de los permisos del usuario conectado. Compara únicamente el
+// contenido que decide acceso: `codigo` del permiso + `accionesConcedidas`
+// ordenadas. Ignora ids, nombres, iconos, nombreRol y las accionesDisponibles
+// del catálogo, para que renombrar un rol o ampliar el catálogo no disparen
+// falsos positivos. Dos snapshots con el mismo acceso producen el mismo string.
+export function canonizarPermisos(permisos: PermisosRolResponse): string {
+  const modulos = [...(permisos?.modulos ?? [])]
+    .sort((a, b) => (a.idModulo ?? 0) - (b.idModulo ?? 0))
+    .map((modulo) =>
+      [...(modulo.permisos ?? [])]
+        .sort((a, b) => (a.codigo ?? "").localeCompare(b.codigo ?? ""))
+        .map(
+          (p) =>
+            `${p.codigo ?? ""}:${[...(p.accionesConcedidas ?? [])]
+              .sort()
+              .join(",")}`
+        )
+        .join("/")
+    )
+    .join("|")
+  return modulos
+}
+
 // La sesión ahora vive en una cookie httpOnly (escolar_token) que manda el navegador.
 // Aquí solo se limpian datos no sensibles de sesión.
 export function cerrarSesionLocal(): void {
   localStorage.removeItem(ES_ADMIN_KEY)
   localStorage.removeItem(PERMISOS_KEY)
+  localStorage.removeItem(PERMISOS_HASH_KEY)
 }
 
 async function notificarLogout(apiUrl: string): Promise<void> {

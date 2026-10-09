@@ -177,15 +177,28 @@ export interface UsuarioRequest {
   niveles?: number[]
 }
 
+export interface UsuariosFiltros {
+  q?: string
+  idRol?: number
+  idAcceso?: number
+}
+
 export const usuariosApi = {
   async listar(
     page = 0,
     size = 10,
-    sort = "idUsuario,asc"
+    sort = "idUsuario,asc",
+    filtros: UsuariosFiltros = {}
   ): Promise<Paginated<UsuarioResponse>> {
-    return apiFetch<Paginated<UsuarioResponse>>(
-      `/usuarios?page=${page}&size=${size}&sort=${encodeURIComponent(sort)}`
-    )
+    const params = new URLSearchParams({
+      page: String(page),
+      size: String(size),
+      sort,
+    })
+    if (filtros.q) params.set("q", filtros.q)
+    if (filtros.idRol != null) params.set("idRol", String(filtros.idRol))
+    if (filtros.idAcceso != null) params.set("idAcceso", String(filtros.idAcceso))
+    return apiFetch<Paginated<UsuarioResponse>>(`/usuarios?${params.toString()}`)
   },
   async crear(data: UsuarioRequest): Promise<UsuarioResponse> {
     return apiFetch<UsuarioResponse>("/usuarios", {

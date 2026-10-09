@@ -33,8 +33,8 @@ export function CampoAcceso({ value, onChange }: CampoAccesoProps) {
       </SelectTrigger>
       <SelectContent>
         {/* SelectGroup no es decorativo: su p-1 deja el texto del ítem a 10px,
-            igual que el pl-2.5 del trigger, que es lo que impide que Base UI
-            desplace el desplegable 4px a la derecha al alinear ítem y valor. */}
+            igual que el pl-2.5 del trigger, para que el desplegable quede
+            alineado con el valor. */}
         <SelectGroup>
           <SelectItem value={String(ACCESO.ACTIVO)}>Activo</SelectItem>
           <SelectItem value={String(ACCESO.INACTIVO)}>Inactivo</SelectItem>

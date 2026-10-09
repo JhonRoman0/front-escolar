@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react"
 import { toast } from "sonner"
-import { Lock, LockOpen, FileDown, Pencil, Plus } from "lucide-react"
+import { Lock, LockOpen, FileDown, Pencil, Plus, RotateCcw } from "lucide-react"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -18,7 +18,10 @@ import {
 } from "@/components/ui/table"
 
 import { TablaPaginacion } from "@/components/shared/paginacion-tabla"
+import { BuscadorTabla } from "@/components/shared/buscador-tabla"
+import { FilterSelect } from "@/components/shared/filter-select"
 import { useEliminarUsuario, useDesbloquearUsuario, useUsuarios, useRoles } from "@/hooks/use-seguridad"
+import { useDebouncedValue } from "@/hooks/use-debounce"
 import { usePuede } from "@/hooks/use-permisos"
 import type { UsuarioResponse } from "@/lib/api/seguridad"
 import { reportesApi } from "@/lib/api/reportes"
@@ -33,6 +36,11 @@ import UsuarioFormDialog from "./usuario-form-dialog"
 
 const TAMANIO_PAGINA = 10
 
+const ESTADO_OPCIONES = [
+  { value: "1", label: "Activo" },
+  { value: "3", label: "Inactivo" },
+]
+
 const MINUTOS_BLOQUEO = 30
 
 function estaBloqueado(usuario: UsuarioResponse): boolean {
@@ -45,9 +53,24 @@ function estaBloqueado(usuario: UsuarioResponse): boolean {
 
 export default function UsuariosTab() {
   const [page, setPage] = useState(0)
+  const [busqueda, setBusqueda] = useState("")
+  const [filtroRolTabla, setFiltroRolTabla] = useState("")
+  const [filtroEstado, setFiltroEstado] = useState("")
+  const busquedaDebounced = useDebouncedValue(busqueda, 400)
+
+  const filtros = useMemo(
+    () => ({
+      q: busquedaDebounced.trim() || undefined,
+      idRol: filtroRolTabla ? Number(filtroRolTabla) : undefined,
+      idAcceso: filtroEstado ? Number(filtroEstado) : undefined,
+    }),
+    [busquedaDebounced, filtroRolTabla, filtroEstado]
+  )
+
   const { data, isLoading, isError, refetch } = useUsuarios(
     page,
-    TAMANIO_PAGINA
+    TAMANIO_PAGINA,
+    filtros
   )
   const eliminar = useEliminarUsuario()
   const desbloquear = useDesbloquearUsuario()
@@ -61,21 +84,48 @@ export default function UsuariosTab() {
   const [editando, setEditando] = useState<UsuarioResponse | null>(null)
   const [dialogSeq, setDialogSeq] = useState(0)
   const [reporteOpen, setReporteOpen] = useState(false)
-  const [filtroRol, setFiltroRol] = useState("")
 
   const opcionesRol = useMemo(
     () => roles.map((r) => ({ value: String(r.idRol), label: r.nombre })),
     [roles]
   )
 
+  // Los filtros resetean a la primera página en el mismo evento que los
+  // cambia, sin un effect de sincronización.
+  function cambiarBusqueda(valor: string) {
+    setBusqueda(valor)
+    setPage(0)
+  }
+
+  function cambiarRolTabla(valor: string) {
+    setFiltroRolTabla(valor)
+    setPage(0)
+  }
+
+  function cambiarEstado(valor: string) {
+    setFiltroEstado(valor)
+    setPage(0)
+  }
+
+  const hayFiltros =
+    busqueda.trim() !== "" || filtroRolTabla !== "" || filtroEstado !== ""
+
+  function limpiarFiltros() {
+    setBusqueda("")
+    setFiltroRolTabla("")
+    setFiltroEstado("")
+    setPage(0)
+  }
+
   async function handleDescargarReporte(
     formato: "pdf" | "excel" | "csv",
     inicio: string,
-    fin: string,
-    filtros: Record<string, string>
+    fin: string
   ) {
     const datos = await reportesApi.usuarios(inicio, fin, {
-      idRol: filtros.idRol ? Number(filtros.idRol) : undefined,
+      q: busqueda.trim() || undefined,
+      idRol: filtroRolTabla ? Number(filtroRolTabla) : undefined,
+      idAcceso: filtroEstado ? Number(filtroEstado) : undefined,
     })
     if (datos.length === 0) {
       toast.warning("No hay usuarios en el rango y filtros seleccionados")
@@ -139,6 +189,40 @@ export default function UsuariosTab() {
           </div>
         </div>
 
+        <div className="flex flex-wrap items-center gap-2">
+          <BuscadorTabla
+            value={busqueda}
+            onValueChange={cambiarBusqueda}
+            placeholder="Buscar por nombre, DNI, código o correo..."
+            className="min-w-[200px] flex-1 max-w-[358px]"
+          />
+          <FilterSelect
+            value={filtroRolTabla}
+            onValueChange={cambiarRolTabla}
+            options={opcionesRol}
+            allLabel="Todos los roles"
+            className="w-[180px]"
+          />
+          <FilterSelect
+            value={filtroEstado}
+            onValueChange={cambiarEstado}
+            options={ESTADO_OPCIONES}
+            allLabel="Todos los estados"
+            className="w-[180px]"
+          />
+          {hayFiltros && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="ml-auto text-muted-foreground"
+              onClick={limpiarFiltros}
+            >
+              <RotateCcw className="mr-1 size-3.5" />
+              Limpiar filtros
+            </Button>
+          )}
+        </div>
+
         <div className="overflow-x-auto rounded-lg border">
           <Table>
           <TableHeader>
@@ -158,7 +242,14 @@ export default function UsuariosTab() {
             ) : isError ? (
               <MensajeSinDatos columnas={7} mensaje="No se pudo cargar. Recarga la pantalla." />
             ) : !data?.content.length ? (
-              <MensajeSinDatos columnas={7} mensaje="Aún no hay usuarios." />
+              <MensajeSinDatos
+                columnas={7}
+                mensaje={
+                  hayFiltros
+                    ? "Sin resultados para los filtros seleccionados."
+                    : "Aún no hay usuarios."
+                }
+              />
             ) : (
               data.content.map((usuario) => {
                 const nombreCompleto = `${usuario.nombre} ${usuario.apellidoPat} ${usuario.apellidoMat}`.trim()
@@ -276,15 +367,6 @@ export default function UsuariosTab() {
           titulo="Reporte de usuarios"
           descripcion="Descarga el listado de usuarios del rango en PDF, Excel o CSV."
           presets={["ultimos_7", "este_mes", "personalizado"]}
-          filtros={[
-            {
-              id: "idRol",
-              label: "Rol",
-              opciones: opcionesRol,
-              valor: filtroRol,
-              onChange: setFiltroRol,
-            },
-          ]}
           onDescargar={handleDescargarReporte}
         />
         </CardContent>
