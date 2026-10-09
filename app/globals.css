@@ -178,23 +178,61 @@
  * medidas como variables --rdp-*. Se sobreescriben aquí para que el calendario
  * use la paleta del tema en vez de su azul por defecto, sin tener que replicar
  * en classNames cada elemento de la librería.
+ *
+ * Las medidas son compactas (celdas de 1.5rem, un 14% menos que las 1.75rem
+ * anteriores): el popup del SelectorFecha vive dentro de diálogos centrados y
+ * necesita caber por debajo del campo. Con fixedWeeks el alto es siempre 6
+ * filas, así que reducirlas baja el conjunto sin que ningún mes quede más
+ * alto que otro.
  */
 .rdp-root {
   --rdp-accent-color: var(--primary);
   --rdp-accent-background-color: var(--accent);
-  --rdp-day-height: 2rem;
-  --rdp-day-width: 2rem;
-  --rdp-day_button-height: 2rem;
-  --rdp-day_button-width: 2rem;
+  --rdp-day-height: 1.5rem;
+  --rdp-day-width: 1.5rem;
+  --rdp-day_button-height: 1.5rem;
+  --rdp-day_button-width: 1.5rem;
   --rdp-day_button-border-radius: calc(var(--radius-md) - 2px);
   --rdp-day_button-border: 1px solid transparent;
   --rdp-today-color: var(--primary);
   --rdp-disabled-opacity: 0.35;
   --rdp-outside-opacity: 0.4;
-  --rdp-nav-height: 2rem;
-  --rdp-nav_button-height: 1.75rem;
-  --rdp-nav_button-width: 1.75rem;
-  --rdp-months-gap: 0;
+  --rdp-nav-height: 1.5rem;
+  --rdp-nav_button-height: 1.5rem;
+  --rdp-nav_button-width: 1.5rem;
+  --rdp-weekday-padding: 0.125rem 0;
+}
+
+/*
+ * Tres reglas puntuales (la librería no expone variables para ellas):
+ *
+ * - font-size del caption: por defecto es `large` (~18px), demasiado para
+ *   celdas de 1.5rem y más ancho que la rejilla en meses largos ("septiembre
+ *   de 2027"). Como el popup es `w-auto`, un título más ancho que la rejilla
+ *   haría que el popup cambiara de ancho al navegar y moviera las flechas de
+ *   mes; con el token `--text-pequeno` (14px) el ancho lo gobierna siempre la
+ *   rejilla.
+ * - padding de la celda: el UA de los navegadores añade 1px por lado a los
+ *   `td`, y al ser `height`/`width` de celda un mínimo, la fila y la columna
+ *   crecen 2px por encima de las variables. Se anula para que mande la medida
+ *   declarada.
+ * - font-size de los números de día: los días heredan el tamaño del body
+ *   (16px), grande dentro de celdas de 1.5rem. Se atan al token
+ *   `--text-pequeno`. Regla directa sobre el botón, así que también fija el
+ *   día seleccionado, que si no heredaría `large` (18px) de la celda vía
+ *   `.rdp-selected`. El `font-weight: bold` del seleccionado sigue heredándose
+ *   con normalidad.
+ */
+.rdp-month_caption {
+  font-size: var(--text-pequeno);
+}
+
+.rdp-day {
+  padding: 0;
+}
+
+.rdp-day_button {
+  font-size: var(--text-pequeno);
 }
 
 @layer base {

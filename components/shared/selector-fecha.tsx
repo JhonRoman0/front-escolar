@@ -63,16 +63,16 @@ export function SelectorFecha({
     if (open) setMes(seleccionada ?? undefined)
   }
 
-// react-day-picker exige `before` y `after` en un DateInterval, así que no cabe
-// un objeto con cotas opcionales. Se usan funciones, que sí admiten una sola.
-const limites = React.useMemo(() => {
-  const antes = isoADate(min)
-  const despues = isoADate(max)
-  const matcher: Matcher[] = []
-  if (antes) matcher.push((dia) => dia < antes)
-  if (despues) matcher.push((dia) => dia > despues)
-  return matcher.length ? matcher : undefined
-}, [min, max])
+  // react-day-picker exige `before` y `after` en un DateInterval, así que no cabe
+  // un objeto con cotas opcionales. Se usan funciones, que sí admiten una sola.
+  const limites = React.useMemo(() => {
+    const antes = isoADate(min)
+    const despues = isoADate(max)
+    const matcher: Matcher[] = []
+    if (antes) matcher.push((dia) => dia < antes)
+    if (despues) matcher.push((dia) => dia > despues)
+    return matcher.length ? matcher : undefined
+  }, [min, max])
 
   return (
     <Field className={className} data-invalid={error ? "" : undefined}>
@@ -98,13 +98,27 @@ const limites = React.useMemo(() => {
             <CalendarIcon className="size-4 shrink-0 opacity-60" />
           </PopoverTrigger>
           <PopoverContent
-            className="p-0"
+            // side="bottom" es el default del wrapper, pero aquí es requisito
+            // y se deja explícito: el calendario siempre se abre hacia abajo.
+            // collisionAvoidance side "none" desactiva el flip por defecto de
+            // Base UI, que voltea el popup arriba cuando no cabe por debajo.
+            // El max-h de seguridad usa la var que Base UI calcula con el
+            // espacio real hasta el borde del viewport: en resoluciones
+            // normales queda por encima del contenido (no aparece scrollbar)
+            // y solo corta con scroll en pantallas de poca altura.
+            className="p-0 max-h-[var(--available-height)] overflow-y-auto"
             side="bottom"
             align="start"
-            sideOffset={4}
+            collisionAvoidance={{ side: "none" }}
           >
             <Calendar
+              // fixedWeeks: siempre 6 filas por mes, sea cual sea el mes, así
+              // el popup no cambia de alto al navegar y las flechas de mes
+              // permanecen siempre en el mismo sitio. p-1.5: el padding del
+              // wrapper (p-3) ocupa demasiado en un popup de diálogo.
               mode="single"
+              fixedWeeks
+              className="p-1.5"
               autoFocus={autoFocus}
               selected={seleccionada}
               month={mes}
