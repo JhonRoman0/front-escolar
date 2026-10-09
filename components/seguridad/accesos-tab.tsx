@@ -151,8 +151,8 @@ export default function AccesosTab() {
     <Card>
       <CardContent className="flex flex-col gap-4 p-4">
         <div className="space-y-0.5">
-          <h2 className="text-[20px] font-semibold tracking-tight">Accesos por rol</h2>
-          <p className="text-[14px] leading-5 text-muted-foreground">
+          <h2 className="text-encabezado font-semibold tracking-tight">Accesos por rol</h2>
+          <p className="text-pequeno leading-5 text-muted-foreground">
             Elige un rol y marca qué puede ver y hacer. Cada área del sistema tiene sus opciones (ver, crear, editar, eliminar).
           </p>
         </div>
@@ -165,7 +165,7 @@ export default function AccesosTab() {
         )}
 
         <Field>
-          <FieldLabel className="text-[14px] font-semibold">Rol</FieldLabel>
+          <FieldLabel className="text-pequeno font-semibold">Rol</FieldLabel>
           <FieldContent>
             <Select value={rolEfectivo} onValueChange={(v) => setRolId(v ?? "")}>
               <SelectTrigger className="w-56">
@@ -173,7 +173,11 @@ export default function AccesosTab() {
                   {rolSeleccionado?.nombre}
                 </SelectValue>
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent
+                alignItemWithTrigger={false}
+                align="start"
+                sideOffset={0}
+              >
                 {rolesActivos.map((rol) => (
                   <SelectItem key={rol.idRol} value={String(rol.idRol)}>
                     {rol.nombre}
@@ -185,7 +189,7 @@ export default function AccesosTab() {
         </Field>
 
         {rolSeleccionado && (
-          <p className="text-[14px] font-semibold text-[#7D7D7F]">
+          <p className="text-pequeno font-semibold text-gris-descripcion">
             Permisos del rol{" "}
             <span className="font-medium text-foreground">
               {rolSeleccionado.nombre}
@@ -258,7 +262,7 @@ export default function AccesosTab() {
                                         : asignarPermiso(permiso.idPermiso)
                                     }
                                   />
-                                  <span className="text-[14px] font-semibold">
+                                  <span className="text-pequeno font-semibold">
                                     {permiso.nombre}
                                   </span>
                                 </label>
