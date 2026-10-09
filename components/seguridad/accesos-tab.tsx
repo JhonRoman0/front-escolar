@@ -2,10 +2,16 @@
 
 import { useMemo, useState } from "react"
 import { toast } from "sonner"
-import { Loader2 } from "lucide-react"
+import { ChevronDown, Loader2 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
+import {
+  Accordion,
+  AccordionItem,
+  AccordionPanel,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
 import { Field, FieldContent, FieldLabel } from "@/components/ui/field"
 import {
   Select,
@@ -41,6 +47,7 @@ export default function AccesosTab() {
 
   const [rolId, setRolId] = useState<string>("")
   const [pendiente, setPendiente] = useState<number | null>(null)
+  const [abiertos, setAbiertos] = useState<string[]>([])
 
   const rolesActivos = useMemo(
     () => roles.filter((r) => r.accesoId === 1),
@@ -193,7 +200,7 @@ export default function AccesosTab() {
         ) : modulosCargando || rpCargando ? (
           <CargandoTarjetas filas={4} />
         ) : (
-          <div className="space-y-4">
+          <Accordion multiple value={abiertos} onValueChange={setAbiertos}>
             {modulos
               .filter((m) => m.accesoId !== 2)
               .map((modulo) => {
@@ -205,93 +212,102 @@ export default function AccesosTab() {
                   concedido.has(p.idPermiso)
                 ).length
                 return (
-                  <div key={modulo.idModulo} className="rounded-3xl border p-3">
-                  <div className="mb-2 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
+                  <AccordionItem
+                    key={modulo.idModulo}
+                    value={String(modulo.idModulo)}
+                    className="overflow-hidden rounded-3xl border bg-card"
+                  >
+                    <AccordionTrigger className="gap-2 rounded-none px-3 py-3 aria-expanded:bg-brand-subtle">
+                      <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform duration-200 group-aria-expanded/accordion-trigger:rotate-180" />
                       <Icono className="size-4 text-primary" />
-                      <p className="text-[16px] font-semibold">{modulo.modulo}</p>
-                    </div>
-<Badge
-                        variant="rol"
-                        className="border border-[#F99119] text-[10px]"
-                      >
-                        {concedidos}/{permisosModulo.length} permitidos
-                      </Badge>
-                    </div>
-                    <div className="space-y-2">
-                      {permisosModulo.map((permiso) => {
-                        const actual = concedido.get(permiso.idPermiso)
-                        const asignado = !!actual
-                        const bloqueado =
-                          pendiente !== null || !puedeEscribir
-                        return (
-                          <div
-                            key={permiso.idPermiso}
-                            className="rounded-2xl border px-3 py-2"
-                          >
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                              <label className="flex items-center gap-2">
-                                <Checkbox
-                                  checked={asignado}
-                                  disabled={bloqueado}
-                                  onCheckedChange={() =>
-                                    asignado
-                                      ? quitarPermiso(
-                                          permiso.idPermiso,
-                                          actual.idRolPermiso
-                                        )
-                                      : asignarPermiso(permiso.idPermiso)
-                                  }
-                                />
-                                <span className="text-[14px] font-semibold">
-                                  {permiso.nombre}
-                                </span>
-                              </label>
-                              {pendiente === permiso.idPermiso && (
-                                <Loader2 className="size-4 animate-spin text-muted-foreground" />
-                              )}
-                            </div>
-                            {asignado && permiso.acciones.length > 0 && (
-                              <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-2 pl-7">
-                                {permiso.acciones.map((accion) => {
-                                  const marcado = actual.acciones.has(accion)
-                                  return (
-                                    <label
-                                      key={accion}
-                                      className="flex items-center gap-1.5 text-[11px] font-light"
-                                    >
-                                      <Checkbox
-                                        checked={marcado}
-                                        disabled={bloqueado}
-                                        onCheckedChange={() =>
-                                          toggleAccion(
+                      <span className="text-[16px] font-semibold">
+                        {modulo.modulo}
+                      </span>
+                      <span className="ml-auto">
+                        <Badge
+                          variant="rol"
+                          className="border border-[#F99119] text-[10px]"
+                        >
+                          {concedidos}/{permisosModulo.length} permitidos
+                        </Badge>
+                      </span>
+                    </AccordionTrigger>
+                    <AccordionPanel className="border-t px-3 pb-3">
+                      <div className="animate-in fade-in slide-in-from-top-1 space-y-2 pt-3 duration-200">
+                        {permisosModulo.map((permiso) => {
+                          const actual = concedido.get(permiso.idPermiso)
+                          const asignado = !!actual
+                          const bloqueado =
+                            pendiente !== null || !puedeEscribir
+                          return (
+                            <div
+                              key={permiso.idPermiso}
+                              className="rounded-2xl border px-3 py-2"
+                            >
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <label className="flex items-center gap-2">
+                                  <Checkbox
+                                    checked={asignado}
+                                    disabled={bloqueado}
+                                    onCheckedChange={() =>
+                                      asignado
+                                        ? quitarPermiso(
                                             permiso.idPermiso,
-                                            accion,
-                                            marcado
+                                            actual.idRolPermiso
                                           )
-                                        }
-                                      />
-                                      <span>
-                                        {accionNombre.get(accion) ?? accion}
-                                      </span>
-                                    </label>
-                                  )
-                                })}
-                                {actual.acciones.size === 0 && (
-                                  <span className="text-[11px] font-light text-muted-foreground">
-                                    Solo lectura
+                                        : asignarPermiso(permiso.idPermiso)
+                                    }
+                                  />
+                                  <span className="text-[14px] font-semibold">
+                                    {permiso.nombre}
                                   </span>
+                                </label>
+                                {pendiente === permiso.idPermiso && (
+                                  <Loader2 className="size-4 animate-spin text-muted-foreground" />
                                 )}
                               </div>
-                            )}
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
+                              {asignado && permiso.acciones.length > 0 && (
+                                <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-2 pl-7">
+                                  {permiso.acciones.map((accion) => {
+                                    const marcado = actual.acciones.has(accion)
+                                    return (
+                                      <label
+                                        key={accion}
+                                        className="flex items-center gap-1.5 text-[11px] font-light"
+                                      >
+                                        <Checkbox
+                                          checked={marcado}
+                                          disabled={bloqueado}
+                                          onCheckedChange={() =>
+                                            toggleAccion(
+                                              permiso.idPermiso,
+                                              accion,
+                                              marcado
+                                            )
+                                          }
+                                        />
+                                        <span>
+                                          {accionNombre.get(accion) ?? accion}
+                                        </span>
+                                      </label>
+                                    )
+                                  })}
+                                  {actual.acciones.size === 0 && (
+                                    <span className="text-[11px] font-light text-muted-foreground">
+                                      Solo lectura
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </AccordionPanel>
+                  </AccordionItem>
                 )
               })}
-          </div>
+          </Accordion>
         )}
       </CardContent>
     </Card>
