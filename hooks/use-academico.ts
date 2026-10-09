@@ -223,6 +223,31 @@ export function useEliminarSeccion() {
   })
 }
 
+export function useActualizarSeccion() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ idGradoSeccion, nombre }: { idGradoSeccion: number; nombre: string }) =>
+      gradoSeccionApi.actualizar(idGradoSeccion, { nombre }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: KEYS.grados })
+      queryClient.invalidateQueries({ queryKey: KEYS.secciones })
+      queryClient.invalidateQueries({ queryKey: KEYS.asignaciones })
+    },
+  })
+}
+
+export function useEliminarSeccionesLote() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (ids: number[]) => gradoSeccionApi.eliminarLote(ids),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: KEYS.grados })
+      queryClient.invalidateQueries({ queryKey: KEYS.secciones })
+      queryClient.invalidateQueries({ queryKey: KEYS.asignaciones })
+    },
+  })
+}
+
 export function useAsignacionesDocente(idDocente: number | null) {
   return useQuery({
     queryKey: [...KEYS.asignaciones, "docente", idDocente],

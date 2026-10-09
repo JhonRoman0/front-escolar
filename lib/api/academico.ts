@@ -480,6 +480,18 @@ export const gradoSeccionApi = {
   async eliminar(idGradoSeccion: number): Promise<void> {
     return apiFetch<void>(`/secciones/${idGradoSeccion}`, { method: "DELETE" })
   },
+  async actualizar(idGradoSeccion: number, request: { nombre: string }): Promise<GradoSeccionItem> {
+    return apiFetch<GradoSeccionItem>(`/secciones/${idGradoSeccion}`, {
+      method: "PUT",
+      body: JSON.stringify({ nombre: request.nombre }),
+    })
+  },
+  async eliminarLote(ids: number[]): Promise<void> {
+    return apiFetch<void>("/secciones/lote", {
+      method: "DELETE",
+      body: JSON.stringify({ ids }),
+    })
+  },
 }
 
 export const asignacionesApi = {

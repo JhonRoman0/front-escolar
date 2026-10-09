@@ -92,9 +92,14 @@ export function ConfirmarEliminar({
           <DialogDescription>{descripcion}</DialogDescription>
         </DialogHeader>
         <DialogFooter>
-          <DialogTrigger render={<Button variant="outline" />}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setOpen(false)}
+            disabled={disabled}
+          >
             Cancelar
-          </DialogTrigger>
+          </Button>
           <Button
             variant={variantConfirmar}
             onClick={handleConfirm}

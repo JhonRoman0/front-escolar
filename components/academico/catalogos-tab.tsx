@@ -53,6 +53,7 @@ import { ConfirmarEliminar } from "@/components/seguridad/confirmar-eliminar"
 import { BotonNuevo } from "@/components/shared/boton-nuevo"
 import { BotonReintentar } from "@/components/shared/boton-reintentar"
 import { BotonGuardar } from "@/components/shared/boton-guardar"
+import { FilterSelect } from "@/components/shared/filter-select"
 import { HeaderSeccion } from "@/components/shared/header-seccion"
 import { SelectorFecha } from "@/components/shared/selector-fecha"
 import { useEliminarConToast } from "@/hooks/use-eliminar-toast"
@@ -374,6 +375,12 @@ function AulasTab() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editando, setEditando] = useState<AulaResponse | null>(null)
 
+  // "" = "Todos los estados". El filtro es local sobre los datos ya cargados.
+  const [estadoFiltro, setEstadoFiltro] = useState("")
+  const aulasFiltradas = (data ?? [])
+    .filter((aula) => estadoFiltro === "" || String(aula.accesoId) === estadoFiltro)
+    .sort((a, b) => b.idAula - a.idAula)
+
   // Los nombres ya registrados, sin incluir el que se está editando: el schema
   // dinámico del diálogo compara contra esta lista, así que un aula nunca choca
   // consigo misma al guardar, pero sí contra cualquier otra.
@@ -411,6 +418,17 @@ function AulasTab() {
             />
           }
         />
+        <div className="flex flex-wrap items-center gap-3">
+          <FilterSelect
+            value={estadoFiltro}
+            onValueChange={setEstadoFiltro}
+            options={[
+              { value: String(ACCESO.ACTIVO), label: "Activo" },
+              { value: String(ACCESO.INACTIVO), label: "Inactivo" },
+            ]}
+            allLabel="Todos los estados"
+          />
+        </div>
         <div className="overflow-x-auto rounded-lg border">
           <Table>
             <TableHeader>
@@ -428,8 +446,13 @@ function AulasTab() {
                 <MensajeSinDatos columnas={4} mensaje="No se pudo cargar. Recarga la pantalla." />
               ) : !data?.length ? (
                 <MensajeSinDatos columnas={4} mensaje="Aún no hay aulas." />
+              ) : !aulasFiltradas.length ? (
+                <MensajeSinDatos
+                  columnas={4}
+                  mensaje="No hay aulas que coincidan con los filtros seleccionados."
+                />
               ) : (
-                data.map((aula) => (
+                aulasFiltradas.map((aula) => (
                   <TableRow key={aula.idAula}>
                     <TableCell className="font-medium">{aula.nombre}</TableCell>
                     <TableCell>{aula.capacidad ?? "—"}</TableCell>
@@ -446,7 +469,7 @@ function AulasTab() {
                         }}
                         onEliminar={() => handleEliminar(aula)}
                         tituloEliminar="Eliminar aula"
-                        descripcionEliminar={`Se marcará "${aula.nombre}" como eliminada.`}
+                        descripcionEliminar={`¿Seguro que quieres eliminar el aula "${aula.nombre}"?`}
                         ariaEditar={`Editar ${aula.nombre}`}
                       />
                     </TableCell>
@@ -823,7 +846,7 @@ function AniosTab() {
                   <TableCell className="text-xs">{anio.fechaInicio || "—"}</TableCell>
                   <TableCell className="text-xs">{anio.fechaFin || "—"}</TableCell>
                   <TableCell><AnioBadge estado={anio.estado} /></TableCell>
-                  <TableCell className="text-right"><AccionesFila puedeActualizar={puedeActualizar && anio.estado !== ESTADO_ANIO.CERRADO} puedeEliminar={puedeEliminar} onEditar={() => { setEditando(anio); setDialogOpen(true) }} onEliminar={() => handleEliminar(anio)} tituloEliminar="Eliminar año escolar" descripcionEliminar={`Se marcará el año ${anio.anio} como eliminado.`} ariaEditar={`Editar año ${anio.anio}`} /></TableCell>
+                  <TableCell className="text-right"><AccionesFila puedeActualizar={puedeActualizar && anio.estado !== ESTADO_ANIO.CERRADO} puedeEliminar={puedeEliminar} onEditar={() => { setEditando(anio); setDialogOpen(true) }} onEliminar={() => handleEliminar(anio)} tituloEliminar="Eliminar año escolar" descripcionEliminar={`¿Seguro que quieres eliminar el año ${anio.anio}?`} ariaEditar={`Editar año ${anio.anio}`} /></TableCell>
                 </TableRow>
               ))}
             </TableBody>

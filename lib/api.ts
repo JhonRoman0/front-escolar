@@ -50,6 +50,27 @@ export class ApiError extends Error {
   }
 }
 
+// El backend manda `message` como string en la mayoria de errores, pero en los
+// de validacion (MethodArgumentNotValidException) manda un objeto
+// { campo: "mensaje" }. Esto lo aplana a un texto legible para que nunca se
+// termine mostrando "[object Object]".
+function extraerMensajeError(body: unknown): string | null {
+  if (!body || typeof body !== "object") return null
+  const datos = body as { mensaje?: unknown; message?: unknown }
+  const candidato = datos.mensaje ?? datos.message
+  if (typeof candidato === "string" && candidato.trim()) return candidato
+  if (candidato && typeof candidato === "object") {
+    const textos = Object.values(candidato as Record<string, unknown>).filter(
+      (v): v is string => typeof v === "string" && v.trim().length > 0,
+    )
+    if (textos.length > 0) {
+      const unido = textos.join(". ")
+      return /[.!?]$/.test(unido) ? unido : `${unido}.`
+    }
+  }
+  return null
+}
+
 export function getEsAdmin(): boolean {
   if (typeof window === "undefined") return false
   return localStorage.getItem(ES_ADMIN_KEY) === "true"

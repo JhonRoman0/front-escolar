@@ -43,13 +43,18 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
+  forceOverlay = false,
   ...props
 }: DialogPrimitive.Popup.Props & {
   showCloseButton?: boolean
+  // Renderiza siempre el overlay aunque el diálogo esté anidado dentro de otro.
+  // Base UI oculta el backdrop de los diálogos anidados salvo que se pida
+  // forceRender; sin esto la confirmación no atenúa al diálogo padre.
+  forceOverlay?: boolean
 }) {
   return (
     <DialogPortal>
-      <DialogOverlay />
+      <DialogOverlay forceRender={forceOverlay} />
       <DialogPrimitive.Popup
         data-slot="dialog-content"
         className={cn(
