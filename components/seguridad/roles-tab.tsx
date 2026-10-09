@@ -38,27 +38,18 @@ import type { RolResponse } from "@/lib/api/seguridad"
 import { rolSchema, type RolValues } from "@/lib/schemas/seguridad"
 import { usePuede } from "@/hooks/use-permisos"
 import { cn } from "@/lib/utils"
+import { COLOR_ROL_ADMIN, COLOR_ROL_FALLBACK, PALETA_COLORES, esRolAdmin } from "@/lib/roles"
 import { ConfirmarEliminar } from "./confirmar-eliminar"
 import { CampoAcceso, CargandoTarjetas } from "./shared"
-
-const PALETA_COLORES = [
-  "#1D4ED8",
-  "#0E7490",
-  "#15803D",
-  "#B45309",
-  "#C2410C",
-  "#B91C1C",
-  "#BE185D",
-  "#6D28D9",
-]
 
 const ESTADO_OPCIONES = [
   { value: "1", label: "Activo" },
   { value: "3", label: "Inactivo" },
 ]
 
-function esRolAdmin(rol: RolResponse) {
-  return rol.nombre.trim().toUpperCase() === "ADMIN"
+function pesoRol(rol: RolResponse) {
+  if (esRolAdmin(rol.nombre)) return 0
+  return rol.accesoId === 1 ? 1 : 2
 }
 
 export default function RolesTab() {
@@ -78,6 +69,7 @@ export default function RolesTab() {
   const rolesFiltrados = filtroEstado
     ? roles.filter((r) => String(r.accesoId) === filtroEstado)
     : roles
+  const rolesOrdenados = [...rolesFiltrados].sort((a, b) => pesoRol(a) - pesoRol(b))
 
   function conteoPermisos(idRol: number) {
     return rolesPermisos.filter((rp) => rp.rol?.idRol === idRol).length
@@ -133,8 +125,8 @@ export default function RolesTab() {
           </p>
         ) : (
           <div className="flex flex-wrap gap-4">
-            {rolesFiltrados.map((rol) => {
-              const admin = esRolAdmin(rol)
+            {rolesOrdenados.map((rol) => {
+              const admin = esRolAdmin(rol.nombre)
               const inactivo = rol.accesoId === 3
               const puedeGestionar = !admin && (puedeActualizar || puedeEliminar)
               const permisos = conteoPermisos(rol.idRol)
@@ -149,7 +141,7 @@ export default function RolesTab() {
                   style={
                     inactivo
                       ? undefined
-                      : { backgroundColor: admin ? "#0F172A" : (rol.color ?? PALETA_COLORES[0]) }
+                      : { backgroundColor: admin ? COLOR_ROL_ADMIN : (rol.color ?? COLOR_ROL_FALLBACK) }
                   }
                 >
                   <div className="flex items-start justify-between gap-2">
@@ -279,14 +271,14 @@ function RolFormDialog({
 
   const form = useForm<RolValues>({
     resolver: zodResolver(rolSchema),
-    defaultValues: { nombre: "", color: PALETA_COLORES[0], accesoId: 1 },
+    defaultValues: { nombre: "", color: COLOR_ROL_FALLBACK, accesoId: 1 },
   })
 
   useEffect(() => {
     if (open) {
       form.reset({
         nombre: rol?.nombre ?? "",
-        color: rol?.color ?? PALETA_COLORES[0],
+        color: rol?.color ?? COLOR_ROL_FALLBACK,
         accesoId: rol?.accesoId ?? 1,
       })
     }

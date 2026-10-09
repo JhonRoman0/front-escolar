@@ -158,7 +158,7 @@ export function useCrearRol() {
 }
 
 export function useActualizarRol() {
-  const invalidar = useInvalidarMutacion(KEYS.roles)
+  const invalidar = useInvalidarMutacion(KEYS.roles, KEYS.usuarios)
   return useMutation({
     mutationFn: ({ id, data }: { id: number; data: RolRequest }) =>
       rolesApi.actualizar(id, data),

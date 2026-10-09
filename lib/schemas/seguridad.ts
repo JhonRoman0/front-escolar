@@ -19,7 +19,7 @@ export const accionSchema = z.object({
 export type AccionValues = z.infer<typeof accionSchema>
 
 export const rolSchema = z.object({
-  nombre: z.string().min(1, "El nombre es requerido").max(20),
+  nombre: z.string().min(1, "El nombre es requerido").max(20, "El nombre del rol no puede superar los 20 caracteres"),
   color: z
     .string()
     .regex(/^#[0-9A-Fa-f]{6}$/, "Formato hex inválido (ej: #FF5733)")
