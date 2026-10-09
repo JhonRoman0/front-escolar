@@ -203,6 +203,8 @@ interface SeccionesPorNivelProps {
   puedeActualizar: boolean
   /** La fila editada define grado + turno + año: los tres van juntos. */
   onEditar: (grado: GradoResponse, idTurno: number, idAnio: number) => void
+  /** Texto del estado vacío cuando no hay resultados tras filtrar. */
+  mensajeVacio?: string
 }
 
 export function SeccionesPorNivel({
@@ -213,6 +215,7 @@ export function SeccionesPorNivel({
   isError,
   puedeActualizar,
   onEditar,
+  mensajeVacio,
 }: SeccionesPorNivelProps) {
   const bloques = useMemo(
     () => agruparPorNivel(grados, niveles, turnos),
@@ -237,7 +240,7 @@ export function SeccionesPorNivel({
   return (
     <div className="flex flex-col gap-3">
       {isLoading || isError || !bloques.length ? (
-        <EstadoTabla isLoading={isLoading} isError={isError} />
+        <EstadoTabla isLoading={isLoading} isError={isError} mensajeVacio={mensajeVacio} />
       ) : (
         <Accordion
           multiple
@@ -268,7 +271,15 @@ export function SeccionesPorNivel({
  * hace fallar la hidratación. El div de afuera es válido: envuelve un `<table>`,
  * que es lo que renderiza `Table`.
   */
-function EstadoTabla({ isLoading, isError }: { isLoading: boolean; isError: boolean }) {
+function EstadoTabla({
+  isLoading,
+  isError,
+  mensajeVacio,
+}: {
+  isLoading: boolean
+  isError: boolean
+  mensajeVacio?: string
+}) {
   if (!isLoading && !isError) {
     return (
       <div className="rounded-2xl border">
@@ -276,7 +287,7 @@ function EstadoTabla({ isLoading, isError }: { isLoading: boolean; isError: bool
           <TableBody>
             <MensajeSinDatos
               columnas={COLUMNAS}
-              mensaje="Aún no hay secciones. Usá Nueva sección para empezar."
+              mensaje={mensajeVacio ?? "Aún no hay secciones. Usá Nueva sección para empezar."}
             />
           </TableBody>
         </Table>

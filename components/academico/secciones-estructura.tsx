@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 import {
   ArrowRight,
@@ -9,6 +9,7 @@ import {
   Clock3,
   GraduationCap,
   Plus,
+  RotateCcw,
   Trash2,
   X,
   type LucideIcon,
@@ -28,6 +29,7 @@ import {
 import { Field, FieldContent, FieldDescription, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { BotonNuevo } from "@/components/shared/boton-nuevo"
+import { FilterSelect } from "@/components/shared/filter-select"
 import { HeaderSeccion } from "@/components/shared/header-seccion"
 import { SeccionesPorNivel } from "@/components/academico/secciones-por-nivel"
 import { NuevaSeccionDialog } from "@/components/academico/nueva-seccion-dialog"
@@ -46,6 +48,7 @@ import { usePuede } from "@/hooks/use-permisos"
 import {
   ESTADO_ANIO,
   aniosHabilitados,
+  anioPorDefecto,
   estadoAnioTexto,
   motivoAnioNoHabilitado,
   type AnioEscolarResponse,
@@ -57,6 +60,66 @@ import { formatearFecha } from "@/lib/fechas"
 interface SeccionesEstructuraProps {
   onIrATurnos?: () => void
   onIrAAnios?: () => void
+}
+
+/** Mismo orden que la tabla: los grados que arrancan con número van primero. */
+function ordenGradoNombre(nombre: string): number {
+  const n = nombre.match(/\d+/)?.[0]
+  return n ? Number.parseInt(n, 10) : Number.POSITIVE_INFINITY
+}
+
+/** Filtros de la vista de secciones. `anio` es null = año predeterminado. */
+interface FiltrosSecciones {
+  anio: string | null
+  nivel: string
+  grado: string
+  turno: string
+}
+
+/**
+ * Garantiza que la jerarquía Año > Nivel > Grado > Turno no deje valores sin
+ * opción válida: si un filtro no existe dentro del contexto de los superiores,
+ * se resetea a "Todos" (""), y lo mismo sus descendientes. Se aplica en cada
+ * cambio de filtro, sin effects.
+ */
+function normalizarFiltros(
+  candidato: FiltrosSecciones,
+  grados: GradoResponse[],
+  anioDefId: number | undefined,
+): FiltrosSecciones {
+  const anio = candidato.anio === "" ? null : candidato.anio
+  const idAnio = anio != null ? Number(anio) : anioDefId
+  const enAnio = grados
+    .map((g) => ({
+      ...g,
+      secciones: g.secciones.filter((s) => s.nombre && s.idAnio === idAnio),
+    }))
+    .filter((g) => g.secciones.length > 0)
+
+  const nivel = candidato.nivel
+  const nivelFinal = !nivel || enAnio.some((g) => String(g.idNivel) === nivel) ? nivel : ""
+
+  const idNivel = nivelFinal ? Number(nivelFinal) : null
+  const grado = candidato.grado
+  const gradoValido =
+    !grado ||
+    enAnio.some(
+      (g) =>
+        (idNivel == null || g.idNivel === idNivel) && String(g.idGrado) === grado,
+    )
+  const gradoFinal = gradoValido ? grado : ""
+
+  const idGrado = gradoFinal ? Number(gradoFinal) : null
+  const turno = candidato.turno
+  const turnoValido =
+    !turno ||
+    enAnio.some((g) => {
+      if (idNivel != null && g.idNivel !== idNivel) return false
+      if (idGrado != null && g.idGrado !== idGrado) return false
+      return g.secciones.some((s) => String(s.idTurno) === turno)
+    })
+
+  return { anio, nivel: nivelFinal, grado: gradoFinal, turno: turnoValido ? turno : "" }
 }
 
 export function SeccionesEstructura({
@@ -75,10 +138,148 @@ export function SeccionesEstructura({
     idTurno: number
     idAnio: number
   } | null>(null)
+  // Filtros: el año arranca en null (= predeterminado) y nivel/grado/turno
+  // usan "" para "Todos". Las combinaciones inválidas se resuelven dentro de
+  // los handlers con normalizarFiltros, sin effects.
+  const [filtros, setFiltros] = useState<FiltrosSecciones>({
+    anio: null,
+    nivel: "",
+    grado: "",
+    turno: "",
+  })
 
   const turnoActivo = turnos.find((t) => t.accesoId === 1) ?? null
-  const habilitados = aniosHabilitados(anios)
   const faltaTurno = !turnoActivo
+  const habilitados = aniosHabilitados(anios)
+  // Predeterminado: siempre el vigente; sin vigente, el por comenzar iniciado
+  // más alto (misma regla que anioPorDefecto). "Limpiar filtros" vuelve acá.
+  const anioVigente =
+    habilitados.find((a) => a.estado === ESTADO_ANIO.VIGENTE) ?? anioPorDefecto(habilitados)
+  const anioDefId = anioVigente?.idAnio
+  const anioEfectivo = filtros.anio ?? (anioDefId != null ? String(anioDefId) : "")
+
+  function aplicarAnio(valor: string) {
+    setFiltros((actuales) =>
+      normalizarFiltros({ ...actuales, anio: valor === "" ? null : valor }, data ?? [], anioDefId),
+    )
+  }
+  function aplicarNivel(valor: string) {
+    setFiltros((actuales) => normalizarFiltros({ ...actuales, nivel: valor }, data ?? [], anioDefId))
+  }
+  function aplicarGrado(valor: string) {
+    setFiltros((actuales) => normalizarFiltros({ ...actuales, grado: valor }, data ?? [], anioDefId))
+  }
+  function aplicarTurno(valor: string) {
+    setFiltros((actuales) => normalizarFiltros({ ...actuales, turno: valor }, data ?? [], anioDefId))
+  }
+
+  function limpiarFiltros() {
+    setFiltros({ anio: null, nivel: "", grado: "", turno: "" })
+  }
+
+  const aniosOptions = useMemo(
+    () =>
+      habilitados
+        .slice()
+        .sort((a, b) => (a.anio < b.anio ? 1 : a.anio > b.anio ? -1 : 0))
+        .map((a) => ({
+          value: String(a.idAnio),
+          label: `${a.anio} · ${estadoAnioTexto(a.estado)}`,
+        })),
+    [habilitados],
+  )
+
+  // Grados con al menos una sección (con letra) en el año seleccionado: base de
+  // las opciones de Nivel, Grado y Turno. Todo el filtrado es local.
+  const conSeccionesDelAnio = useMemo(() => {
+    const id = Number(anioEfectivo)
+    if (!id) return [] as GradoResponse[]
+    return (data ?? [])
+      .map((g) => ({
+        ...g,
+        secciones: g.secciones.filter((s) => s.nombre && s.idAnio === id),
+      }))
+      .filter((g) => g.secciones.length > 0)
+  }, [data, anioEfectivo])
+
+  const nivelesDisponibles = useMemo(() => {
+    const pos = new Map(niveles.map((n, i) => [n.idNivel, i]))
+    const porNivel = new Map<number, string>()
+    for (const g of conSeccionesDelAnio) porNivel.set(g.idNivel, g.nivel)
+    return [...porNivel.entries()]
+      .sort(
+        (a, b) =>
+          (pos.get(a[0]) ?? Number.POSITIVE_INFINITY) - (pos.get(b[0]) ?? Number.POSITIVE_INFINITY) ||
+          a[1].localeCompare(b[1], "es"),
+      )
+      .map(([id, nombre]) => ({ value: String(id), label: nombre }))
+  }, [conSeccionesDelAnio, niveles])
+
+  const idNivelSel = filtros.nivel ? Number(filtros.nivel) : null
+  const gradosDisponibles = useMemo(() => {
+    // Orden de nivel del catálogo y, dentro de cada nivel, por número de grado:
+    // así los encabezados de nivel no quedan intercalados.
+    const posNivel = new Map(niveles.map((n, i) => [n.idNivel, i]))
+    return conSeccionesDelAnio
+      .filter((g) => (idNivelSel == null ? true : g.idNivel === idNivelSel))
+      .sort(
+        (a, b) =>
+          (posNivel.get(a.idNivel) ?? Number.POSITIVE_INFINITY) -
+            (posNivel.get(b.idNivel) ?? Number.POSITIVE_INFINITY) ||
+          ordenGradoNombre(a.nombre) - ordenGradoNombre(b.nombre) ||
+          a.nombre.localeCompare(b.nombre, "es"),
+      )
+      .map((g) => ({
+        value: String(g.idGrado),
+        label: g.nombre,
+        // Con "Nivel: Todos" las opciones se agrupan por nivel en el dropdown;
+        // con un nivel elegido la lista ya está filtrada y no se muestra header.
+        group: idNivelSel == null ? g.nivel : undefined,
+      }))
+  }, [conSeccionesDelAnio, idNivelSel, niveles])
+
+  const idGradoSel = filtros.grado ? Number(filtros.grado) : null
+  const turnosDisponibles = useMemo(() => {
+    const pos = new Map(turnos.map((t, i) => [t.idTurno, i]))
+    const porTurno = new Map<number, string>()
+    for (const g of conSeccionesDelAnio) {
+      if (idNivelSel != null && g.idNivel !== idNivelSel) continue
+      if (idGradoSel != null && g.idGrado !== idGradoSel) continue
+      for (const s of g.secciones) porTurno.set(s.idTurno, s.turno)
+    }
+    return [...porTurno.entries()]
+      .sort(
+        (a, b) =>
+          (pos.get(a[0]) ?? Number.POSITIVE_INFINITY) - (pos.get(b[0]) ?? Number.POSITIVE_INFINITY) ||
+          a[1].localeCompare(b[1], "es"),
+      )
+      .map(([id, nombre]) => ({ value: String(id), label: nombre }))
+  }, [conSeccionesDelAnio, idNivelSel, idGradoSel, turnos])
+
+  const gradosFiltrados = useMemo(() => {
+    const idAnio = Number(anioEfectivo)
+    const idTurnoSel = filtros.turno ? Number(filtros.turno) : null
+    return (data ?? [])
+      .filter((g) => (idNivelSel == null ? true : g.idNivel === idNivelSel))
+      .filter((g) => (idGradoSel == null ? true : g.idGrado === idGradoSel))
+      .map((g) => ({
+        ...g,
+        secciones: g.secciones.filter(
+          (s) =>
+            s.nombre &&
+            (idAnio ? s.idAnio === idAnio : true) &&
+            (idTurnoSel == null || s.idTurno === idTurnoSel),
+        ),
+      }))
+      .filter((g) => g.secciones.length > 0)
+  }, [data, anioEfectivo, idNivelSel, idGradoSel, filtros.turno])
+
+  const hayFiltros =
+    anioDefId != null &&
+    (anioEfectivo !== String(anioDefId) ||
+      filtros.nivel !== "" ||
+      filtros.grado !== "" ||
+      filtros.turno !== "")
   // No alcanza con que exista un año: tiene que ser uno sobre el que se pueda
   // crear hoy (vigente o por comenzar ya iniciado).
   const faltaAnio = habilitados.length === 0
@@ -133,14 +334,59 @@ export function SeccionesEstructura({
             />
           }
         />
+        <div className="flex flex-wrap items-center gap-3">
+          <FilterSelect
+            label="Año escolar"
+            includeAll={false}
+            value={anioEfectivo || ""}
+            onValueChange={aplicarAnio}
+            options={aniosOptions}
+            className="min-w-48"
+          />
+          <FilterSelect
+            value={filtros.nivel}
+            onValueChange={aplicarNivel}
+            options={nivelesDisponibles}
+            allLabel="Todos los niveles"
+          />
+          <FilterSelect
+            value={filtros.grado}
+            onValueChange={aplicarGrado}
+            options={gradosDisponibles}
+            allLabel="Todos los grados"
+          />
+          <FilterSelect
+            value={filtros.turno}
+            onValueChange={aplicarTurno}
+            options={turnosDisponibles}
+            allLabel="Todos los turnos"
+          />
+          {hayFiltros && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="ml-auto text-muted-foreground"
+              onClick={limpiarFiltros}
+            >
+              <RotateCcw className="mr-1 size-3.5" />
+              Limpiar filtros
+            </Button>
+          )}
+        </div>
         <SeccionesPorNivel
-          grados={data ?? []}
+          grados={gradosFiltrados}
           niveles={niveles}
           turnos={turnos}
           isLoading={isLoading}
           isError={isError}
           puedeActualizar={puedeActualizar}
           onEditar={(grado, idTurno, idAnio) => setEditando({ grado, idTurno, idAnio })}
+          mensajeVacio={
+            hayFiltros
+              ? "No hay secciones que coincidan con los filtros seleccionados."
+              : undefined
+          }
         />
         {isError && (
           <Button variant="outline" size="sm" onClick={() => refetch()}>
