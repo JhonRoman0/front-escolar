@@ -84,7 +84,7 @@ import type {
   TurnoResponse,
 } from "@/lib/api/academico"
 import { ACCESO, ESTADO_ANIO, horaCorta } from "@/lib/api/academico"
-import { conflictosTurnos, type TurnoFranja } from "@/lib/turnos"
+import { type TurnoFranja } from "@/lib/turnos"
 import { rangoLectivo } from "@/lib/fechas"
 import {
   anioEscolarSchema,
@@ -511,8 +511,7 @@ function TurnosTab() {
   const puedeActualizar = usePuede("TURNOS", "ACTUALIZAR")
   const [editandoId, setEditandoId] = useState<number | null>(null)
 
-  // El solapamiento se calcula sobre lo guardado, así que la franja aparece
-  // después de guardar el turno que lo provoca, no mientras se tipea.
+  // Turnos activos guardados: el formulario los usa para que no se crucen.
   const franjas = useMemo<TurnoFranja[]>(
     () =>
       (data ?? [])
@@ -525,7 +524,6 @@ function TurnosTab() {
         })),
     [data],
   )
-  const conflictos = useMemo(() => conflictosTurnos(franjas), [franjas])
 
   return (
     <Card>
@@ -534,20 +532,6 @@ function TurnosTab() {
           titulo="Turnos"
           descripcion="Horarios de entrada y tardanza por turno"
         />
-        {conflictos.length > 0 && (
-          <div className="flex gap-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-amber-900 dark:border-amber-700/50 dark:bg-amber-500/10 dark:text-amber-300">
-            <TriangleAlert className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
-            <div className="space-y-1 text-sm">
-              <p className="font-medium">Hay turnos que se pisan</p>
-              {conflictos.map(({ anterior, siguiente }) => (
-                <p key={`${anterior.id}-${siguiente.id}`}>
-                  {anterior.nombre} termina a las {anterior.horaSalida} y {siguiente.nombre} empieza a las{" "}
-                  {siguiente.horaEntrada}. Corrige la hora de entrada de {siguiente.nombre}.
-                </p>
-              ))}
-            </div>
-          </div>
-        )}
         {isLoading ? (
           <CargandoTarjetas filas={2} />
         ) : isError ? (
