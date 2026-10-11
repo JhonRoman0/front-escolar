@@ -26,18 +26,25 @@ import { MENSAJE_CONTRASENA_SEGURA } from "@/lib/schemas/comun"
 
 interface CambiarContrasenaDialogProps {
   open: boolean
-  onOpenChange: (open: boolean) => void
+  onOpenChange?: (open: boolean) => void
+  /** Primer ingreso: el modal no se puede cerrar hasta cambiar la contraseña. */
+  obligatorio?: boolean
+  onCambiada?: () => void
+  onCerrarSesion?: () => void
 }
 
 /**
- * Modal de cambio voluntario de contraseña. Reutiliza la misma lógica que el
- * antiguo formulario embebido en Seguridad: el backend identifica al usuario
- * por el token de sesión (POST /auth/change-password); contraseña actual
- * incorrecta responde 400 y NO cierra sesión.
+ * Modal de cambio de contraseña. El backend identifica al usuario por el
+ * token de sesión (POST /auth/change-password); contraseña actual incorrecta
+ * responde 400 y NO cierra sesión. En modo obligatorio se usa para reemplazar
+ * la contraseña temporal enviada por correo.
  */
 export function CambiarContrasenaDialog({
   open,
   onOpenChange,
+  obligatorio = false,
+  onCambiada,
+  onCerrarSesion,
 }: CambiarContrasenaDialogProps) {
   const [enviando, setEnviando] = useState(false)
 
@@ -48,7 +55,7 @@ export function CambiarContrasenaDialog({
 
   function handleOpenChange(v: boolean) {
     if (!v) form.reset()
-    onOpenChange(v)
+    onOpenChange?.(v)
   }
 
   async function onSubmit(values: CambiarContrasenaValues) {
@@ -60,8 +67,13 @@ export function CambiarContrasenaDialog({
         nuevaContrasena: values.nuevaContrasena,
       })
       form.reset()
-      toast.success("Contraseña actualizada correctamente. Por seguridad, te recomendamos cerrar sesión y volver a ingresar.")
-      onOpenChange(false)
+      toast.success(
+        obligatorio
+          ? "Contraseña actualizada correctamente."
+          : "Contraseña actualizada correctamente. Por seguridad, te recomendamos cerrar sesión y volver a ingresar."
+      )
+      onCambiada?.()
+      onOpenChange?.(false)
     } catch (error) {
       toast.error(
         error instanceof Error && error.message
@@ -74,14 +86,17 @@ export function CambiarContrasenaDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-md">
+    // Sin onOpenChange en modo obligatorio: Escape y clic fuera no lo cierran.
+    <Dialog open={open} onOpenChange={obligatorio ? undefined : handleOpenChange}>
+      <DialogContent showCloseButton={!obligatorio} className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-lg font-semibold tracking-tight">
-            Cambiar contraseña
+            {obligatorio ? "Cambia tu contraseña" : "Cambiar contraseña"}
           </DialogTitle>
           <DialogDescription>
-            Ingresa tu contraseña actual y establece una nueva.
+            {obligatorio
+              ? "Por seguridad, debes reemplazar la contraseña temporal que recibiste por correo antes de continuar."
+              : "Ingresa tu contraseña actual y establece una nueva."}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" noValidate>
@@ -92,7 +107,7 @@ export function CambiarContrasenaDialog({
               <CampoContrasena
                 {...field}
                 error={fieldState.error}
-                label="Contraseña actual"
+                label={obligatorio ? "Contraseña temporal" : "Contraseña actual"}
                 placeholder="••••••••"
               />
             )}
@@ -121,9 +136,15 @@ export function CambiarContrasenaDialog({
             )}
           />
           <DialogFooter>
-            <DialogTrigger render={<Button variant="outline" />}>
-              Cancelar
-            </DialogTrigger>
+            {obligatorio ? (
+              <Button type="button" variant="outline" onClick={onCerrarSesion}>
+                Cerrar sesión
+              </Button>
+            ) : (
+              <DialogTrigger render={<Button variant="outline" />}>
+                Cancelar
+              </DialogTrigger>
+            )}
             <BotonGuardar etiqueta="Cambiar contraseña" enviando={enviando} />
           </DialogFooter>
         </form>

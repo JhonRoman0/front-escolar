@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import { Loader2 } from "lucide-react"
+import { useQueryClient } from "@tanstack/react-query"
 
 import { authApi, type LoginRequest, type LoginResponse, type PermisosRolResponse, type UsuarioResponse } from "@/lib/api/auth"
 import {
@@ -16,6 +17,7 @@ import {
   setPermisosHash,
 } from "@/lib/api"
 import { PermisosActualizadosModal } from "@/components/seguridad/permisos-actualizados-modal"
+import { CambiarContrasenaDialog } from "@/components/cuenta/cambiar-contrasena-dialog"
 
 const RUTA_LOGIN = "/login"
 const INTERVALO_VERIFICACION_PERMISOS_MS = 30_000
@@ -50,6 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [permisosCambiados, setPermisosCambiados] = useState(false)
   const router = useRouter()
   const pathname = usePathname()
+  const queryClient = useQueryClient()
 
   useEffect(() => {
     let cancelado = false
@@ -174,9 +177,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     )
   }
 
+  // El sistema queda difuminado detrás del modal. Sus consultas fallan con 403
+  // mientras tanto, por eso se recargan al completar el cambio.
+  const cambioPendiente = !!usuario?.debeCambiarContrasena && !esRutaPublica(pathname)
+
+  function onContrasenaCambiada() {
+    setUsuario((u) => (u ? { ...u, debeCambiarContrasena: false } : u))
+    void queryClient.invalidateQueries()
+  }
+
   return (
     <AuthContext.Provider value={{ usuario, permisos, esAdmin, cargando, permisosCambiados, login, logout }}>
       {children}
+      {cambioPendiente && (
+        <CambiarContrasenaDialog
+          open
+          obligatorio
+          onCambiada={onContrasenaCambiada}
+          onCerrarSesion={logout}
+        />
+      )}
       {usuario && (
         <PermisosActualizadosModal
           abierto={permisosCambiados}
