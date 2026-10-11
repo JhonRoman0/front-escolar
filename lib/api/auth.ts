@@ -29,6 +29,7 @@ export interface UsuarioResponse {
   fechaBloqueo: string | null
   nombreRol: string | null
   roles: RolResponse[]
+  debeCambiarContrasena?: boolean
 }
 
 export interface PermisoAccionResponse {
