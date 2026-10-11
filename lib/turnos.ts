@@ -1,15 +1,10 @@
-// Orden y solapamiento de los turnos del colegio.
+// Orden de los turnos del colegio en la jornada.
 
 export interface TurnoFranja {
   id: number
   nombre: string
   horaEntrada: string
   horaSalida: string
-}
-
-export interface ConflictoTurnos {
-  anterior: TurnoFranja
-  siguiente: TurnoFranja
 }
 
 /** "HH:mm" con hora y minutos válidos. */
@@ -31,11 +26,7 @@ function ordenarTurnos(turnos: TurnoFranja[]): TurnoFranja[] {
     })
 }
 
-/**
- * Turno inmediatamente anterior en la jornada, o null si este es el primero.
- * Es el único con el que un turno puede solaparse: los que vienen después se
- * validan contra él, no al revés.
- */
+/** Turno inmediatamente anterior en la jornada, o null si este es el primero. */
 export function turnoAnterior(
   turnos: TurnoFranja[],
   idTurno: number,
@@ -46,17 +37,13 @@ export function turnoAnterior(
   return cadena[indice - 1]
 }
 
-/** Pares de turnos consecutivos cuyas ventanas de asistencia se pisan. */
-export function conflictosTurnos(turnos: TurnoFranja[]): ConflictoTurnos[] {
+/** Turno inmediatamente siguiente en la jornada, o null si este es el último. */
+export function turnoSiguiente(
+  turnos: TurnoFranja[],
+  idTurno: number,
+): TurnoFranja | null {
   const cadena = ordenarTurnos(turnos)
-  const conflictos: ConflictoTurnos[] = []
-  for (let i = 1; i < cadena.length; i++) {
-    const anterior = cadena[i - 1]
-    const siguiente = cadena[i]
-    // El empate está permitido: representa el cambio de turno.
-    if (siguiente.horaEntrada < anterior.horaSalida) {
-      conflictos.push({ anterior, siguiente })
-    }
-  }
-  return conflictos
+  const indice = cadena.findIndex((t) => t.id === idTurno)
+  if (indice < 0 || indice === cadena.length - 1) return null
+  return cadena[indice + 1]
 }

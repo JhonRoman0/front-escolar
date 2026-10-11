@@ -1,7 +1,7 @@
 import * as z from "zod"
 
 import { contrasenaSeguraOpcional, emailRequerido, MENSAJE_DNI, MENSAJE_SOLO_LETRAS_Y_ESPACIOS, REGEX_DNI, REGEX_SOLO_LETRAS_Y_ESPACIOS } from "@/lib/schemas/comun"
-import { esHoraValida, turnoAnterior, type TurnoFranja } from "@/lib/turnos"
+import { esHoraValida, turnoAnterior, turnoSiguiente, type TurnoFranja } from "@/lib/turnos"
 
 const accesoId = z.number().int().min(1, "Selecciona un estado").max(3)
 const REGEX_FECHA = /^\d{4}-\d{2}-\d{2}$/
@@ -115,25 +115,29 @@ export const crearTurnoSchema = (turnos: TurnoFranja[] = [], idTurno = -1) =>
           ctx.addIssue({ code: "custom", path: [campo], message: mensaje })
         }
       }
-      // Un turno solo se valida contra el que lo precede en la jornada, y el
-      // empate está permitido porque representa el cambio de turno: Mañana sale
-      // 12:30 y Tarde entra 12:30 es una configuración válida. Al revés no se
-      // comprueba, así que editar Mañana nunca falla por un turno posterior.
-      // La cadena se arma con las horas del formulario, no con las guardadas,
-      // para que al cambiar la hora de entrada el orden se recalcule al vuelo.
-      const anterior = turnoAnterior(
-        turnos.map((t) =>
-          t.id === idTurno
-            ? { ...t, horaEntrada: turno.horaEntrada, horaSalida: turno.horaSalida }
-            : t,
-        ),
-        idTurno,
+      // Un turno se compara con el anterior y el siguiente de la jornada, y
+      // entre ellos debe haber al menos un minuto: si Mañana sale 12:30, Tarde
+      // recién puede entrar 12:31. La cadena se arma con las horas del
+      // formulario, no con las guardadas, para que el orden se recalcule al vuelo.
+      const cadena = turnos.map((t) =>
+        t.id === idTurno
+          ? { ...t, horaEntrada: turno.horaEntrada, horaSalida: turno.horaSalida }
+          : t,
       )
-      if (anterior && turno.horaEntrada < anterior.horaSalida) {
+      const anterior = turnoAnterior(cadena, idTurno)
+      if (anterior && esHoraValida(turno.horaEntrada) && turno.horaEntrada <= anterior.horaSalida) {
         ctx.addIssue({
           code: "custom",
           path: ["horaEntrada"],
-          message: `No puede iniciar antes de que termine el turno ${anterior.nombre} (${anterior.horaSalida})`,
+          message: `Debe iniciar después de que termine el turno ${anterior.nombre} (${anterior.horaSalida})`,
+        })
+      }
+      const siguiente = turnoSiguiente(cadena, idTurno)
+      if (siguiente && esHoraValida(turno.horaSalida) && turno.horaSalida >= siguiente.horaEntrada) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["horaSalida"],
+          message: `Debe terminar antes de que empiece el turno ${siguiente.nombre} (${siguiente.horaEntrada})`,
         })
       }
     })
