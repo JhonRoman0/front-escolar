@@ -14,6 +14,7 @@ import { CampoTextoAcceso, botonAcceso } from "@/components/shared/campo-texto-a
 import { LayoutAcceso } from "@/components/shared/layout-acceso"
 import { EntradaCodigo } from "@/components/portal/public/entrada-codigo"
 import { authApi } from "@/lib/api/auth"
+import { ApiError } from "@/lib/api"
 import { contrasenaSegura } from "@/lib/schemas/comun"
 import { cn } from "@/lib/utils"
 
@@ -49,6 +50,19 @@ function formatearContador(segundos: number): string {
 
 function mensajeError(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback
+}
+
+const CODIGO_AGOTADO = "CODIGO_RECUPERACION_AGOTADO"
+
+function esCodigoAgotado(error: unknown): boolean {
+  return error instanceof ApiError && error.body?.codigo === CODIGO_AGOTADO
+}
+
+// 429 del backend: segundos que faltan para poder pedir otro código.
+function segundosDeEspera(error: unknown): number | null {
+  if (!(error instanceof ApiError) || error.status !== 429) return null
+  const segundos = Number(error.body?.segundosRestantes)
+  return Number.isFinite(segundos) && segundos > 0 ? segundos : null
 }
 
 export function RecuperarContrasenaWizard() {
@@ -106,7 +120,9 @@ export function RecuperarContrasenaWizard() {
     } catch (error) {
       const mensaje = mensajeError(error, "El código no es válido")
       toast.error(mensaje)
-      if (mensaje.toLowerCase().includes("expirado")) {
+      if (esCodigoAgotado(error)) {
+        setCodigo("")
+      } else if (mensaje.toLowerCase().includes("expirado")) {
         setSegundos(0)
       }
     } finally {
@@ -123,6 +139,8 @@ export function RecuperarContrasenaWizard() {
       toast.success("Se envió un nuevo código a tu correo")
     } catch (error) {
       toast.error(mensajeError(error, "No se pudo reenviar el código"))
+      const espera = segundosDeEspera(error)
+      if (espera) setSegundos(espera)
     } finally {
       setReenviando(false)
     }
