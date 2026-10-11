@@ -252,14 +252,17 @@ export default function UsuarioFormDialog({
     )
     try {
       if (esEdicion && usuario) {
-        await actualizar.mutateAsync({
+        const actualizado = await actualizar.mutateAsync({
           id: usuario.idUsuario,
           data: buildRequest(values),
         })
         if (fotoNueva) {
           await subirFoto.mutateAsync({ id: usuario.idUsuario, file: fotoNueva })
         }
-        toast.success("Usuario actualizado", { id: guardando })
+        toast.success(mensajeConCredenciales(actualizado, "Usuario actualizado"), { id: guardando })
+        if (actualizado.credencialesEnviadas === false) {
+          toast.warning("No se pudieron enviar las credenciales al correo del usuario", { id: guardando })
+        }
       } else {
         const creado = await crear.mutateAsync(buildRequest(values))
         const mensaje = mensajeConCredenciales(creado, "Usuario creado correctamente")

@@ -26,6 +26,8 @@ const formSchema = z.object({
 type LoginValues = z.infer<typeof formSchema>
 
 const MAX_INTENTOS_FALLIDOS = 5
+const MENSAJE_CUENTA_BLOQUEADA =
+  "Tu cuenta está bloqueada por intentos fallidos. Recupera tu contraseña o comunícate con el administrador."
 
 export function LoginForm() {
   const { login } = useAuth()
@@ -49,9 +51,10 @@ export function LoginForm() {
       toast.success("¡Bienvenido!")
     } catch (error) {
       if (error instanceof ApiError && error.status === 423) {
-        toast.error(
-          "Tu cuenta está bloqueada. Contacta al administrador."
-        )
+        toast.error(MENSAJE_CUENTA_BLOQUEADA)
+      } else if (error instanceof ApiError && error.status === 403) {
+        // Usuario inactivo: no cuenta como intento fallido.
+        toast.error(error.message)
       } else if (error instanceof ApiError && error.status === 401) {
         const nuevosFallos = fallos + 1
         setFallos(nuevosFallos)
@@ -63,7 +66,7 @@ export function LoginForm() {
           )
         } else {
           toast.error(
-            "Credenciales incorrectas. Tu cuenta quedó bloqueada. Contacta al administrador."
+            "Credenciales incorrectas. Tu cuenta quedó bloqueada. Recupera tu contraseña o comunícate con el administrador."
           )
         }
       } else {
