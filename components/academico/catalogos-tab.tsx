@@ -85,7 +85,7 @@ import type {
 } from "@/lib/api/academico"
 import { ACCESO, ESTADO_ANIO, horaCorta } from "@/lib/api/academico"
 import { type TurnoFranja } from "@/lib/turnos"
-import { rangoLectivo } from "@/lib/fechas"
+import { fechaHoyISO, rangoLectivo } from "@/lib/fechas"
 import {
   anioEscolarSchema,
   CAPACIDAD_MAX,
@@ -905,9 +905,15 @@ function AnioDialog({
       const congelada =
         form.getValues("estado") === ESTADO_ANIO.VIGENTE ||
         (esEdicion && anio?.estado === ESTADO_ANIO.VIGENTE)
-      const nuevoInicio = congelada || dentro(inicio) ? inicio : ""
+      // Un por comenzar no admite inicio el 31/12 ni fin fuera del año elegido.
+      const porComenzar = form.getValues("estado") === ESTADO_ANIO.POR_COMENZAR
+      const nuevoInicio =
+        (congelada || dentro(inicio)) && !(porComenzar && inicio === `${nuevoAnio}-12-31`) ? inicio : ""
       // El fin solo sobrevive si el inicio sobrevivió y sigue siendo posterior.
-      const nuevoFin = nuevoInicio && dentro(fin) && fin > nuevoInicio ? fin : ""
+      const nuevoFin =
+        nuevoInicio && dentro(fin) && fin > nuevoInicio && (!porComenzar || fin.startsWith(`${nuevoAnio}-`))
+          ? fin
+          : ""
       if (nuevoInicio !== inicio) form.setValue("fechaInicio", nuevoInicio)
       if (nuevoFin !== fin) form.setValue("fechaFin", nuevoFin)
     },
@@ -947,6 +953,25 @@ function AnioDialog({
   // misma regla en update().
   const yaEraVigente = esEdicion && estadoInicial === ESTADO_ANIO.VIGENTE
   const fechaInicioBloqueada = yaEraVigente || estadoForm === ESTADO_ANIO.VIGENTE
+
+  // Regla 4: un por comenzar no puede iniciar antes de hoy, así que los días
+  // pasados quedan deshabilitados en el calendario (espejo de
+  // validarInicioPorComenzarNoPasado del backend). El vigente no cambia.
+  const hoy = fechaHoyISO()
+  const esPorComenzar = estadoForm === ESTADO_ANIO.POR_COMENZAR
+  const minFechaInicio = esPorComenzar
+    ? rango?.min && rango.min > hoy ? rango.min : hoy
+    : rango?.min
+
+  // Regla 5: el fin de un por comenzar cae dentro del año elegido y nunca en
+  // un día pasado (espejo de validarFinEnElAnio). Por eso el inicio llega como
+  // máximo al 30/12: así siempre queda al menos un día para el fin.
+  const maxFechaInicio = esPorComenzar && rango ? `${anioSeleccionado}-12-30` : rango?.max
+  const minFechaFinCalendario = esPorComenzar
+    ? [rango ? `${anioSeleccionado}-01-01` : undefined, hoy, minFechaFin]
+        .filter((f): f is string => !!f)
+        .reduce((a, b) => (a > b ? a : b))
+    : minFechaFin ?? rango?.min
 
   useResetAlAbrir(
     open,
@@ -1124,11 +1149,11 @@ function AnioDialog({
                     descripcion={
                       fechaInicioBloqueada
                         ? "El año vigente no admite cambios en su fecha de inicio."
-                        : "Primer día de clases."
+                        : "Inicio del periodo escolar."
                     }
                     deshabilitado={fechaInicioBloqueada}
-                    min={rango?.min}
-                    max={rango?.max}
+                    min={minFechaInicio}
+                    max={maxFechaInicio}
                     error={form.formState.errors.fechaInicio}
                   />
                 )}
@@ -1141,8 +1166,8 @@ function AnioDialog({
                     label="Fecha de fin"
                     value={field.value ?? ""}
                     onChange={field.onChange}
-                    descripcion="Último día de clases."
-                    min={minFechaFin ?? rango?.min}
+                    descripcion="Fin del periodo escolar."
+                    min={minFechaFinCalendario}
                     max={rango?.max}
                     error={form.formState.errors.fechaFin}
                   />
