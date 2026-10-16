@@ -60,13 +60,22 @@ export interface TipoContratoResponse {
 
 export interface CursoResponse {
   idCurso: number
+  codigo: string
   nombre: string
   accesoId: number | null
 }
 
-interface CursoRequest {
+export interface CursoRequest {
+  codigo: string
   nombre: string
   accesoId?: number | null
+}
+
+export interface CursoImportResponse {
+  totalDetectados: number
+  creados: number
+  actualizados: number
+  cursos: CursoResponse[]
 }
 
 // ── Turno ────────────────────────────────────────────────────────────────
@@ -431,7 +440,23 @@ export const tiposContratoApi = {
   },
 }
 
-export const cursosApi = crud<CursoResponse, CursoRequest>("/cursos")
+export const cursosApi = {
+  ...crud<CursoResponse, CursoRequest>("/cursos"),
+  async cambiarEstado(idCurso: number, accesoId: number): Promise<CursoResponse> {
+    return apiFetch<CursoResponse>(`/cursos/${idCurso}/estado`, {
+      method: "PATCH",
+      body: JSON.stringify({ accesoId }),
+    })
+  },
+  async importarExcel(archivo: File): Promise<CursoImportResponse> {
+    const formData = new FormData()
+    formData.append("archivo", archivo)
+    return apiFetch<CursoImportResponse>("/cursos/importar-excel", {
+      method: "POST",
+      body: formData,
+    })
+  },
+}
 export const turnosApi = crud<TurnoResponse, TurnoRequest>("/turnos")
 export const gradosApi = {
   ...crud<GradoResponse, GradoRequest>("/grados"),

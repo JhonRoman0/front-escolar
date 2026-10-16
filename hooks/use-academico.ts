@@ -390,6 +390,23 @@ export function useCrudCursos() {
   )
 }
 
+export function useCambiarEstadoCurso() {
+  const invalidar = useInvalidarMutacion(KEYS.cursos)
+  return useMutation({
+    mutationFn: ({ id, accesoId }: { id: number; accesoId: number }) =>
+      cursosApi.cambiarEstado(id, accesoId),
+    onSuccess: invalidar,
+  })
+}
+
+export function useImportarCursosExcel() {
+  const invalidar = useInvalidarMutacion(KEYS.cursos)
+  return useMutation({
+    mutationFn: (archivo: File) => cursosApi.importarExcel(archivo),
+    onSuccess: invalidar,
+  })
+}
+
 export function useCrudTurnos() {
   return useCrud(
     KEYS.turnos,

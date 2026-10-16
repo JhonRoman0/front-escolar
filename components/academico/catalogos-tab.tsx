@@ -72,15 +72,12 @@ import {
   useCambiarEstadoAnioEscolar,
   useCrudAniosEscolares,
   useCrudAulas,
-  useCrudCursos,
   useCrudTurnos,
-  useCursos,
   useTurnos,
 } from "@/hooks/use-academico"
 import type {
   AnioEscolarResponse,
   AulaResponse,
-  CursoResponse,
   TurnoResponse,
 } from "@/lib/api/academico"
 import { ACCESO, ESTADO_ANIO, horaCorta } from "@/lib/api/academico"
@@ -92,12 +89,10 @@ import {
   CAPACIDAD_MIN,
   crearAulaSchema,
   crearTurnoSchema,
-  cursoSchema,
   LIMITE_NOMBRE_AULA,
   sanitizarNombreAula,
   type AnioEscolarValues,
   type AulaValues,
-  type CursoValues,
   type TurnoValues,
 } from "@/lib/schemas/academico"
 import { usePuede } from "@/hooks/use-permisos"
@@ -187,181 +182,7 @@ export default function CatalogosTab({
 
 // ── Cursos (export para top-level) ──────────────────────────────────────
 
-export function CursosTab() {
-  const { data, isLoading, isError, refetch } = useCursos()
-  const crud = useCrudCursos()
-  const puedeCrear = usePuede("CURSOS", "CREAR")
-  const puedeActualizar = usePuede("CURSOS", "ACTUALIZAR")
-  const puedeEliminar = usePuede("CURSOS", "ELIMINAR")
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [editando, setEditando] = useState<CursoResponse | null>(null)
-
-  const eliminarConToast = useEliminarConToast()
-
-  function handleEliminar(curso: CursoResponse) {
-    return eliminarConToast(crud.eliminar.mutateAsync, {
-      id: curso.idCurso,
-      mensaje: `Curso "${curso.nombre}" eliminado`,
-    })
-  }
-
-  return (
-    <Card>
-      <CardContent className="flex flex-col gap-4 p-4">
-        <HeaderSeccion
-          titulo="Cursos"
-          descripcion="Las materias que se dictan (Matemática, Comunicación...)."
-          acciones={
-            <BotonNuevo
-              texto="Nuevo curso"
-              puedeCrear={puedeCrear}
-              onClick={() => {
-                setEditando(null)
-                setDialogOpen(true)
-              }}
-            />
-          }
-        />
-        <div className="overflow-x-auto rounded-lg border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Curso</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                <FilasCargando columnas={3} />
-              ) : isError ? (
-                <MensajeSinDatos columnas={3} mensaje="No se pudo cargar. Recarga la pantalla." />
-              ) : !data?.length ? (
-                <MensajeSinDatos columnas={3} mensaje="Aún no hay cursos." />
-              ) : (
-                data.map((curso) => (
-                  <TableRow key={curso.idCurso}>
-                    <TableCell className="font-medium">{curso.nombre}</TableCell>
-                    <TableCell>
-                      <EstadoBadge accesoId={curso.accesoId} />
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <AccionesFila
-                        puedeActualizar={puedeActualizar}
-                        puedeEliminar={puedeEliminar}
-                        onEditar={() => {
-                          setEditando(curso)
-                          setDialogOpen(true)
-                        }}
-                        onEliminar={() => handleEliminar(curso)}
-                        tituloEliminar="Eliminar curso"
-                        descripcionEliminar={`Se marcará "${curso.nombre}" como eliminado.`}
-                        ariaEditar={`Editar ${curso.nombre}`}
-                      />
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
-        {isError && <BotonReintentar refetch={refetch} />}
-        <CursoDialog
-          open={dialogOpen}
-          onOpenChange={setDialogOpen}
-          curso={editando}
-          crear={crud.crear}
-          actualizar={crud.actualizar}
-        />
-      </CardContent>
-    </Card>
-  )
-}
-
-function CursoDialog({
-  open,
-  onOpenChange,
-  curso,
-  crear,
-  actualizar,
-}: {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  curso?: CursoResponse | null
-  crear: ReturnType<typeof useCrudCursos>["crear"]
-  actualizar: ReturnType<typeof useCrudCursos>["actualizar"]
-}) {
-  const esEdicion = !!curso
-  // Primitivos y no el objeto: un refetch de React Query devuelve una referencia
-  // nueva y con el objeto en las deps el reset se dispararía mientras se escribe.
-  const nombre = curso?.nombre ?? ""
-  const accesoId = curso?.accesoId ?? ACCESO.ACTIVO
-  const form = useForm<CursoValues>({
-    resolver: zodResolver(cursoSchema),
-    defaultValues: { nombre, accesoId },
-  })
-
-  useResetAlAbrir(open, form, { nombre, accesoId }, [nombre, accesoId])
-
-  async function onSubmit(values: CursoValues) {
-    await guardarConToast(async () => {
-      if (esEdicion && curso) {
-        await actualizar.mutateAsync({ id: curso.idCurso, data: { nombre: values.nombre, accesoId: values.accesoId } })
-        toast.success("Curso actualizado")
-      } else {
-        await crear.mutateAsync({ nombre: values.nombre })
-        toast.success("Curso creado")
-      }
-      onOpenChange(false)
-    })
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="text-lg font-semibold tracking-tight">{esEdicion ? "Editar curso" : "Nuevo curso"}</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5" noValidate>
-          <FieldGroup>
-            <Controller
-              control={form.control}
-              name="nombre"
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel>Nombre del curso</FieldLabel>
-                  <FieldContent>
-                    <Input placeholder="Matemática" autoFocus {...field} />
-                    <FieldDescription className="text-xs">Máx. 50 caracteres. Ej: Comunicación, Ciencia.</FieldDescription>
-                    <FieldError errors={[form.formState.errors.nombre]} />
-                  </FieldContent>
-                </Field>
-              )}
-            />
-            {esEdicion && (
-              <Controller
-                control={form.control}
-                name="accesoId"
-                render={({ field }) => (
-                  <Field>
-                    <FieldLabel>Estado</FieldLabel>
-                    <FieldContent>
-                      <CampoAcceso value={field.value} onChange={field.onChange} />
-                    </FieldContent>
-                  </Field>
-                )}
-              />
-            )}
-          </FieldGroup>
-          <DialogFooter>
-            <DialogTrigger render={<Button variant="outline" />}>Cancelar</DialogTrigger>
-            <BotonGuardar etiqueta={esEdicion ? "Guardar cambios" : "Crear curso"} enviando={crear.isPending || actualizar.isPending} />
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  )
-}
+export { CursosTab } from "./cursos-tab"
 
 // ── Aulas ────────────────────────────────────────────────────────────────
 

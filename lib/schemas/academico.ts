@@ -68,7 +68,16 @@ export type DocenteValues = z.infer<typeof docenteSchema>
 // ── Curso ────────────────────────────────────────────────────────────────
 
 export const cursoSchema = z.object({
-  nombre: z.string().min(1, "El nombre es requerido").max(50),
+  codigo: z
+    .string()
+    .trim()
+    .min(1, "El código es requerido")
+    .max(30, "El código no puede superar los 30 caracteres"),
+  nombre: z
+    .string()
+    .trim()
+    .min(1, "El nombre es requerido")
+    .max(100, "El nombre no puede superar los 100 caracteres"),
   accesoId: accesoId.optional(),
 })
 export type CursoValues = z.infer<typeof cursoSchema>
