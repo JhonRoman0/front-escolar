@@ -67,20 +67,16 @@ export type DocenteValues = z.infer<typeof docenteSchema>
 
 // ── Curso ────────────────────────────────────────────────────────────────
 
-export const cursoSchema = z.object({
-  codigo: z
-    .string()
-    .trim()
-    .min(1, "El código es requerido")
-    .max(30, "El código no puede superar los 30 caracteres"),
+// Las áreas vienen del Excel del SIAGIE: solo los subcursos se escriben a mano.
+export const subcursoSchema = z.object({
   nombre: z
     .string()
     .trim()
     .min(1, "El nombre es requerido")
-    .max(100, "El nombre no puede superar los 100 caracteres"),
-  accesoId: accesoId.optional(),
+    .max(150, "El nombre no puede superar los 150 caracteres"),
+  idCompetencias: z.array(z.number()).min(1, "Selecciona al menos una competencia"),
 })
-export type CursoValues = z.infer<typeof cursoSchema>
+export type SubcursoValues = z.infer<typeof subcursoSchema>
 
 // ── Turno ────────────────────────────────────────────────────────────────
 

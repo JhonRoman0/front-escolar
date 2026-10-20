@@ -22,9 +22,11 @@ import {
   suspensionesApi,
   tiposContratoApi,
   turnosApi,
+  type CursoCopiaRequest,
   type DocenteRequest,
   type SeccionRequest,
   type SeccionesBatchRequest,
+  type SubcursoRequest,
   type SuspensionRequest,
 } from "@/lib/api/academico"
 
@@ -82,10 +84,15 @@ export function useDocenteDeUsuario(idUsuario: number | null | undefined) {
   return docentes.find((d) => d.idUsuario === idUsuario) ?? null
 }
 
-export function useCursos() {
+/**
+ * Sin filtros trae todos los cursos de todos los años (lo usa Asignaciones).
+ * Con filtros espera a tener año y nivel para no traer la lista completa.
+ */
+export function useCursos(filtros?: { idAnio: number | null; idNivel: number | null }) {
   return useQuery({
-    queryKey: KEYS.cursos,
-    queryFn: cursosApi.listar,
+    queryKey: [...KEYS.cursos, filtros?.idAnio ?? null, filtros?.idNivel ?? null],
+    queryFn: () => cursosApi.listar(filtros?.idAnio, filtros?.idNivel),
+    enabled: !filtros || (!!filtros.idAnio && !!filtros.idNivel),
     staleTime: 1000 * 60 * 30,
   })
 }
@@ -380,15 +387,8 @@ export function useEliminarFotoDocente() {
   })
 }
 
-export function useCrudCursos() {
-  return useCrud(
-    KEYS.cursos,
-    [],
-    cursosApi.crear,
-    ({ id, data }) => cursosApi.actualizar(id, data),
-    (id) => cursosApi.eliminar(id)
-  )
-}
+// Importar, copiar y cambiar subcursos también tocan las competencias.
+const KEY_COMPETENCIAS = ["competencias"] as const
 
 export function useCambiarEstadoCurso() {
   const invalidar = useInvalidarMutacion(KEYS.cursos)
@@ -399,10 +399,53 @@ export function useCambiarEstadoCurso() {
   })
 }
 
-export function useImportarCursosExcel() {
+export function useCambiarSubcursos() {
+  const invalidar = useInvalidarMutacion(KEYS.cursos, KEY_COMPETENCIAS)
+  return useMutation({
+    mutationFn: ({ id, tieneSubcursos }: { id: number; tieneSubcursos: boolean }) =>
+      cursosApi.cambiarSubcursos(id, tieneSubcursos),
+    onSuccess: invalidar,
+  })
+}
+
+export function useGuardarSubcurso() {
+  const invalidar = useInvalidarMutacion(KEYS.cursos, KEY_COMPETENCIAS)
+  return useMutation({
+    // Con idSubcurso edita; sin él crea dentro del área.
+    mutationFn: ({ idArea, idSubcurso, data }: { idArea: number; idSubcurso?: number; data: SubcursoRequest }) =>
+      idSubcurso ? cursosApi.actualizarSubcurso(idSubcurso, data) : cursosApi.crearSubcurso(idArea, data),
+    onSuccess: invalidar,
+  })
+}
+
+export function useEliminarCurso() {
   const invalidar = useInvalidarMutacion(KEYS.cursos)
   return useMutation({
-    mutationFn: (archivo: File) => cursosApi.importarExcel(archivo),
+    mutationFn: (id: number) => cursosApi.eliminar(id),
+    onSuccess: invalidar,
+  })
+}
+
+export function useVistaPreviaCursos() {
+  return useMutation({
+    mutationFn: ({ archivo, idAnio }: { archivo: File; idAnio: number }) =>
+      cursosApi.vistaPrevia(archivo, idAnio),
+  })
+}
+
+export function useImportarCursos() {
+  const invalidar = useInvalidarMutacion(KEYS.cursos, KEY_COMPETENCIAS)
+  return useMutation({
+    mutationFn: ({ archivo, idAnio }: { archivo: File; idAnio: number }) =>
+      cursosApi.importar(archivo, idAnio),
+    onSuccess: invalidar,
+  })
+}
+
+export function useCopiarCursos() {
+  const invalidar = useInvalidarMutacion(KEYS.cursos, KEY_COMPETENCIAS)
+  return useMutation({
+    mutationFn: (data: CursoCopiaRequest) => cursosApi.copiar(data),
     onSuccess: invalidar,
   })
 }

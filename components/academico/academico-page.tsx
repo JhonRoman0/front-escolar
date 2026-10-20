@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import DocentesTab from "./docentes-tab"
 import CatalogosTab, { CursosTab } from "./catalogos-tab"
 import AsignacionesTab from "./asignaciones-tab"
+import { CompetenciasTab } from "./competencias-tab"
 import SuspensionesTab from "./suspensiones-tab"
 import CambiosDocenteTab from "./cambios-docente-tab"
 import RecreosTab from "./recreos-tab"
@@ -13,6 +14,7 @@ import { usePuedeLeer } from "@/hooks/use-permisos"
 export default function AcademicoPage() {
   const puedeDocentes = usePuedeLeer("DOCENTES")
   const puedeCursos = usePuedeLeer("CURSOS")
+  const puedeCompetencias = usePuedeLeer("COMPETENCIAS")
   const puedeTurnos = usePuedeLeer("TURNOS")
   const puedeAnios = usePuedeLeer("ANIOS_ESCOLARES")
   const puedeAulas = usePuedeLeer("AULAS")
@@ -42,6 +44,7 @@ export default function AcademicoPage() {
           {tieneEstructura && <TabsTrigger value="estructura">Estructura académica</TabsTrigger>}
           {puedeDocentes && <TabsTrigger value="docentes">Docentes</TabsTrigger>}
           {puedeCursos && <TabsTrigger value="cursos">Cursos</TabsTrigger>}
+          {puedeCompetencias && <TabsTrigger value="competencias">Competencias</TabsTrigger>}
           {puedeAsignaciones && <TabsTrigger value="asignaciones">Asignaciones</TabsTrigger>}
           {puedeRecreos && <TabsTrigger value="recreos">Recreos</TabsTrigger>}
           {puedeSuspensiones && <TabsTrigger value="suspensiones">Suspensiones</TabsTrigger>}
@@ -66,6 +69,11 @@ export default function AcademicoPage() {
         {puedeCursos && (
           <TabsContent value="cursos">
             <CursosTab />
+          </TabsContent>
+        )}
+        {puedeCompetencias && (
+          <TabsContent value="competencias">
+            <CompetenciasTab />
           </TabsContent>
         )}
         {puedeAsignaciones && (

@@ -1,9 +1,11 @@
 import { apiFetch } from "@/lib/api"
 
-// ── Competencia (catálogo, solo lectura) ──────────────────────────────────
+// ── Competencia (viene del Excel del SIAGIE: solo se activa o desactiva) ──
 
 export interface CompetenciaResponse {
   idCompetencia: number
+  /** Número de la LEYENDA del SIAGIE ("01", "02"...). */
+  codigo: string
   competencia: string
   idCurso: number
   curso: string
@@ -118,6 +120,12 @@ export const competenciasApi = {
     return apiFetch<CompetenciaResponse[]>(
       `/competencias${query ? `?${query}` : ""}`
     )
+  },
+  async cambiarEstado(idCompetencia: number, accesoId: number): Promise<CompetenciaResponse> {
+    return apiFetch<CompetenciaResponse>(`/competencias/${idCompetencia}/estado`, {
+      method: "PATCH",
+      body: JSON.stringify({ accesoId }),
+    })
   },
 }
 

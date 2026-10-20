@@ -58,24 +58,62 @@ export interface TipoContratoResponse {
 
 // ── Curso ────────────────────────────────────────────────────────────────
 
+// AREA y TRANSVERSAL vienen del Excel del SIAGIE; SUBCURSO lo crea el colegio.
+export type TipoCurso = "AREA" | "TRANSVERSAL" | "SUBCURSO"
+
 export interface CursoResponse {
   idCurso: number
-  codigo: string
+  /** Código MINEDU ("063: MATE"). Los subcursos no tienen. */
+  codigo: string | null
   nombre: string
   accesoId: number | null
-}
-
-export interface CursoRequest {
-  codigo: string
-  nombre: string
-  accesoId?: number | null
+  idAnio: number
+  anio: string
+  idNivel: number
+  nivel: string
+  tipo: TipoCurso
+  tieneSubcursos: boolean
+  idCursoPadre: number | null
+  /** Competencias activas del área o transversal. */
+  cantidadCompetencias: number
+  /** Solo subcursos: competencias del área que evalúa. */
+  idCompetencias: number[]
 }
 
 export interface CursoImportResponse {
   totalDetectados: number
   creados: number
   actualizados: number
+  inactivados: number
   cursos: CursoResponse[]
+}
+
+export interface CursoVistaPreviaResponse {
+  idNivel: number
+  nivel: string
+  nivelArchivo: string
+  anioArchivo: string | null
+  periodoArchivo: string | null
+  areas: {
+    codigo: string
+    nombre: string
+    tipo: TipoCurso
+    accion: "NUEVA" | "ACTUALIZA"
+    competencias: { codigo: string; nombre: string }[]
+  }[]
+  seInactivan: string[]
+  advertencias: string[]
+}
+
+export interface CursoCopiaRequest {
+  idAnioOrigen: number
+  idAnioDestino: number
+  idNivel: number
+}
+
+export interface SubcursoRequest {
+  nombre: string
+  idCompetencias: number[]
 }
 
 // ── Turno ────────────────────────────────────────────────────────────────
@@ -440,20 +478,67 @@ export const tiposContratoApi = {
   },
 }
 
+function formularioImportacion(archivo: File, idAnio: number): FormData {
+  const formData = new FormData()
+  formData.append("archivo", archivo)
+  formData.append("idAnio", String(idAnio))
+  return formData
+}
+
+// Las áreas no se crean ni editan a mano: entran importando el Excel del
+// SIAGIE o copiando otro año. Lo único que se escribe son los subcursos.
 export const cursosApi = {
-  ...crud<CursoResponse, CursoRequest>("/cursos"),
+  /** Sin filtros trae todos los cursos (lo usa Asignaciones). */
+  async listar(idAnio?: number | null, idNivel?: number | null): Promise<CursoResponse[]> {
+    const params = new URLSearchParams()
+    if (idAnio) params.set("idAnio", String(idAnio))
+    if (idNivel) params.set("idNivel", String(idNivel))
+    const query = params.toString()
+    return apiFetch<CursoResponse[]>(`/cursos${query ? `?${query}` : ""}`)
+  },
   async cambiarEstado(idCurso: number, accesoId: number): Promise<CursoResponse> {
     return apiFetch<CursoResponse>(`/cursos/${idCurso}/estado`, {
       method: "PATCH",
       body: JSON.stringify({ accesoId }),
     })
   },
-  async importarExcel(archivo: File): Promise<CursoImportResponse> {
-    const formData = new FormData()
-    formData.append("archivo", archivo)
-    return apiFetch<CursoImportResponse>("/cursos/importar-excel", {
+  async cambiarSubcursos(idCurso: number, tieneSubcursos: boolean): Promise<CursoResponse> {
+    return apiFetch<CursoResponse>(`/cursos/${idCurso}/subcursos`, {
+      method: "PATCH",
+      body: JSON.stringify({ tieneSubcursos }),
+    })
+  },
+  async crearSubcurso(idArea: number, data: SubcursoRequest): Promise<CursoResponse> {
+    return apiFetch<CursoResponse>(`/cursos/${idArea}/subcursos`, {
       method: "POST",
-      body: formData,
+      body: JSON.stringify(data),
+    })
+  },
+  async actualizarSubcurso(idSubcurso: number, data: SubcursoRequest): Promise<CursoResponse> {
+    return apiFetch<CursoResponse>(`/cursos/${idSubcurso}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    })
+  },
+  async eliminar(idCurso: number): Promise<void> {
+    return apiFetch<void>(`/cursos/${idCurso}`, { method: "DELETE" })
+  },
+  async vistaPrevia(archivo: File, idAnio: number): Promise<CursoVistaPreviaResponse> {
+    return apiFetch<CursoVistaPreviaResponse>("/cursos/importar/vista-previa", {
+      method: "POST",
+      body: formularioImportacion(archivo, idAnio),
+    })
+  },
+  async importar(archivo: File, idAnio: number): Promise<CursoImportResponse> {
+    return apiFetch<CursoImportResponse>("/cursos/importar", {
+      method: "POST",
+      body: formularioImportacion(archivo, idAnio),
+    })
+  },
+  async copiar(data: CursoCopiaRequest): Promise<CursoResponse[]> {
+    return apiFetch<CursoResponse[]>("/cursos/copiar", {
+      method: "POST",
+      body: JSON.stringify(data),
     })
   },
 }
