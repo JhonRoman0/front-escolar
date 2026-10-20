@@ -335,8 +335,12 @@ const CAMPOS_TURNO: {
 function TurnosTab() {
   const { data, isLoading, isError, refetch } = useTurnos()
   const crud = useCrudTurnos()
+  const puedeCrear = usePuede("TURNOS", "CREAR")
   const puedeActualizar = usePuede("TURNOS", "ACTUALIZAR")
+  const puedeEliminar = usePuede("TURNOS", "ELIMINAR")
   const [editandoId, setEditandoId] = useState<number | null>(null)
+  const [nuevoOpen, setNuevoOpen] = useState(false)
+  const eliminarConToast = useEliminarConToast()
 
   // Turnos activos guardados: el formulario los usa para que no se crucen.
   const franjas = useMemo<TurnoFranja[]>(
@@ -358,6 +362,7 @@ function TurnosTab() {
         <HeaderSeccion
           titulo="Turnos"
           descripcion="Horarios de entrada y tardanza por turno"
+          acciones={<BotonNuevo texto="Nuevo turno" puedeCrear={puedeCrear} onClick={() => setNuevoOpen(true)} />}
         />
         {isLoading ? (
           <CargandoTarjetas filas={2} />
@@ -373,16 +378,26 @@ function TurnosTab() {
                 turno={turno}
                 franjas={franjas}
                 puedeEditar={puedeActualizar}
+                puedeEliminar={puedeEliminar}
                 editando={editandoId === turno.idTurno}
                 onEditar={() => setEditandoId(turno.idTurno)}
                 onCancelar={() => setEditandoId(null)}
                 actualizar={crud.actualizar}
+                onEliminar={() =>
+                  eliminarConToast(crud.eliminar.mutateAsync, {
+                    id: turno.idTurno,
+                    mensaje: `Turno "${turno.nombre}" eliminado`,
+                  })
+                }
               />
             ))}
           </div>
         )}
         {isError && (
           <div><BotonReintentar refetch={refetch} /></div>
+        )}
+        {nuevoOpen && (
+          <NuevoTurnoDialog onOpenChange={setNuevoOpen} franjas={franjas} crear={crud.crear} />
         )}
       </CardContent>
     </Card>
@@ -402,18 +417,22 @@ function TurnoCard({
   turno,
   franjas,
   puedeEditar,
+  puedeEliminar,
   editando,
   onEditar,
   onCancelar,
   actualizar,
+  onEliminar,
 }: {
   turno: TurnoResponse
   franjas: TurnoFranja[]
   puedeEditar: boolean
+  puedeEliminar: boolean
   editando: boolean
   onEditar: () => void
   onCancelar: () => void
   actualizar: ReturnType<typeof useCrudTurnos>["actualizar"]
+  onEliminar: () => Promise<void>
 }) {
   // El turno se valida contra el que lo precede en la jornada. Editar el
   // primero de la cadena nunca falla por los que vienen después.
@@ -471,10 +490,21 @@ function TurnoCard({
           <Icono className="size-4 text-muted-foreground" />
           <span className="text-sm font-medium">{turno.nombre}</span>
         </div>
-        {puedeEditar && !editando && (
-          <Button variant="outline" size="sm" onClick={editar}>
-            <Pencil /> Editar
-          </Button>
+        {!editando && (puedeEditar || puedeEliminar) && (
+          <div className="flex items-center gap-2">
+            {puedeEditar && (
+              <Button variant="outline" size="sm" onClick={editar}>
+                <Pencil /> Editar
+              </Button>
+            )}
+            {puedeEliminar && (
+              <ConfirmarEliminar
+                titulo={`Eliminar el turno ${turno.nombre}`}
+                descripcion={`Se eliminará el turno "${turno.nombre}". No se puede si tiene secciones o recreos.`}
+                onConfirm={onEliminar}
+              />
+            )}
+          </div>
         )}
       </div>
       {editando ? (
@@ -527,6 +557,93 @@ function TurnoCard({
         </div>
       )}
     </div>
+  )
+}
+
+// Id con el que un turno nuevo entra a la cadena: va después de los que
+// empiezan a la misma hora, igual que en el backend (TurnoService.create).
+const ID_TURNO_NUEVO = Number.MAX_SAFE_INTEGER
+
+function NuevoTurnoDialog({
+  onOpenChange,
+  franjas,
+  crear,
+}: {
+  onOpenChange: (open: boolean) => void
+  franjas: TurnoFranja[]
+  crear: ReturnType<typeof useCrudTurnos>["crear"]
+}) {
+  const schema = useMemo(() => crearTurnoSchema(franjas, ID_TURNO_NUEVO), [franjas])
+  const form = useForm<TurnoValues>({
+    resolver: zodResolver(schema),
+    defaultValues: {
+      nombre: "",
+      horaEntrada: "",
+      horaEntradaLimite: "",
+      horaFaltaLimite: "",
+      horaSalida: "",
+      accesoId: ACCESO.ACTIVO,
+    },
+  })
+
+  async function guardar(values: TurnoValues) {
+    await guardarConToast(async () => {
+      await crear.mutateAsync({ ...values, nombre: values.nombre.trim() })
+      toast.success(`Turno "${values.nombre.trim()}" creado`)
+      onOpenChange(false)
+    })
+  }
+
+  return (
+    <Dialog open onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="text-lg font-semibold tracking-tight">Nuevo turno</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={form.handleSubmit(guardar)} className="space-y-5" noValidate>
+          <FieldGroup>
+            <Controller
+              control={form.control}
+              name="nombre"
+              render={({ field }) => (
+                <Field>
+                  <FieldLabel>Nombre del turno</FieldLabel>
+                  <FieldContent>
+                    <Input placeholder="Ej: Noche" autoFocus maxLength={50} {...field} />
+                    <FieldError errors={[form.formState.errors.nombre]} />
+                  </FieldContent>
+                </Field>
+              )}
+            />
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {CAMPOS_TURNO.map((campo) => (
+                <Controller
+                  key={campo.name}
+                  control={form.control}
+                  name={campo.name}
+                  render={({ field }) => (
+                    <Field>
+                      <FieldLabel>{campo.label}</FieldLabel>
+                      <FieldContent>
+                        <Input type="time" {...field} />
+                        <FieldDescription className="text-xs">{campo.descripcion}</FieldDescription>
+                        <FieldError errors={[form.formState.errors[campo.name]]} />
+                      </FieldContent>
+                    </Field>
+                  )}
+                />
+              ))}
+            </div>
+          </FieldGroup>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancelar
+            </Button>
+            <BotonGuardar etiqueta="Crear turno" enviando={crear.isPending} />
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   )
 }
 

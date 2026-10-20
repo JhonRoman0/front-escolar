@@ -129,6 +129,10 @@ export const crearTurnoSchema = (turnos: TurnoFranja[] = [], idTurno = -1) =>
           ? { ...t, horaEntrada: turno.horaEntrada, horaSalida: turno.horaSalida }
           : t,
       )
+      // Un turno nuevo todavía no está en la lista: entra con las horas del formulario.
+      if (!turnos.some((t) => t.id === idTurno)) {
+        cadena.push({ id: idTurno, nombre: turno.nombre, horaEntrada: turno.horaEntrada, horaSalida: turno.horaSalida })
+      }
       const anterior = turnoAnterior(cadena, idTurno)
       if (anterior && esHoraValida(turno.horaEntrada) && turno.horaEntrada <= anterior.horaSalida) {
         ctx.addIssue({
