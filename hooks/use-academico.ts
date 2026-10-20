@@ -24,6 +24,8 @@ import {
   turnosApi,
   type CursoCopiaRequest,
   type DocenteRequest,
+  type RecreoRequest,
+  type RecreoUpdateRequest,
   type SeccionRequest,
   type SeccionesBatchRequest,
   type SubcursoRequest,
@@ -169,6 +171,16 @@ export function useGradosPorNivel(idNivel: number | null) {
     queryKey: [...KEYS.grados, "nivel", idNivel],
     queryFn: () => gradosApi.porNivel(idNivel as number),
     enabled: !!idNivel,
+    staleTime: 1000 * 60 * 10,
+  })
+}
+
+/** Grados del nivel con secciones en ese año (cada sección trae su turno). */
+export function useGradosDelAnio(idNivel: number | null, idAnio: number | null) {
+  return useQuery({
+    queryKey: [...KEYS.grados, "nivel", idNivel, "anio", idAnio],
+    queryFn: () => gradosApi.porNivel(idNivel as number, idAnio),
+    enabled: !!idNivel && !!idAnio,
     staleTime: 1000 * 60 * 10,
   })
 }
@@ -320,31 +332,47 @@ export function useCambiosDocente() {
 
 // ── Recreos ──────────────────────────────────────────────────────────────
 
-export function useRecreos() {
+/** Espera a tener el año para no traer los recreos de todos los años. */
+export function useRecreos(filtros: { idAnio: number | null; idNivel?: number | null; idTurno?: number | null }) {
   return useQuery({
-    queryKey: KEYS.recreos,
-    queryFn: recreosApi.listar,
-    staleTime: 1000 * 60 * 30,
-  })
-}
-
-export function useRecreosPorNivel(idNivel: number | null) {
-  return useQuery({
-    queryKey: [...KEYS.recreos, "nivel", idNivel],
-    queryFn: () => recreosApi.porNivel(idNivel as number),
-    enabled: !!idNivel,
+    queryKey: [...KEYS.recreos, filtros.idAnio, filtros.idNivel ?? null, filtros.idTurno ?? null],
+    queryFn: () => recreosApi.listar(filtros),
+    enabled: !!filtros.idAnio,
     staleTime: 1000 * 60 * 10,
   })
 }
 
-export function useCrudRecreos() {
-  return useCrud(
-    KEYS.recreos,
-    [],
-    recreosApi.crear,
-    ({ id, data }) => recreosApi.actualizar(id, data),
-    (id) => recreosApi.eliminar(id)
-  )
+export function useCrearRecreos() {
+  const invalidar = useInvalidarMutacion(KEYS.recreos)
+  return useMutation({
+    mutationFn: (data: RecreoRequest) => recreosApi.crear(data),
+    onSuccess: invalidar,
+  })
+}
+
+export function useActualizarRecreo() {
+  const invalidar = useInvalidarMutacion(KEYS.recreos)
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: RecreoUpdateRequest }) => recreosApi.actualizar(id, data),
+    onSuccess: invalidar,
+  })
+}
+
+export function useEliminarRecreo() {
+  const invalidar = useInvalidarMutacion(KEYS.recreos)
+  return useMutation({
+    mutationFn: (id: number) => recreosApi.eliminar(id),
+    onSuccess: invalidar,
+  })
+}
+
+export function useEliminarRecreosDelGrado() {
+  const invalidar = useInvalidarMutacion(KEYS.recreos)
+  return useMutation({
+    mutationFn: ({ idAnio, idTurno, idGrado }: { idAnio: number; idTurno: number; idGrado: number }) =>
+      recreosApi.eliminarDelGrado(idAnio, idTurno, idGrado),
+    onSuccess: invalidar,
+  })
 }
 
 // ── Mutaciones ───────────────────────────────────────────────────────────

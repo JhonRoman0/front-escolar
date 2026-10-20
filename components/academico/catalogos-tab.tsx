@@ -38,6 +38,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Switch } from "@/components/ui/switch"
 import {
   Table,
   TableBody,
@@ -274,7 +275,12 @@ function AulasTab() {
               ) : (
                 aulasFiltradas.map((aula) => (
                   <TableRow key={aula.idAula}>
-                    <TableCell className="font-medium">{aula.nombre}</TableCell>
+                    <TableCell className="font-medium">
+                      <span className="flex items-center gap-2">
+                        {aula.nombre}
+                        {aula.usoCompartido && <Badge variant="info">Compartido</Badge>}
+                      </span>
+                    </TableCell>
                     <TableCell>{aula.capacidad ?? "—"}</TableCell>
                     <TableCell>
                       <EstadoBadge accesoId={aula.accesoId} />
@@ -1050,6 +1056,7 @@ function AulaDialog({
   // nueva y con el objeto en las deps el reset se dispararía mientras se escribe.
   const nombre = aula?.nombre ?? ""
   const capacidad = aula?.capacidad ?? undefined
+  const usoCompartido = aula?.usoCompartido ?? false
   const accesoId = aula?.accesoId ?? ACCESO.ACTIVO
   // La lista de nombres llega filtrada desde AulasTab; el schema se rearma
   // cuando cambia, por lo que crear y editar comparan contra lo que corresponde.
@@ -1059,10 +1066,15 @@ function AulaDialog({
     // Con onChange el duplicado y el resto de reglas se avisan mientras se
     // escribe, sin esperar a pulsar Guardar.
     mode: "onChange",
-    defaultValues: { nombre, capacidad, accesoId },
+    defaultValues: { nombre, capacidad, usoCompartido, accesoId },
   })
 
-  useResetAlAbrir(open, form, { nombre, capacidad, accesoId }, [nombre, capacidad, accesoId])
+  useResetAlAbrir(
+    open,
+    form,
+    { nombre, capacidad, usoCompartido, accesoId },
+    [nombre, capacidad, usoCompartido, accesoId]
+  )
 
   async function onSubmit(values: AulaValues) {
     await guardarConToast(async () => {
@@ -1081,6 +1093,21 @@ function AulaDialog({
           <FieldGroup>
             <Controller control={form.control} name="nombre" render={({ field }) => (<Field><FieldLabel>Nombre del aula</FieldLabel><FieldContent><Input placeholder="Aula 101" autoFocus maxLength={LIMITE_NOMBRE_AULA} {...field} onChange={(e) => field.onChange(sanitizarNombreAula(e.target.value))} /><FieldError errors={[form.formState.errors.nombre]} /></FieldContent></Field>)} />
             <Controller control={form.control} name="capacidad" render={({ field }) => (<Field><FieldLabel>Capacidad</FieldLabel><FieldContent><Input type="number" min={String(CAPACIDAD_MIN)} max={String(CAPACIDAD_MAX)} placeholder="30" value={field.value ?? ""} onChange={(e) => field.onChange(parsearCapacidad(e.target.value))} /><FieldDescription className="text-xs">Obligatorio. Entre {CAPACIDAD_MIN} y {CAPACIDAD_MAX} asientos.</FieldDescription><FieldError errors={[form.formState.errors.capacidad]} /></FieldContent></Field>)} />
+            <Controller
+              control={form.control}
+              name="usoCompartido"
+              render={({ field }) => (
+                <Field orientation="horizontal">
+                  <FieldContent>
+                    <FieldLabel>Uso compartido</FieldLabel>
+                    <FieldDescription className="text-xs">
+                      Patio, losa deportiva o auditorio: admite varias clases a la misma hora.
+                    </FieldDescription>
+                  </FieldContent>
+                  <Switch checked={field.value} onCheckedChange={field.onChange} aria-label="Uso compartido" />
+                </Field>
+              )}
+            />
             {esEdicion && <Controller control={form.control} name="accesoId" render={({ field }) => (<Field><FieldLabel>Estado</FieldLabel><FieldContent><CampoAcceso value={field.value} onChange={field.onChange} /></FieldContent></Field>)} />}
           </FieldGroup>
           <DialogFooter><DialogTrigger render={<Button variant="outline" />}>Cancelar</DialogTrigger><BotonGuardar etiqueta={esEdicion ? "Guardar cambios" : "Crear aula"} enviando={crear.isPending || actualizar.isPending} /></DialogFooter>

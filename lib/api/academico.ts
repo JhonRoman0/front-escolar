@@ -339,12 +339,15 @@ export interface AulaResponse {
   idAula: number
   nombre: string
   capacidad: number | null
+  /** Patio, losa o auditorio: admite varias clases a la misma hora. */
+  usoCompartido: boolean
   accesoId: number | null
 }
 
 interface AulaRequest {
   nombre: string
   capacidad: number
+  usoCompartido: boolean
   accesoId?: number | null
 }
 
@@ -410,6 +413,10 @@ export interface AsignacionResponse {
   idDocente: number
   docente: string
   idGradoSeccion: number
+  idNivel: number
+  nivel: string
+  idGrado: number
+  idTurno: number
   grado: string
   seccion: string
   turno: string
@@ -652,40 +659,65 @@ export const cambiosDocenteApi = {
 
 // ── Recreos ──────────────────────────────────────────────────────────────
 
+/** 1 = lunes ... 6 = sábado. El domingo no hay clases. */
+export const DIAS_CLASE = [
+  { value: 1, label: "Lunes", corto: "Lun" },
+  { value: 2, label: "Martes", corto: "Mar" },
+  { value: 3, label: "Miércoles", corto: "Mié" },
+  { value: 4, label: "Jueves", corto: "Jue" },
+  { value: 5, label: "Viernes", corto: "Vie" },
+  { value: 6, label: "Sábado", corto: "Sáb" },
+] as const
+
+/** Un recreo de un grado en un turno: aplica a todas sus secciones. */
 export interface RecreoResponse {
   idRecreo: number
+  idAnio: number
+  anio: string
   idNivel: number
   nivel: string
-  idGradoSeccion: number | null
-  gradoSeccion: string | null
+  idTurno: number
+  turno: string
+  idGrado: number
+  grado: string
   diaSemana: number
   horaInicio: string
   horaFin: string
   accesoId: number | null
 }
 
+/** Crea un recreo por cada combinación de grado, día y franja. */
 export interface RecreoRequest {
+  idAnio: number
   idNivel: number
-  idGradoSeccion?: number | null
+  idTurno: number
+  idGrados: number[]
+  dias: number[]
+  franjas: { horaInicio: string; horaFin: string }[]
+}
+
+export interface RecreoUpdateRequest {
   diaSemana: number
   horaInicio: string
   horaFin: string
 }
 
 export const recreosApi = {
-  async listar(): Promise<RecreoResponse[]> {
-    return apiFetch<RecreoResponse[]>("/recreos")
+  async listar(filtros: { idAnio?: number | null; idNivel?: number | null; idTurno?: number | null } = {}): Promise<RecreoResponse[]> {
+    const params = new URLSearchParams()
+    if (filtros.idAnio) params.set("idAnio", String(filtros.idAnio))
+    if (filtros.idNivel) params.set("idNivel", String(filtros.idNivel))
+    if (filtros.idTurno) params.set("idTurno", String(filtros.idTurno))
+    const query = params.toString()
+    return apiFetch<RecreoResponse[]>(`/recreos${query ? `?${query}` : ""}`)
   },
-  async porNivel(idNivel: number): Promise<RecreoResponse[]> {
-    return apiFetch<RecreoResponse[]>(`/recreos/nivel/${idNivel}`)
-  },
-  async crear(data: RecreoRequest): Promise<RecreoResponse> {
-    return apiFetch<RecreoResponse>("/recreos", {
+  async crear(data: RecreoRequest): Promise<RecreoResponse[]> {
+    return apiFetch<RecreoResponse[]>("/recreos", {
       method: "POST",
       body: JSON.stringify(data),
     })
   },
-  async actualizar(id: number, data: RecreoRequest): Promise<RecreoResponse> {
+  async actualizar(id: number, data: RecreoUpdateRequest): Promise<RecreoResponse> {
     return apiFetch<RecreoResponse>(`/recreos/${id}`, {
       method: "PUT",
       body: JSON.stringify(data),
@@ -693,5 +725,8 @@ export const recreosApi = {
   },
   async eliminar(id: number): Promise<void> {
     return apiFetch<void>(`/recreos/${id}`, { method: "DELETE" })
+  },
+  async eliminarDelGrado(idAnio: number, idTurno: number, idGrado: number): Promise<void> {
+    return apiFetch<void>(`/recreos/anio/${idAnio}/turno/${idTurno}/grado/${idGrado}`, { method: "DELETE" })
   },
 }

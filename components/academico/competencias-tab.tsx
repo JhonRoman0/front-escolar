@@ -87,8 +87,9 @@ export function CompetenciasTab() {
             options={areas.map((a) => ({ value: String(a.idCurso), label: a.nombre }))}
             includeAll={false}
             allLabel="Sin áreas"
-            className="min-w-[240px]"
+            className="w-full sm:w-[320px]"
             disabled={!areas.length}
+            opcionesLargas
           />
         </div>
 

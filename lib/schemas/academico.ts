@@ -341,6 +341,7 @@ const aulaSchemaBase = z.object({
     .int("La capacidad debe ser un número entero")
     .min(CAPACIDAD_MIN, "La capacidad debe ser al menos 1")
     .max(CAPACIDAD_MAX, "La capacidad máxima es 50"),
+  usoCompartido: z.boolean(),
   accesoId: accesoId.optional(),
 })
 export type AulaValues = z.infer<typeof aulaSchemaBase>
@@ -372,9 +373,10 @@ function normalizarNombreAula(nombre: string) {
 const horarioSchema = z
   .object({
     idAula: z.number().int().min(1, "Selecciona un aula"),
-    diaSemana: z.number().int().min(1).max(7),
-    horaInicio: hora,
-    horaFin: hora,
+    // Lunes (1) a sábado (6): el domingo no hay clases.
+    diaSemana: z.number().int().min(1).max(6, "El domingo no hay clases"),
+    horaInicio: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Elige la hora de inicio"),
+    horaFin: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Elige la hora de fin"),
   })
   .refine((h) => h.horaFin > h.horaInicio, {
     message: "La hora de fin debe ser posterior a la de inicio",
@@ -382,29 +384,32 @@ const horarioSchema = z
   })
 export type HorarioValues = z.infer<typeof horarioSchema>
 
+// Año, nivel y grado solo guían la cascada del formulario: al backend viajan
+// el año y la sección. El turno, el recreo y los cruces con otras clases los
+// valida el backend.
 export const asignacionSchema = z
   .object({
-    idCurso: z.number().int().min(1, "Selecciona un curso"),
+    idAnio: z.number().int().min(1, "Selecciona el año escolar"),
+    idNivel: z.number().int().min(1, "Selecciona el nivel"),
+    idGrado: z.number().int().min(1, "Selecciona el grado"),
+    idGradoSeccion: z.number().int().min(1, "Selecciona la sección"),
     idDocente: z.number().int().min(1, "Selecciona un docente"),
-    idGradoSeccion: z.number().int().min(0, "Selecciona el grado-sección"),
-    idAnio: z.number().int().min(1, "Selecciona un año escolar"),
+    idCurso: z.number().int().min(1, "Selecciona un curso"),
     horarios: z
       .array(horarioSchema)
       .min(1, "Indica al menos un horario"),
-    accesoId: accesoId.optional(),
   })
   .superRefine((val, ctx) => {
-    const choques = new Set<string>()
-    val.horarios.forEach((h, i) => {
-      const clave = `${h.diaSemana}-${h.horaInicio}-${h.horaFin}`
-      if (choques.has(clave)) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["horarios", i],
-          message: "Horarios repetidos en el mismo día",
-        })
-      }
-      choques.add(clave)
+    val.horarios.forEach((a, i) => {
+      val.horarios.slice(0, i).forEach((b) => {
+        if (a.diaSemana === b.diaSemana && a.horaInicio < b.horaFin && b.horaInicio < a.horaFin) {
+          ctx.addIssue({
+            code: "custom",
+            path: ["horarios", i, "horaInicio"],
+            message: "Se cruza con otro horario de esta asignación",
+          })
+        }
+      })
     })
   })
 export type AsignacionValues = z.infer<typeof asignacionSchema>
