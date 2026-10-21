@@ -37,10 +37,21 @@ export function useAsignacionesUsuario() {
 
 export function useCompetencias(idCurso?: number) {
   return useQuery({
-    queryKey: [KEYS.competencias, idCurso],
+    // Esparcido para que invalidar ["competencias"] alcance a todas las de cada curso.
+    queryKey: [...KEYS.competencias, idCurso],
     queryFn: () => competenciasApi.listar(idCurso),
     enabled: !!idCurso,
     staleTime: 1000 * 60 * 30,
+  })
+}
+
+export function useCambiarEstadoCompetencia() {
+  // Los cursos muestran cuántas competencias activas tienen.
+  const invalidar = useInvalidarMutacion(KEYS.competencias, ["cursos"])
+  return useMutation({
+    mutationFn: ({ id, accesoId }: { id: number; accesoId: number }) =>
+      competenciasApi.cambiarEstado(id, accesoId),
+    onSuccess: invalidar,
   })
 }
 

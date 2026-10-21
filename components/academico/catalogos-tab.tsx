@@ -38,6 +38,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Switch } from "@/components/ui/switch"
 import {
   Table,
   TableBody,
@@ -274,7 +275,12 @@ function AulasTab() {
               ) : (
                 aulasFiltradas.map((aula) => (
                   <TableRow key={aula.idAula}>
-                    <TableCell className="font-medium">{aula.nombre}</TableCell>
+                    <TableCell className="font-medium">
+                      <span className="flex items-center gap-2">
+                        {aula.nombre}
+                        {aula.usoCompartido && <Badge variant="info">Compartido</Badge>}
+                      </span>
+                    </TableCell>
                     <TableCell>{aula.capacidad ?? "—"}</TableCell>
                     <TableCell>
                       <EstadoBadge accesoId={aula.accesoId} />
@@ -329,8 +335,12 @@ const CAMPOS_TURNO: {
 function TurnosTab() {
   const { data, isLoading, isError, refetch } = useTurnos()
   const crud = useCrudTurnos()
+  const puedeCrear = usePuede("TURNOS", "CREAR")
   const puedeActualizar = usePuede("TURNOS", "ACTUALIZAR")
+  const puedeEliminar = usePuede("TURNOS", "ELIMINAR")
   const [editandoId, setEditandoId] = useState<number | null>(null)
+  const [nuevoOpen, setNuevoOpen] = useState(false)
+  const eliminarConToast = useEliminarConToast()
 
   // Turnos activos guardados: el formulario los usa para que no se crucen.
   const franjas = useMemo<TurnoFranja[]>(
@@ -352,6 +362,7 @@ function TurnosTab() {
         <HeaderSeccion
           titulo="Turnos"
           descripcion="Horarios de entrada y tardanza por turno"
+          acciones={<BotonNuevo texto="Nuevo turno" puedeCrear={puedeCrear} onClick={() => setNuevoOpen(true)} />}
         />
         {isLoading ? (
           <CargandoTarjetas filas={2} />
@@ -367,16 +378,26 @@ function TurnosTab() {
                 turno={turno}
                 franjas={franjas}
                 puedeEditar={puedeActualizar}
+                puedeEliminar={puedeEliminar}
                 editando={editandoId === turno.idTurno}
                 onEditar={() => setEditandoId(turno.idTurno)}
                 onCancelar={() => setEditandoId(null)}
                 actualizar={crud.actualizar}
+                onEliminar={() =>
+                  eliminarConToast(crud.eliminar.mutateAsync, {
+                    id: turno.idTurno,
+                    mensaje: `Turno "${turno.nombre}" eliminado`,
+                  })
+                }
               />
             ))}
           </div>
         )}
         {isError && (
           <div><BotonReintentar refetch={refetch} /></div>
+        )}
+        {nuevoOpen && (
+          <NuevoTurnoDialog onOpenChange={setNuevoOpen} franjas={franjas} crear={crud.crear} />
         )}
       </CardContent>
     </Card>
@@ -396,18 +417,22 @@ function TurnoCard({
   turno,
   franjas,
   puedeEditar,
+  puedeEliminar,
   editando,
   onEditar,
   onCancelar,
   actualizar,
+  onEliminar,
 }: {
   turno: TurnoResponse
   franjas: TurnoFranja[]
   puedeEditar: boolean
+  puedeEliminar: boolean
   editando: boolean
   onEditar: () => void
   onCancelar: () => void
   actualizar: ReturnType<typeof useCrudTurnos>["actualizar"]
+  onEliminar: () => Promise<void>
 }) {
   // El turno se valida contra el que lo precede en la jornada. Editar el
   // primero de la cadena nunca falla por los que vienen después.
@@ -465,10 +490,21 @@ function TurnoCard({
           <Icono className="size-4 text-muted-foreground" />
           <span className="text-sm font-medium">{turno.nombre}</span>
         </div>
-        {puedeEditar && !editando && (
-          <Button variant="outline" size="sm" onClick={editar}>
-            <Pencil /> Editar
-          </Button>
+        {!editando && (puedeEditar || puedeEliminar) && (
+          <div className="flex items-center gap-2">
+            {puedeEditar && (
+              <Button variant="outline" size="sm" onClick={editar}>
+                <Pencil /> Editar
+              </Button>
+            )}
+            {puedeEliminar && (
+              <ConfirmarEliminar
+                titulo={`Eliminar el turno ${turno.nombre}`}
+                descripcion={`Se eliminará el turno "${turno.nombre}". No se puede si tiene secciones o recreos.`}
+                onConfirm={onEliminar}
+              />
+            )}
+          </div>
         )}
       </div>
       {editando ? (
@@ -521,6 +557,93 @@ function TurnoCard({
         </div>
       )}
     </div>
+  )
+}
+
+// Id con el que un turno nuevo entra a la cadena: va después de los que
+// empiezan a la misma hora, igual que en el backend (TurnoService.create).
+const ID_TURNO_NUEVO = Number.MAX_SAFE_INTEGER
+
+function NuevoTurnoDialog({
+  onOpenChange,
+  franjas,
+  crear,
+}: {
+  onOpenChange: (open: boolean) => void
+  franjas: TurnoFranja[]
+  crear: ReturnType<typeof useCrudTurnos>["crear"]
+}) {
+  const schema = useMemo(() => crearTurnoSchema(franjas, ID_TURNO_NUEVO), [franjas])
+  const form = useForm<TurnoValues>({
+    resolver: zodResolver(schema),
+    defaultValues: {
+      nombre: "",
+      horaEntrada: "",
+      horaEntradaLimite: "",
+      horaFaltaLimite: "",
+      horaSalida: "",
+      accesoId: ACCESO.ACTIVO,
+    },
+  })
+
+  async function guardar(values: TurnoValues) {
+    await guardarConToast(async () => {
+      await crear.mutateAsync({ ...values, nombre: values.nombre.trim() })
+      toast.success(`Turno "${values.nombre.trim()}" creado`)
+      onOpenChange(false)
+    })
+  }
+
+  return (
+    <Dialog open onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="text-lg font-semibold tracking-tight">Nuevo turno</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={form.handleSubmit(guardar)} className="space-y-5" noValidate>
+          <FieldGroup>
+            <Controller
+              control={form.control}
+              name="nombre"
+              render={({ field }) => (
+                <Field>
+                  <FieldLabel>Nombre del turno</FieldLabel>
+                  <FieldContent>
+                    <Input placeholder="Ej: Noche" autoFocus maxLength={50} {...field} />
+                    <FieldError errors={[form.formState.errors.nombre]} />
+                  </FieldContent>
+                </Field>
+              )}
+            />
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {CAMPOS_TURNO.map((campo) => (
+                <Controller
+                  key={campo.name}
+                  control={form.control}
+                  name={campo.name}
+                  render={({ field }) => (
+                    <Field>
+                      <FieldLabel>{campo.label}</FieldLabel>
+                      <FieldContent>
+                        <Input type="time" {...field} />
+                        <FieldDescription className="text-xs">{campo.descripcion}</FieldDescription>
+                        <FieldError errors={[form.formState.errors[campo.name]]} />
+                      </FieldContent>
+                    </Field>
+                  )}
+                />
+              ))}
+            </div>
+          </FieldGroup>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancelar
+            </Button>
+            <BotonGuardar etiqueta="Crear turno" enviando={crear.isPending} />
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -1050,6 +1173,7 @@ function AulaDialog({
   // nueva y con el objeto en las deps el reset se dispararía mientras se escribe.
   const nombre = aula?.nombre ?? ""
   const capacidad = aula?.capacidad ?? undefined
+  const usoCompartido = aula?.usoCompartido ?? false
   const accesoId = aula?.accesoId ?? ACCESO.ACTIVO
   // La lista de nombres llega filtrada desde AulasTab; el schema se rearma
   // cuando cambia, por lo que crear y editar comparan contra lo que corresponde.
@@ -1059,10 +1183,15 @@ function AulaDialog({
     // Con onChange el duplicado y el resto de reglas se avisan mientras se
     // escribe, sin esperar a pulsar Guardar.
     mode: "onChange",
-    defaultValues: { nombre, capacidad, accesoId },
+    defaultValues: { nombre, capacidad, usoCompartido, accesoId },
   })
 
-  useResetAlAbrir(open, form, { nombre, capacidad, accesoId }, [nombre, capacidad, accesoId])
+  useResetAlAbrir(
+    open,
+    form,
+    { nombre, capacidad, usoCompartido, accesoId },
+    [nombre, capacidad, usoCompartido, accesoId]
+  )
 
   async function onSubmit(values: AulaValues) {
     await guardarConToast(async () => {
@@ -1081,6 +1210,21 @@ function AulaDialog({
           <FieldGroup>
             <Controller control={form.control} name="nombre" render={({ field }) => (<Field><FieldLabel>Nombre del aula</FieldLabel><FieldContent><Input placeholder="Aula 101" autoFocus maxLength={LIMITE_NOMBRE_AULA} {...field} onChange={(e) => field.onChange(sanitizarNombreAula(e.target.value))} /><FieldError errors={[form.formState.errors.nombre]} /></FieldContent></Field>)} />
             <Controller control={form.control} name="capacidad" render={({ field }) => (<Field><FieldLabel>Capacidad</FieldLabel><FieldContent><Input type="number" min={String(CAPACIDAD_MIN)} max={String(CAPACIDAD_MAX)} placeholder="30" value={field.value ?? ""} onChange={(e) => field.onChange(parsearCapacidad(e.target.value))} /><FieldDescription className="text-xs">Obligatorio. Entre {CAPACIDAD_MIN} y {CAPACIDAD_MAX} asientos.</FieldDescription><FieldError errors={[form.formState.errors.capacidad]} /></FieldContent></Field>)} />
+            <Controller
+              control={form.control}
+              name="usoCompartido"
+              render={({ field }) => (
+                <Field orientation="horizontal">
+                  <FieldContent>
+                    <FieldLabel>Uso compartido</FieldLabel>
+                    <FieldDescription className="text-xs">
+                      Patio, losa deportiva o auditorio: admite varias clases a la misma hora.
+                    </FieldDescription>
+                  </FieldContent>
+                  <Switch checked={field.value} onCheckedChange={field.onChange} aria-label="Uso compartido" />
+                </Field>
+              )}
+            />
             {esEdicion && <Controller control={form.control} name="accesoId" render={({ field }) => (<Field><FieldLabel>Estado</FieldLabel><FieldContent><CampoAcceso value={field.value} onChange={field.onChange} /></FieldContent></Field>)} />}
           </FieldGroup>
           <DialogFooter><DialogTrigger render={<Button variant="outline" />}>Cancelar</DialogTrigger><BotonGuardar etiqueta={esEdicion ? "Guardar cambios" : "Crear aula"} enviando={crear.isPending || actualizar.isPending} /></DialogFooter>

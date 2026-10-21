@@ -287,7 +287,9 @@ export default function AccesosTab() {
                                           }
                                         />
                                         <span>
-                                          {accionNombre.get(accion) ?? accion}
+                                          {permiso.etiquetas?.[accion] ??
+                                            accionNombre.get(accion) ??
+                                            accion}
                                         </span>
                                       </label>
                                     )
@@ -298,6 +300,12 @@ export default function AccesosTab() {
                                     </span>
                                   )}
                                 </div>
+                              )}
+                              {/* Módulos de consulta, sin nada que crear ni editar. */}
+                              {asignado && permiso.acciones.length === 0 && (
+                                <p className="mt-2 pl-7 text-[11px] font-light text-muted-foreground">
+                                  Solo lectura
+                                </p>
                               )}
                             </div>
                           )

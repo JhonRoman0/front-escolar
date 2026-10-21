@@ -31,6 +31,11 @@ interface FilterSelectProps {
   allLabel?: string
   className?: string
   disabled?: boolean
+  /**
+   * Para opciones con textos largos (por ejemplo nombres de áreas): la lista
+   * puede ser más ancha que el botón y los textos bajan de línea en vez de cortarse.
+   */
+  opcionesLargas?: boolean
 }
 
 /**
@@ -47,6 +52,7 @@ export function FilterSelect({
   allLabel = "Todos",
   className,
   disabled,
+  opcionesLargas,
 }: FilterSelectProps) {
   const seleccion = options.find((o) => o.value === value)
   const valor = seleccion?.label ?? (value ? value : allLabel)
@@ -83,15 +89,21 @@ export function FilterSelect({
           {label != null && (
             <span className="text-muted-foreground">{label}:</span>
           )}
-          <span className="text-foreground">{valor}</span>
+          <span className={cn("text-foreground", opcionesLargas && "truncate")}>{valor}</span>
         </SelectValue>
       </SelectTrigger>
-      <SelectContent>
+      <SelectContent
+        className={opcionesLargas ? "w-auto min-w-(--anchor-width) max-w-[min(26rem,calc(100vw-2rem))]" : undefined}
+      >
         {secciones.map((seccion, i) => (
           <SelectGroup key={i}>
             {seccion.label != null && <SelectLabel>{seccion.label}</SelectLabel>}
             {seccion.opciones.map((op) => (
-              <SelectItem key={op.value} value={op.value}>
+              <SelectItem
+                key={op.value}
+                value={op.value}
+                className={opcionesLargas ? "py-1.5 [&>*:first-child]:shrink [&>*:first-child]:whitespace-normal" : undefined}
+              >
                 {op.label}
               </SelectItem>
             ))}

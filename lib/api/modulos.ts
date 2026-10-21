@@ -5,6 +5,8 @@ export interface PermisoResponse {
   codigo: string
   nombre: string
   acciones: string[]
+  /** Nombre de cada acción en este módulo ("Importar, copiar…"); si falta se usa el genérico. */
+  etiquetas?: Record<string, string> | null
   accesoId: number | null
 }
 

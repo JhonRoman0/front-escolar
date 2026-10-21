@@ -22,9 +22,13 @@ import {
   suspensionesApi,
   tiposContratoApi,
   turnosApi,
+  type CursoCopiaRequest,
   type DocenteRequest,
+  type RecreoRequest,
+  type RecreoUpdateRequest,
   type SeccionRequest,
   type SeccionesBatchRequest,
+  type SubcursoRequest,
   type SuspensionRequest,
 } from "@/lib/api/academico"
 
@@ -82,10 +86,15 @@ export function useDocenteDeUsuario(idUsuario: number | null | undefined) {
   return docentes.find((d) => d.idUsuario === idUsuario) ?? null
 }
 
-export function useCursos() {
+/**
+ * Sin filtros trae todos los cursos de todos los años (lo usa Asignaciones).
+ * Con filtros espera a tener año y nivel para no traer la lista completa.
+ */
+export function useCursos(filtros?: { idAnio: number | null; idNivel: number | null }) {
   return useQuery({
-    queryKey: KEYS.cursos,
-    queryFn: cursosApi.listar,
+    queryKey: [...KEYS.cursos, filtros?.idAnio ?? null, filtros?.idNivel ?? null],
+    queryFn: () => cursosApi.listar(filtros?.idAnio, filtros?.idNivel),
+    enabled: !filtros || (!!filtros.idAnio && !!filtros.idNivel),
     staleTime: 1000 * 60 * 30,
   })
 }
@@ -162,6 +171,16 @@ export function useGradosPorNivel(idNivel: number | null) {
     queryKey: [...KEYS.grados, "nivel", idNivel],
     queryFn: () => gradosApi.porNivel(idNivel as number),
     enabled: !!idNivel,
+    staleTime: 1000 * 60 * 10,
+  })
+}
+
+/** Grados del nivel con secciones en ese año (cada sección trae su turno). */
+export function useGradosDelAnio(idNivel: number | null, idAnio: number | null) {
+  return useQuery({
+    queryKey: [...KEYS.grados, "nivel", idNivel, "anio", idAnio],
+    queryFn: () => gradosApi.porNivel(idNivel as number, idAnio),
+    enabled: !!idNivel && !!idAnio,
     staleTime: 1000 * 60 * 10,
   })
 }
@@ -313,31 +332,47 @@ export function useCambiosDocente() {
 
 // ── Recreos ──────────────────────────────────────────────────────────────
 
-export function useRecreos() {
+/** Espera a tener el año para no traer los recreos de todos los años. */
+export function useRecreos(filtros: { idAnio: number | null; idNivel?: number | null; idTurno?: number | null }) {
   return useQuery({
-    queryKey: KEYS.recreos,
-    queryFn: recreosApi.listar,
-    staleTime: 1000 * 60 * 30,
-  })
-}
-
-export function useRecreosPorNivel(idNivel: number | null) {
-  return useQuery({
-    queryKey: [...KEYS.recreos, "nivel", idNivel],
-    queryFn: () => recreosApi.porNivel(idNivel as number),
-    enabled: !!idNivel,
+    queryKey: [...KEYS.recreos, filtros.idAnio, filtros.idNivel ?? null, filtros.idTurno ?? null],
+    queryFn: () => recreosApi.listar(filtros),
+    enabled: !!filtros.idAnio,
     staleTime: 1000 * 60 * 10,
   })
 }
 
-export function useCrudRecreos() {
-  return useCrud(
-    KEYS.recreos,
-    [],
-    recreosApi.crear,
-    ({ id, data }) => recreosApi.actualizar(id, data),
-    (id) => recreosApi.eliminar(id)
-  )
+export function useCrearRecreos() {
+  const invalidar = useInvalidarMutacion(KEYS.recreos)
+  return useMutation({
+    mutationFn: (data: RecreoRequest) => recreosApi.crear(data),
+    onSuccess: invalidar,
+  })
+}
+
+export function useActualizarRecreo() {
+  const invalidar = useInvalidarMutacion(KEYS.recreos)
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: RecreoUpdateRequest }) => recreosApi.actualizar(id, data),
+    onSuccess: invalidar,
+  })
+}
+
+export function useEliminarRecreo() {
+  const invalidar = useInvalidarMutacion(KEYS.recreos)
+  return useMutation({
+    mutationFn: (id: number) => recreosApi.eliminar(id),
+    onSuccess: invalidar,
+  })
+}
+
+export function useEliminarRecreosDelGrado() {
+  const invalidar = useInvalidarMutacion(KEYS.recreos)
+  return useMutation({
+    mutationFn: ({ idAnio, idTurno, idGrado }: { idAnio: number; idTurno: number; idGrado: number }) =>
+      recreosApi.eliminarDelGrado(idAnio, idTurno, idGrado),
+    onSuccess: invalidar,
+  })
 }
 
 // ── Mutaciones ───────────────────────────────────────────────────────────
@@ -380,15 +415,8 @@ export function useEliminarFotoDocente() {
   })
 }
 
-export function useCrudCursos() {
-  return useCrud(
-    KEYS.cursos,
-    [],
-    cursosApi.crear,
-    ({ id, data }) => cursosApi.actualizar(id, data),
-    (id) => cursosApi.eliminar(id)
-  )
-}
+// Importar, copiar y cambiar subcursos también tocan las competencias.
+const KEY_COMPETENCIAS = ["competencias"] as const
 
 export function useCambiarEstadoCurso() {
   const invalidar = useInvalidarMutacion(KEYS.cursos)
@@ -399,10 +427,53 @@ export function useCambiarEstadoCurso() {
   })
 }
 
-export function useImportarCursosExcel() {
+export function useCambiarSubcursos() {
+  const invalidar = useInvalidarMutacion(KEYS.cursos, KEY_COMPETENCIAS)
+  return useMutation({
+    mutationFn: ({ id, tieneSubcursos }: { id: number; tieneSubcursos: boolean }) =>
+      cursosApi.cambiarSubcursos(id, tieneSubcursos),
+    onSuccess: invalidar,
+  })
+}
+
+export function useGuardarSubcurso() {
+  const invalidar = useInvalidarMutacion(KEYS.cursos, KEY_COMPETENCIAS)
+  return useMutation({
+    // Con idSubcurso edita; sin él crea dentro del área.
+    mutationFn: ({ idArea, idSubcurso, data }: { idArea: number; idSubcurso?: number; data: SubcursoRequest }) =>
+      idSubcurso ? cursosApi.actualizarSubcurso(idSubcurso, data) : cursosApi.crearSubcurso(idArea, data),
+    onSuccess: invalidar,
+  })
+}
+
+export function useEliminarCurso() {
   const invalidar = useInvalidarMutacion(KEYS.cursos)
   return useMutation({
-    mutationFn: (archivo: File) => cursosApi.importarExcel(archivo),
+    mutationFn: (id: number) => cursosApi.eliminar(id),
+    onSuccess: invalidar,
+  })
+}
+
+export function useVistaPreviaCursos() {
+  return useMutation({
+    mutationFn: ({ archivo, idAnio }: { archivo: File; idAnio: number }) =>
+      cursosApi.vistaPrevia(archivo, idAnio),
+  })
+}
+
+export function useImportarCursos() {
+  const invalidar = useInvalidarMutacion(KEYS.cursos, KEY_COMPETENCIAS)
+  return useMutation({
+    mutationFn: ({ archivo, idAnio }: { archivo: File; idAnio: number }) =>
+      cursosApi.importar(archivo, idAnio),
+    onSuccess: invalidar,
+  })
+}
+
+export function useCopiarCursos() {
+  const invalidar = useInvalidarMutacion(KEYS.cursos, KEY_COMPETENCIAS)
+  return useMutation({
+    mutationFn: (data: CursoCopiaRequest) => cursosApi.copiar(data),
     onSuccess: invalidar,
   })
 }
