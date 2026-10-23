@@ -147,6 +147,9 @@ export interface SeccionResponse {
   turno: string
   idAnio: number
   anio: string
+  /** Salón de la sección; null si todavía no tiene. */
+  idAula: number | null
+  aula: string | null
   tieneMatriculas: boolean
   tieneAsignaciones: boolean
 }
@@ -171,8 +174,16 @@ export interface GradoRequest {
   idTurno: number
   /** Opcional: el backend usa el año vigente cuando no viene. */
   idAnio?: number | null
-  secciones?: string[]
+  /** Cada sección con su salón. Al editar, una existente se reconoce por su nombre. */
+  secciones?: SeccionNueva[]
+  /** Salón de la sección única, cuando el grado no tiene secciones. */
+  idAula?: number | null
   accesoId?: number | null
+}
+
+export interface SeccionNueva {
+  nombre: string
+  idAula: number
 }
 
 // ── Nivel (filtro cascada) ──────────────────────────────────────────────
@@ -192,6 +203,8 @@ interface GradoSeccionItem {
   turno: string
   idAnio: number
   anio: string
+  idAula: number | null
+  aula: string | null
   /**
    * El backend los calcula en cada listado. La UI los usa para deshabilitar la
    * papelera: si hay matriculas o asignaciones, la seccion ya no se puede tocar.
@@ -204,6 +217,7 @@ export interface SeccionRequest {
   idGrado: number
   idTurno: number
   nombre: string
+  idAula: number
   idAnio?: number | null
 }
 
@@ -215,7 +229,7 @@ export interface SeccionRequest {
 export interface SeccionesBatchRequest {
   idGrado: number
   idTurno: number
-  nombres: string[]
+  secciones: SeccionNueva[]
   /**
    * Opcional: la UI siempre lo envía. Si no viene, el backend resuelve con su
    * fallback (por comenzar habilitado de año más alto, si no, el vigente) y
@@ -335,19 +349,33 @@ export const ACCESO = {
 
 // ── Aula ─────────────────────────────────────────────────────────────────
 
+/**
+ * SALON: el aula fija de una sección (una por sección, por año y turno).
+ * AMBIENTE: laboratorio, cómputo… todas las secciones, una clase a la vez.
+ * COMPARTIDO: patio, losa, auditorio… varias clases a la misma hora.
+ */
+export type TipoAula = "SALON" | "AMBIENTE" | "COMPARTIDO"
+
+export const TIPOS_AULA: { value: TipoAula; label: string; ayuda: string }[] = [
+  { value: "SALON", label: "Salón", ayuda: "El aula fija de una sección: se le asigna a una sola por año y turno." },
+  { value: "AMBIENTE", label: "Ambiente especial", ayuda: "Laboratorio, cómputo, arte… lo usan todas las secciones, una clase a la vez." },
+  { value: "COMPARTIDO", label: "Espacio compartido", ayuda: "Patio, losa o auditorio: admite varias clases a la misma hora." },
+]
+
 export interface AulaResponse {
   idAula: number
   nombre: string
   capacidad: number | null
-  /** Patio, losa o auditorio: admite varias clases a la misma hora. */
-  usoCompartido: boolean
+  tipo: TipoAula
+  /** Secciones de las que es salón ("3.° A – Mañana 2027"). */
+  secciones: string[]
   accesoId: number | null
 }
 
 interface AulaRequest {
   nombre: string
   capacidad: number
-  usoCompartido: boolean
+  tipo: TipoAula
   accesoId?: number | null
 }
 
@@ -597,10 +625,10 @@ export const gradoSeccionApi = {
   async eliminar(idGradoSeccion: number): Promise<void> {
     return apiFetch<void>(`/secciones/${idGradoSeccion}`, { method: "DELETE" })
   },
-  async actualizar(idGradoSeccion: number, request: { nombre: string }): Promise<GradoSeccionItem> {
+  async actualizar(idGradoSeccion: number, request: { nombre: string; idAula: number }): Promise<GradoSeccionItem> {
     return apiFetch<GradoSeccionItem>(`/secciones/${idGradoSeccion}`, {
       method: "PUT",
-      body: JSON.stringify({ nombre: request.nombre }),
+      body: JSON.stringify({ nombre: request.nombre, idAula: request.idAula }),
     })
   },
   async eliminarLote(ids: number[]): Promise<void> {
@@ -728,5 +756,44 @@ export const recreosApi = {
   },
   async eliminarDelGrado(idAnio: number, idTurno: number, idGrado: number): Promise<void> {
     return apiFetch<void>(`/recreos/anio/${idAnio}/turno/${idTurno}/grado/${idGrado}`, { method: "DELETE" })
+  },
+}
+
+// ── Configuración académica ──────────────────────────────────────────────
+
+/** Duración de la hora académica de un nivel en un año escolar. */
+export interface ConfiguracionAcademicaResponse {
+  idAnio: number
+  anio: string
+  idNivel: number
+  nivel: string
+  /** Minutos de la hora académica; null: libre (la clase dura lo que se elija). */
+  minutosHoraAcademica: number | null
+  /** CONFIGURADO en este año, HEREDADO de un año anterior o valor por DEFECTO. */
+  origen: "CONFIGURADO" | "HEREDADO" | "DEFECTO"
+  anioOrigen: string | null
+  /** Con alguna asignación en el año y nivel, la duración ya no cambia. */
+  asignaciones: number
+}
+
+export interface ConfiguracionAcademicaRequest {
+  idAnio: number
+  idNivel: number
+  minutosHoraAcademica: number | null
+}
+
+export const configuracionAcademicaApi = {
+  async listar(idAnio: number): Promise<ConfiguracionAcademicaResponse[]> {
+    return apiFetch<ConfiguracionAcademicaResponse[]>(`/configuracion-academica?idAnio=${idAnio}`)
+  },
+  async guardar(data: ConfiguracionAcademicaRequest): Promise<ConfiguracionAcademicaResponse> {
+    return apiFetch<ConfiguracionAcademicaResponse>("/configuracion-academica", {
+      method: "PUT",
+      body: JSON.stringify(data),
+    })
+  },
+  /** La misma información, por la ruta de Asignaciones: quien asigna no necesita este permiso. */
+  async horaAcademica(idAnio: number, idNivel: number): Promise<ConfiguracionAcademicaResponse> {
+    return apiFetch<ConfiguracionAcademicaResponse>(`/asignaciones/hora-academica?idAnio=${idAnio}&idNivel=${idNivel}`)
   },
 }

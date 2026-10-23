@@ -56,6 +56,7 @@ import {
   type TurnoResponse,
 } from "@/lib/api/academico"
 import { formatearFecha } from "@/lib/fechas"
+import { SelectorSalon } from "@/components/academico/selector-salon"
 
 interface SeccionesEstructuraProps {
   onIrATurnos?: () => void
@@ -530,8 +531,10 @@ function EditarSeccionesDialog({
   const { data: secciones = [], isLoading, refetch } = useSeccionesPorGrado(grado.idGrado)
   const [agregar, setAgregar] = useState(false)
   const [nombreNuevo, setNombreNuevo] = useState("")
+  const [salonNuevo, setSalonNuevo] = useState<number | null>(null)
   const [editId, setEditId] = useState<number | null>(null)
   const [editNombre, setEditNombre] = useState("")
+  const [editSalon, setEditSalon] = useState<number | null>(null)
   const [editError, setEditError] = useState<string | null>(null)
   const [seleccionados, setSeleccionados] = useState<Set<number>>(new Set())
   const [confirmarEliminar, setConfirmarEliminar] = useState<{
@@ -613,18 +616,24 @@ function EditarSeccionesDialog({
       toast.error("La sección debe ser una sola letra (A-Z)")
       return
     }
+    if (!salonNuevo) {
+      toast.error("Elige el salón de la sección")
+      return
+    }
 
     try {
       await crear.mutateAsync({
         idGrado: grado.idGrado,
         idTurno,
         nombre,
+        idAula: salonNuevo,
         idAnio: anio.idAnio,
       })
 
       toast.success(`Sección ${nombre} agregada`)
       setNombreNuevo("")
       setAgregar(false)
+      setSalonNuevo(null)
       refetch()
     } catch (error) {
       toast.error(
@@ -698,6 +707,22 @@ function EditarSeccionesDialog({
                               disabled={anioBloqueado}
                               className="h-8"
                             />
+                            {s.tieneAsignaciones ? (
+                              <p className="text-xs text-muted-foreground">
+                                Salón: {s.aula ?? "sin salón"} (tiene cursos asignados, no cambia)
+                              </p>
+                            ) : (
+                              <SelectorSalon
+                                value={editSalon}
+                                onChange={(idAula) => {
+                                  setEditSalon(idAula)
+                                  setEditError(null)
+                                }}
+                                idAnio={anio.idAnio}
+                                idTurno={idTurno}
+                                idGradoSeccionActual={s.idGradoSeccion}
+                              />
+                            )}
                             {editError && (
                               <p className="text-xs text-destructive">{editError}</p>
                             )}
@@ -709,12 +734,14 @@ function EditarSeccionesDialog({
                               if (!puedeActualizar || anioBloqueado) return
                               setEditId(s.idGradoSeccion)
                               setEditNombre(s.nombre)
+                              setEditSalon(s.idAula)
                               setEditError(null)
                             }}
                             onFocus={() => {
                               if (!puedeActualizar || anioBloqueado) return
                               setEditId(s.idGradoSeccion)
                               setEditNombre(s.nombre)
+                              setEditSalon(s.idAula)
                               setEditError(null)
                             }}
                             tabIndex={0}
@@ -722,6 +749,9 @@ function EditarSeccionesDialog({
                             aria-label={`Editar sección ${s.nombre}`}
                           >
                             <p className="text-sm font-medium">{s.nombre}</p>
+                            <p className={`text-xs ${s.aula ? "text-muted-foreground" : "text-amber-700 dark:text-amber-400"}`}>
+                              {s.aula ? `Salón: ${s.aula}` : "Sin salón: asígnale uno para poder asignarle cursos"}
+                            </p>
                             {bloqueada && (
                               <p className="text-xs text-muted-foreground">
                                 {s.tieneMatriculas ? "con alumnos" : "con cursos"}
@@ -739,7 +769,7 @@ function EditarSeccionesDialog({
                             disabled={anioBloqueado || actualizar.isPending}
                             onClick={async () => {
                               const nombreEdit = editNombre.trim().toUpperCase()
-                              if (nombreEdit === s.nombre) {
+                              if (nombreEdit === s.nombre && editSalon === s.idAula) {
                                 setEditId(null)
                                 setEditNombre("")
                                 setEditError(null)
@@ -747,6 +777,10 @@ function EditarSeccionesDialog({
                               }
                               if (nombreEdit.length !== 1 || !/^[A-Z]$/.test(nombreEdit)) {
                                 setEditError("La sección debe ser una sola letra (A-Z)")
+                                return
+                              }
+                              if (!editSalon) {
+                                setEditError("Elige el salón de la sección")
                                 return
                               }
                               const duplicado = seccionesConLetra.some(
@@ -762,10 +796,9 @@ function EditarSeccionesDialog({
                                 await actualizar.mutateAsync({
                                   idGradoSeccion: s.idGradoSeccion,
                                   nombre: nombreEdit,
+                                  idAula: editSalon,
                                 })
-                                toast.success(
-                                  `Sección ${s.nombre} actualizada a ${nombreEdit}`,
-                                )
+                                toast.success(`Sección ${nombreEdit} actualizada`)
                                 setEditId(null)
                                 setEditNombre("")
                                 setEditError(null)
@@ -885,14 +918,20 @@ function EditarSeccionesDialog({
                   </FieldDescription>
                 </FieldContent>
               </Field>
+              <Field>
+                <FieldLabel>Salón</FieldLabel>
+                <FieldContent>
+                  <SelectorSalon value={salonNuevo} onChange={setSalonNuevo} idAnio={anio.idAnio} idTurno={idTurno} />
+                </FieldContent>
+              </Field>
               <div className="flex justify-end gap-2">
-                <Button type="button" variant="ghost" size="sm" onClick={() => { setAgregar(false); setNombreNuevo("") }}>
+                <Button type="button" variant="ghost" size="sm" onClick={() => { setAgregar(false); setNombreNuevo(""); setSalonNuevo(null) }}>
                   Cancelar
                 </Button>
                 <Button
                   type="button"
                   size="sm"
-                  disabled={!nombreNuevo || crear.isPending}
+                  disabled={!nombreNuevo || !salonNuevo || crear.isPending}
                   onClick={guardarNueva}
                 >
                   Agregar

@@ -162,7 +162,13 @@ export const gradoSchema = z
     idNivel: z.number().int().min(1, "Selecciona un nivel"),
     idAnio: z.number().int().min(1, "Selecciona un año escolar"),
     idTurno: z.number().int().min(1, "Selecciona un turno"),
-    secciones: z.array(z.string().trim().min(1, "La sección es requerida")),
+    // Cada sección con su salón: un aula de tipo salón libre en ese año y turno.
+    secciones: z.array(
+      z.object({
+        nombre: z.string().trim().min(1, "La sección es requerida"),
+        idAula: z.number({ error: "Elige el salón" }).int().min(1, "Elige el salón"),
+      })
+    ),
     accesoId: accesoId.optional(),
   })
   .superRefine((data, ctx) => {
@@ -173,7 +179,7 @@ export const gradoSchema = z
         message: "Indica al menos una sección",
       })
     }
-    const limpias = data.secciones.map((s) => s.trim().toLowerCase())
+    const limpias = data.secciones.map((s) => s.nombre.trim().toLowerCase())
     const duplicado = limpias.find((s, i) => limpias.indexOf(s) !== i)
     if (duplicado) {
       ctx.addIssue({
@@ -181,6 +187,14 @@ export const gradoSchema = z
         path: ["secciones"],
         message:
           "No se pueden repetir secciones dentro del mismo grado (secciones duplicadas).",
+      })
+    }
+    const salones = data.secciones.map((s) => s.idAula).filter(Boolean)
+    if (salones.some((id, i) => salones.indexOf(id) !== i)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["secciones"],
+        message: "Cada sección necesita un salón distinto",
       })
     }
   })
@@ -257,8 +271,18 @@ export const crearSeccionSchema = (existentes: string[] = []) =>
         .array(z.string())
         .min(1, "Indica al menos una sección")
         .max(26, "Máximo 26 secciones"),
+      // El salón de cada sección, en el mismo orden que `secciones` (0 = sin elegir).
+      salones: z.array(z.number()),
     })
     .superRefine((data, ctx) => {
+      data.secciones.forEach((_, i) => {
+        const salon = data.salones[i] ?? 0
+        if (!salon) {
+          ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["salones", i], message: "Elige el salón" })
+        } else if (data.salones.indexOf(salon) !== i) {
+          ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["salones", i], message: "Ese salón ya está elegido para otra sección" })
+        }
+      })
       data.secciones.forEach((bruto, i) => {
         if (!letraSeccion.test(bruto.trim().toUpperCase())) {
           ctx.addIssue({
@@ -345,7 +369,7 @@ const aulaSchemaBase = z.object({
     .int("La capacidad debe ser un número entero")
     .min(CAPACIDAD_MIN, "La capacidad debe ser al menos 1")
     .max(CAPACIDAD_MAX, "La capacidad máxima es 50"),
-  usoCompartido: z.boolean(),
+  tipo: z.enum(["SALON", "AMBIENTE", "COMPARTIDO"]),
   accesoId: accesoId.optional(),
 })
 export type AulaValues = z.infer<typeof aulaSchemaBase>

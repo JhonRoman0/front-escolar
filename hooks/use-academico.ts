@@ -13,6 +13,7 @@ import {
   aulasApi,
   cambiosDocenteApi,
   cursosApi,
+  configuracionAcademicaApi,
   docentesApi,
   gradosAcademicosApi,
   gradosApi,
@@ -22,6 +23,7 @@ import {
   suspensionesApi,
   tiposContratoApi,
   turnosApi,
+  type ConfiguracionAcademicaRequest,
   type CursoCopiaRequest,
   type DocenteRequest,
   type RecreoRequest,
@@ -208,6 +210,8 @@ export function useCrearSeccion() {
       queryClient.invalidateQueries({ queryKey: KEYS.grados })
       queryClient.invalidateQueries({ queryKey: KEYS.secciones })
       queryClient.invalidateQueries({ queryKey: KEYS.asignaciones })
+      // Aulas muestra de qué sección es salón cada aula.
+      queryClient.invalidateQueries({ queryKey: KEYS.aulas })
     },
   })
 }
@@ -226,6 +230,8 @@ export function useCrearSeccionesLote() {
       queryClient.invalidateQueries({ queryKey: KEYS.grados })
       queryClient.invalidateQueries({ queryKey: KEYS.secciones })
       queryClient.invalidateQueries({ queryKey: KEYS.asignaciones })
+      // Aulas muestra de qué sección es salón cada aula.
+      queryClient.invalidateQueries({ queryKey: KEYS.aulas })
     },
   })
 }
@@ -238,6 +244,8 @@ export function useEliminarSeccion() {
       queryClient.invalidateQueries({ queryKey: KEYS.grados })
       queryClient.invalidateQueries({ queryKey: KEYS.secciones })
       queryClient.invalidateQueries({ queryKey: KEYS.asignaciones })
+      // Aulas muestra de qué sección es salón cada aula.
+      queryClient.invalidateQueries({ queryKey: KEYS.aulas })
     },
   })
 }
@@ -245,12 +253,14 @@ export function useEliminarSeccion() {
 export function useActualizarSeccion() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ idGradoSeccion, nombre }: { idGradoSeccion: number; nombre: string }) =>
-      gradoSeccionApi.actualizar(idGradoSeccion, { nombre }),
+    mutationFn: ({ idGradoSeccion, nombre, idAula }: { idGradoSeccion: number; nombre: string; idAula: number }) =>
+      gradoSeccionApi.actualizar(idGradoSeccion, { nombre, idAula }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: KEYS.grados })
       queryClient.invalidateQueries({ queryKey: KEYS.secciones })
       queryClient.invalidateQueries({ queryKey: KEYS.asignaciones })
+      // Aulas muestra de qué sección es salón cada aula.
+      queryClient.invalidateQueries({ queryKey: KEYS.aulas })
     },
   })
 }
@@ -263,6 +273,8 @@ export function useEliminarSeccionesLote() {
       queryClient.invalidateQueries({ queryKey: KEYS.grados })
       queryClient.invalidateQueries({ queryKey: KEYS.secciones })
       queryClient.invalidateQueries({ queryKey: KEYS.asignaciones })
+      // Aulas muestra de qué sección es salón cada aula.
+      queryClient.invalidateQueries({ queryKey: KEYS.aulas })
     },
   })
 }
@@ -493,7 +505,7 @@ export function useCrudTurnos() {
 export function useCrudGrados() {
   return useCrud(
     KEYS.grados,
-    [KEYS.asignaciones],
+    [KEYS.asignaciones, KEYS.aulas],
     gradosApi.crear,
     ({ id, data }) => gradosApi.actualizar(id, data),
     (id) => gradosApi.eliminar(id)
@@ -530,4 +542,35 @@ export function useCrudAsignaciones() {
     ({ id, data }) => asignacionesApi.actualizar(id, data),
     (id) => asignacionesApi.eliminar(id)
   )
+}
+
+// ── Configuración académica ──────────────────────────────────────────────
+
+const KEY_CONFIGURACION = ["configuracion-academica"] as const
+
+export function useConfiguracionAcademica(idAnio: number | null) {
+  return useQuery({
+    queryKey: [...KEY_CONFIGURACION, idAnio],
+    queryFn: () => configuracionAcademicaApi.listar(idAnio as number),
+    enabled: !!idAnio,
+    staleTime: 1000 * 60 * 10,
+  })
+}
+
+/** Hora académica de un año y nivel, para el formulario de asignaciones. */
+export function useHoraAcademica(idAnio: number | null, idNivel: number | null) {
+  return useQuery({
+    queryKey: [...KEY_CONFIGURACION, "hora", idAnio, idNivel],
+    queryFn: () => configuracionAcademicaApi.horaAcademica(idAnio as number, idNivel as number),
+    enabled: !!idAnio && !!idNivel,
+    staleTime: 1000 * 60 * 10,
+  })
+}
+
+export function useGuardarConfiguracionAcademica() {
+  const invalidar = useInvalidarMutacion(KEY_CONFIGURACION)
+  return useMutation({
+    mutationFn: (data: ConfiguracionAcademicaRequest) => configuracionAcademicaApi.guardar(data),
+    onSuccess: invalidar,
+  })
 }

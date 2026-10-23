@@ -49,6 +49,7 @@ import {
   type NivelResponse,
   type TurnoResponse,
 } from "@/lib/api/academico"
+import { SelectorSalon } from "@/components/academico/selector-salon"
 import {
   crearSeccionSchema,
   duplicadosDeSeccion,
@@ -131,6 +132,7 @@ export function NuevaSeccionDialog({
       idGrado: 0,
       idAnio: anioInicial,
       secciones: [""],
+      salones: [0],
     },
   })
 
@@ -139,6 +141,8 @@ export function NuevaSeccionDialog({
   const idTurno = useWatch({ control: form.control, name: "idTurno" })
   const idAnio = useWatch({ control: form.control, name: "idAnio" })
   const secciones = useWatch({ control: form.control, name: "secciones" })
+  const salones = useWatch({ control: form.control, name: "salones" }) ?? []
+  const erroresSalones = form.formState.errors.salones as ({ message?: string } | undefined)[] | undefined
   const gradosNivel = idNivel ? grados.filter((g) => g.idNivel === idNivel) : []
   const anioSel = habilitados.find((a) => a.idAnio === idAnio) ?? null
 
@@ -180,6 +184,7 @@ export function NuevaSeccionDialog({
       idGrado: 0,
       idAnio: anioInicial,
       secciones: [""],
+      salones: [0],
     })
   }, [open, turnoPorDefecto, anioInicial, form])
 
@@ -206,9 +211,10 @@ export function NuevaSeccionDialog({
   const errorGeneral = Array.isArray(erroresSecciones) ? undefined : erroresSecciones
 
   async function onSubmit(values: SeccionValues) {
-    const nombres = values.secciones
-      .map((s) => s.trim().toUpperCase())
-      .filter(Boolean)
+    const nuevas = values.secciones
+      .map((s, i) => ({ nombre: s.trim().toUpperCase(), idAula: values.salones[i] ?? 0 }))
+      .filter((s) => s.nombre)
+    const nombres = nuevas.map((s) => s.nombre)
 
     if (!nombres.length) return
 
@@ -216,7 +222,7 @@ export function NuevaSeccionDialog({
       await crearLote.mutateAsync({
         idGrado: values.idGrado,
         idTurno: values.idTurno,
-        nombres,
+        secciones: nuevas,
         idAnio: values.idAnio,
       })
       const detalle = nombres.join(", ")
@@ -464,6 +470,21 @@ export function NuevaSeccionDialog({
                               ]}
                             />
                           </Field>
+                          <Field className="flex-[2]">
+                            <SelectorSalon
+                              value={salones[i] || null}
+                              onChange={(idAula) => {
+                                const siguientes = [...salones]
+                                siguientes[i] = idAula
+                                form.setValue("salones", siguientes, { shouldValidate: form.formState.isSubmitted })
+                              }}
+                              idAnio={idAnio}
+                              idTurno={idTurno}
+                              reservados={salones.filter((_, j) => j !== i)}
+                              invalido={Boolean(erroresSalones?.[i])}
+                            />
+                            <FieldError errors={erroresSalones?.[i] ? [erroresSalones[i]] : []} />
+                          </Field>
                           {/*
                             El primer input no lleva X a proposito: es el unico
                             que garantiza que quede al menos una seccion. Si se
@@ -475,9 +496,10 @@ export function NuevaSeccionDialog({
                               type="button"
                               variant="ghost"
                               size="icon"
-                              onClick={() =>
+                              onClick={() => {
                                 field.onChange(field.value.filter((_, j) => j !== i))
-                              }
+                                form.setValue("salones", salones.filter((_, j) => j !== i))
+                              }}
                               aria-label={`Quitar sección ${i + 1}`}
                               title={`Quitar sección ${i + 1}`}
                             >
@@ -492,7 +514,10 @@ export function NuevaSeccionDialog({
                         variant="outline"
                         size="sm"
                         className="self-start"
-                        onClick={() => field.onChange([...field.value, ""])}
+                        onClick={() => {
+                          field.onChange([...field.value, ""])
+                          form.setValue("salones", [...salones, 0])
+                        }}
                         disabled={faltaDestino}
                       >
                         <Plus data-icon="inline-start" />

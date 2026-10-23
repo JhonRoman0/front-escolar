@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react"
 import { toast } from "sonner"
-import { CalendarDays, CircleHelp, Clock3, CloudSun, DoorOpen, GraduationCap, Pencil, Sun, TriangleAlert, X, type LucideIcon } from "lucide-react"
+import { CalendarDays, CircleHelp, SlidersHorizontal, Clock3, Lock, CloudSun, DoorOpen, GraduationCap, Pencil, Sun, TriangleAlert, X, type LucideIcon } from "lucide-react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm, useWatch } from "react-hook-form"
 
@@ -38,7 +38,6 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Switch } from "@/components/ui/switch"
 import {
   Table,
   TableBody,
@@ -81,8 +80,9 @@ import type {
   AulaResponse,
   TurnoResponse,
 } from "@/lib/api/academico"
-import { ACCESO, ESTADO_ANIO, horaCorta } from "@/lib/api/academico"
+import { ACCESO, ESTADO_ANIO, horaCorta, TIPOS_AULA, type TipoAula } from "@/lib/api/academico"
 import { type TurnoFranja } from "@/lib/turnos"
+import { ConfiguracionAcademicaTab } from "./configuracion-academica-tab"
 import { fechaHoyISO, rangoLectivo } from "@/lib/fechas"
 import {
   anioEscolarSchema,
@@ -104,15 +104,17 @@ interface CatalogosTabProps {
   puedeAnios: boolean
   puedeAulas: boolean
   puedeGrados: boolean
+  puedeConfiguracion: boolean
 }
 
-type EstructuraKey = "anios" | "grados" | "turnos" | "aulas"
+type EstructuraKey = "anios" | "grados" | "turnos" | "aulas" | "configuracion"
 
 export default function CatalogosTab({
   puedeTurnos,
   puedeAnios,
   puedeAulas,
   puedeGrados,
+  puedeConfiguracion,
 }: CatalogosTabProps) {
   // Orden de configuración: primero los catálogos libres (turnos, aulas), luego el
   // año escolar y al final grados, que es el único que depende de los anteriores.
@@ -122,8 +124,9 @@ export default function CatalogosTab({
       { value: "aulas", label: "Aulas", icon: DoorOpen, show: puedeAulas },
       { value: "anios", label: "Año escolar", icon: CalendarDays, show: puedeAnios },
       { value: "grados", label: "Secciones", icon: GraduationCap, show: puedeGrados },
+      { value: "configuracion", label: "Configuración académica", icon: SlidersHorizontal, show: puedeConfiguracion },
     ],
-    [puedeAnios, puedeAulas, puedeGrados, puedeTurnos]
+    [puedeAnios, puedeAulas, puedeGrados, puedeTurnos, puedeConfiguracion]
   )
 
   const visibles = opciones.filter((o) => o.show)
@@ -177,7 +180,57 @@ export default function CatalogosTab({
           />
         </TabsContent>
       )}
+      {puedeConfiguracion && (
+        <TabsContent value="configuracion">
+          <ConfiguracionAcademicaTab />
+        </TabsContent>
+      )}
     </Tabs>
+  )
+}
+
+// ── Aulas: tipo y uso ────────────────────────────────────────────────────
+
+const VARIANTE_TIPO_AULA: Record<TipoAula, "secondary" | "info" | "success"> = {
+  SALON: "secondary",
+  AMBIENTE: "info",
+  COMPARTIDO: "success",
+}
+
+function BadgeTipoAula({ tipo }: { tipo: TipoAula }) {
+  return <Badge variant={VARIANTE_TIPO_AULA[tipo]}>{TIPOS_AULA.find((t) => t.value === tipo)?.label ?? tipo}</Badge>
+}
+
+/** "3 años B – Mañana 2026" → sección resaltada y turno y año en gris. */
+function SeccionesDelSalon({ secciones }: { secciones: string[] }) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {secciones.map((s) => {
+        const [seccion, turnoAnio] = s.split(" – ")
+        return (
+          <Badge key={s} variant="outline" className="h-auto gap-1.5 py-0.5 font-normal">
+            <span className="font-medium">{seccion}</span>
+            {turnoAnio && <span className="text-muted-foreground">{turnoAnio}</span>}
+          </Badge>
+        )
+      })}
+    </div>
+  )
+}
+
+/** Quién usa el aula: las secciones de un salón, o para qué sirve un ambiente. */
+function UsoAula({ aula }: { aula: AulaResponse }) {
+  if (aula.tipo === "SALON") {
+    return aula.secciones.length ? (
+      <SeccionesDelSalon secciones={aula.secciones} />
+    ) : (
+      <span className="text-xs text-muted-foreground">Libre: sin sección asignada</span>
+    )
+  }
+  return (
+    <span className="text-xs text-muted-foreground">
+      {aula.tipo === "AMBIENTE" ? "Todas las secciones, una clase a la vez" : "Todas las secciones, varias clases a la vez"}
+    </span>
   )
 }
 
@@ -255,33 +308,36 @@ function AulasTab() {
             <TableHeader>
               <TableRow>
                 <TableHead>Aula</TableHead>
+                <TableHead>Tipo</TableHead>
                 <TableHead>Capacidad</TableHead>
+                <TableHead>Uso</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                <FilasCargando columnas={4} />
+                <FilasCargando columnas={6} />
               ) : isError ? (
-                <MensajeSinDatos columnas={4} mensaje="No se pudo cargar. Recarga la pantalla." />
+                <MensajeSinDatos columnas={6} mensaje="No se pudo cargar. Recarga la pantalla." />
               ) : !data?.length ? (
-                <MensajeSinDatos columnas={4} mensaje="Aún no hay aulas." />
+                <MensajeSinDatos columnas={6} mensaje="Aún no hay aulas." />
               ) : !aulasFiltradas.length ? (
                 <MensajeSinDatos
-                  columnas={4}
+                  columnas={6}
                   mensaje="No hay aulas que coincidan con los filtros seleccionados."
                 />
               ) : (
                 aulasFiltradas.map((aula) => (
                   <TableRow key={aula.idAula}>
-                    <TableCell className="font-medium">
-                      <span className="flex items-center gap-2">
-                        {aula.nombre}
-                        {aula.usoCompartido && <Badge variant="info">Compartido</Badge>}
-                      </span>
+                    <TableCell className="font-medium">{aula.nombre}</TableCell>
+                    <TableCell>
+                      <BadgeTipoAula tipo={aula.tipo} />
                     </TableCell>
                     <TableCell>{aula.capacidad ?? "—"}</TableCell>
+                    <TableCell>
+                      <UsoAula aula={aula} />
+                    </TableCell>
                     <TableCell>
                       <EstadoBadge accesoId={aula.accesoId} />
                     </TableCell>
@@ -1173,7 +1229,9 @@ function AulaDialog({
   // nueva y con el objeto en las deps el reset se dispararía mientras se escribe.
   const nombre = aula?.nombre ?? ""
   const capacidad = aula?.capacidad ?? undefined
-  const usoCompartido = aula?.usoCompartido ?? false
+  const tipo = aula?.tipo ?? "SALON"
+  // Un salón que ya es de una sección no cambia de tipo (el backend lo rechaza).
+  const tipoBloqueado = !!aula && aula.tipo === "SALON" && aula.secciones.length > 0
   const accesoId = aula?.accesoId ?? ACCESO.ACTIVO
   // La lista de nombres llega filtrada desde AulasTab; el schema se rearma
   // cuando cambia, por lo que crear y editar comparan contra lo que corresponde.
@@ -1183,14 +1241,14 @@ function AulaDialog({
     // Con onChange el duplicado y el resto de reglas se avisan mientras se
     // escribe, sin esperar a pulsar Guardar.
     mode: "onChange",
-    defaultValues: { nombre, capacidad, usoCompartido, accesoId },
+    defaultValues: { nombre, capacidad, tipo, accesoId },
   })
 
   useResetAlAbrir(
     open,
     form,
-    { nombre, capacidad, usoCompartido, accesoId },
-    [nombre, capacidad, usoCompartido, accesoId]
+    { nombre, capacidad, tipo, accesoId },
+    [nombre, capacidad, tipo, accesoId]
   )
 
   async function onSubmit(values: AulaValues) {
@@ -1212,16 +1270,38 @@ function AulaDialog({
             <Controller control={form.control} name="capacidad" render={({ field }) => (<Field><FieldLabel>Capacidad</FieldLabel><FieldContent><Input type="number" min={String(CAPACIDAD_MIN)} max={String(CAPACIDAD_MAX)} placeholder="30" value={field.value ?? ""} onChange={(e) => field.onChange(parsearCapacidad(e.target.value))} /><FieldDescription className="text-xs">Obligatorio. Entre {CAPACIDAD_MIN} y {CAPACIDAD_MAX} asientos.</FieldDescription><FieldError errors={[form.formState.errors.capacidad]} /></FieldContent></Field>)} />
             <Controller
               control={form.control}
-              name="usoCompartido"
+              name="tipo"
               render={({ field }) => (
-                <Field orientation="horizontal">
+                <Field>
+                  <FieldLabel>Tipo de aula</FieldLabel>
                   <FieldContent>
-                    <FieldLabel>Uso compartido</FieldLabel>
-                    <FieldDescription className="text-xs">
-                      Patio, losa deportiva o auditorio: admite varias clases a la misma hora.
-                    </FieldDescription>
+                    <RadioGroup
+                      value={field.value}
+                      onValueChange={(valor) => field.onChange(valor as TipoAula)}
+                      disabled={tipoBloqueado}
+                    >
+                      {TIPOS_AULA.map((t) => (
+                        <RadioGroupItem key={t.value} value={t.value}>
+                          <span className="text-sm font-medium">{t.label}</span>
+                          <span className="text-xs text-muted-foreground">{t.ayuda}</span>
+                        </RadioGroupItem>
+                      ))}
+                    </RadioGroup>
+                    {tipoBloqueado && aula && (
+                      <div className="mt-1 flex gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-950 dark:text-amber-200">
+                        <Lock className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                        <div className="space-y-2">
+                          <p className="font-medium leading-tight">
+                            El tipo no se puede cambiar
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {aula.nombre} es el salón de {aula.secciones.length === 1 ? "esta sección" : "estas secciones"}. Para cambiar su tipo, primero asígnales otro salón en Secciones.
+                          </p>
+                          <SeccionesDelSalon secciones={aula.secciones} />
+                        </div>
+                      </div>
+                    )}
                   </FieldContent>
-                  <Switch checked={field.value} onCheckedChange={field.onChange} aria-label="Uso compartido" />
                 </Field>
               )}
             />
