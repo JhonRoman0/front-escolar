@@ -123,7 +123,7 @@ export function useFiltrosMalla() {
   return { anios, niveles, idAnio, setIdAnio, idNivel, setIdNivel, anio, nivel }
 }
 
-const TEXTO_ESTADO_ANIO: Record<number, string> = {
+export const TEXTO_ESTADO_ANIO: Record<number, string> = {
   [ESTADO_ANIO.VIGENTE]: "vigente",
   [ESTADO_ANIO.CERRADO]: "cerrado",
   [ESTADO_ANIO.POR_COMENZAR]: "por comenzar",
@@ -156,7 +156,7 @@ export function FiltrosMalla({
         options={opcionesAnio}
         includeAll={false}
         allLabel="Selecciona"
-        className="w-[210px]"
+        className="w-[240px]"
       />
       <FilterSelect
         label="Nivel"

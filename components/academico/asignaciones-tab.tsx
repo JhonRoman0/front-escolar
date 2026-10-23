@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react"
 import { toast } from "sonner"
-import { AlertTriangle, Lock, Pencil, Plus, X } from "lucide-react"
+import { AlertTriangle, Coffee, Lock, Pencil, Plus, X } from "lucide-react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form"
 
@@ -49,6 +49,7 @@ import {
   useCursos,
   useDocentes,
   useGradosDelAnio,
+  useHoraAcademica,
   useHorasDocente,
   useRecreos,
   useTurnos,
@@ -59,6 +60,8 @@ import {
   ESTADO_ANIO,
   horaCorta,
   type AnioEscolarResponse,
+  type RecreoResponse,
+  type TipoAula,
   type AsignacionRequest,
   type AsignacionResponse,
   type NivelResponse,
@@ -75,6 +78,41 @@ function formatoHorario(h: { diaSemana: number; horaInicio: string; horaFin: str
 }
 
 const HORARIO_VACIO = { idAula: 0, diaSemana: 1, horaInicio: "", horaFin: "" }
+
+const TIPO_AULA_EN_HORARIO: Record<TipoAula, string> = {
+  SALON: "Salón de la sección",
+  AMBIENTE: "Ambiente especial · una clase a la vez",
+  COMPARTIDO: "Espacio compartido",
+}
+
+/**
+ * Recreos agrupados por los días que comparten horario: "Lun–Vie 09:20–09:40"
+ * en vez de repetir la misma franja cinco veces.
+ */
+function resumenRecreos(recreos: RecreoResponse[]): { dias: string; franjas: string }[] {
+  const porDia = new Map<number, string>()
+  for (const dia of [...new Set(recreos.map((r) => r.diaSemana))].sort()) {
+    porDia.set(
+      dia,
+      recreos
+        .filter((r) => r.diaSemana === dia)
+        .sort((a, b) => a.horaInicio.localeCompare(b.horaInicio))
+        .map((r) => `${horaCorta(r.horaInicio)}–${horaCorta(r.horaFin)}`)
+        .join(" y ")
+    )
+  }
+  const grupos = new Map<string, number[]>()
+  porDia.forEach((franjas, dia) => grupos.set(franjas, [...(grupos.get(franjas) ?? []), dia]))
+  const corto = (dia: number) => DIAS_CLASE.find((d) => d.value === dia)?.corto ?? String(dia)
+  return [...grupos.entries()].map(([franjas, dias]) => {
+    // Días seguidos se juntan en un rango (Lun–Vie); si no, van separados.
+    const seguidos = dias.length > 2 && dias.every((d, i) => i === 0 || d === dias[i - 1] + 1)
+    return {
+      dias: seguidos ? `${corto(dias[0])}–${corto(dias[dias.length - 1])}` : dias.map(corto).join(", "),
+      franjas,
+    }
+  })
+}
 
 export default function AsignacionesTab() {
   const filtros = useFiltrosMalla()
@@ -310,6 +348,17 @@ function AsignacionFormDialog({
   const secciones = grado?.secciones.filter((s) => s.idAnio === idAnio) ?? []
   const seccion = secciones.find((s) => s.idGradoSeccion === idGradoSeccion)
   const turno = turnos.find((t) => t.idTurno === seccion?.idTurno)
+  // Sin salon la seccion no recibe cursos: cada horario parte de su salon.
+  const sinSalon = !!seccion && !seccion.idAula
+  const horarioVacio = { ...HORARIO_VACIO, idAula: seccion?.idAula ?? 0 }
+  // Las clases duran bloques de la hora académica del año y nivel (pestaña
+  // Configuración académica). Null: libre, en pasos de 5 minutos.
+  const { data: horaAcademica } = useHoraAcademica(idAnio || null, idNivel || null)
+  const minutosBloque = horaAcademica?.minutosHoraAcademica ?? null
+  // Su salon, los ambientes especiales y los espacios compartidos; nunca el salon de otra seccion.
+  const aulasPermitidas = aulas.filter(
+    (a) => (a.accesoId ?? ACCESO.ACTIVO) === ACCESO.ACTIVO && (a.tipo !== "SALON" || a.idAula === seccion?.idAula)
+  )
 
   // El docente debe estar activo y enseñar en el nivel.
   const docentesDelNivel = docentes.filter(
@@ -339,11 +388,16 @@ function AsignacionFormDialog({
   // El grado necesita recreo en su turno, y uno cada día que tenga clase.
   const { data: recreos = [], isLoading: cargandoRecreos } = useRecreos({ idAnio: idAnio || null, idNivel: idNivel || null })
   const recreosDelGrado = recreos.filter((r) => r.idGrado === idGrado && r.idTurno === seccion?.idTurno)
+  // Recreos del dia en "HH:mm", para deshabilitar esas horas en los selectores.
+  const recreosDelDia = (dia: number | undefined) =>
+    recreosDelGrado
+      .filter((r) => r.diaSemana === dia)
+      .map((r) => ({ inicio: horaCorta(r.horaInicio), fin: horaCorta(r.horaFin) }))
   const sinRecreo = !!seccion && !cargandoRecreos && recreosDelGrado.length === 0
   const diasSinRecreo = new Set(
     horarios.map((h) => h.diaSemana).filter((dia) => !recreosDelGrado.some((r) => r.diaSemana === dia))
   )
-  const bloqueado = sinRecreo || (!!seccion && diasSinRecreo.size > 0)
+  const bloqueado = sinSalon || sinRecreo || (!!seccion && diasSinRecreo.size > 0)
 
   function cambiarCascada(campo: "idAnio" | "idNivel" | "idGrado" | "idGradoSeccion", valor: number) {
     form.setValue(campo, valor, { shouldValidate: true })
@@ -352,7 +406,10 @@ function AsignacionFormDialog({
     for (const dependiente of orden.slice(orden.indexOf(campo) + 1)) form.setValue(dependiente, 0)
     if (campo !== "idGradoSeccion") form.setValue("idDocente", 0)
     form.setValue("idCurso", 0)
-    if (campo === "idGradoSeccion" || campo === "idGrado") form.setValue("horarios", [HORARIO_VACIO])
+    if (campo === "idGradoSeccion" || campo === "idGrado") {
+      const salon = campo === "idGradoSeccion" ? secciones.find((s) => s.idGradoSeccion === valor)?.idAula ?? 0 : 0
+      form.setValue("horarios", [{ ...HORARIO_VACIO, idAula: salon }])
+    }
   }
 
   async function guardar(values: AsignacionValues, otro: boolean) {
@@ -380,7 +437,7 @@ function AsignacionFormDialog({
       toast.success(`${nombreCurso(values.idCurso)} asignado`)
       if (otro) {
         // Se queda con año, nivel, sección y docente para seguir con otro curso.
-        form.reset({ ...values, idCurso: 0, horarios: [HORARIO_VACIO] })
+        form.reset({ ...values, idCurso: 0, horarios: [horarioVacio] })
       } else {
         onOpenChange(false)
       }
@@ -463,14 +520,21 @@ function AsignacionFormDialog({
             </Field>
           </div>
 
-          {sinRecreo && grado && turno && (
+          {sinSalon && seccion && grado && (
+            <div className="flex gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-700/50 dark:bg-amber-500/10 dark:text-amber-300">
+              <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+              Asigna primero el salón de {grado.nombre} {seccion.nombre} en Grados y secciones.
+            </div>
+          )}
+
+          {!sinSalon && sinRecreo && grado && turno && (
             <div className="flex gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-700/50 dark:bg-amber-500/10 dark:text-amber-300">
               <AlertTriangle className="mt-0.5 size-4 shrink-0" />
               Primero configura el recreo de {grado.nombre} – turno {turno.nombre} en la pestaña Recreos.
             </div>
           )}
 
-          <fieldset disabled={!seccion || sinRecreo} className="space-y-5 disabled:opacity-60">
+          <fieldset disabled={!seccion || sinSalon || sinRecreo} className="space-y-5 disabled:opacity-60">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Controller
                 control={form.control}
@@ -515,13 +579,21 @@ function AsignacionFormDialog({
                       <Select value={field.value ? String(field.value) : null} onValueChange={(v) => field.onChange(Number(v))}>
                         <SelectTrigger className="w-full">
                           <SelectValue>
-                            {field.value ? nombreCurso(field.value) : cursosAsignables.length ? "Selecciona" : "Sin cursos por asignar"}
+                            <span className="truncate">
+                              {field.value ? nombreCurso(field.value) : cursosAsignables.length ? "Selecciona" : "Sin cursos por asignar"}
+                            </span>
                           </SelectValue>
                         </SelectTrigger>
-                        <SelectContent>
+                        {/* Nombres largos (Desarrollo personal, ciudadanía y cívica): la lista
+                            puede ser más ancha que el botón y el texto baja de línea. */}
+                        <SelectContent className="max-h-72 w-auto min-w-(--anchor-width) max-w-[min(26rem,calc(100vw-2rem))]">
                           <SelectGroup>
                             {cursosAsignables.map((c) => (
-                              <SelectItem key={c.idCurso} value={String(c.idCurso)}>
+                              <SelectItem
+                                key={c.idCurso}
+                                value={String(c.idCurso)}
+                                className="py-1.5 [&>*:first-child]:shrink [&>*:first-child]:whitespace-normal"
+                              >
                                 {nombreCurso(c.idCurso)}
                               </SelectItem>
                             ))}
@@ -542,17 +614,44 @@ function AsignacionFormDialog({
               <FieldLabel>Horarios</FieldLabel>
               <FieldDescription className="text-xs">
                 {turno
-                  ? `Aula, día y horas dentro del turno ${turno.nombre} (${horaCorta(turno.horaEntrada)} – ${horaCorta(turno.horaSalida)}).`
+                  ? `Aula, día y horas dentro del turno ${turno.nombre} (${horaCorta(turno.horaEntrada)} – ${horaCorta(turno.horaSalida)}).${minutosBloque ? ` Cada clase dura bloques de ${minutosBloque} minutos.` : ""}`
                   : "Elige la sección para habilitar las horas de su turno."}
               </FieldDescription>
               <FieldContent>
                 <div className="flex flex-col gap-3">
+                  {recreosDelGrado.length > 0 && (
+                    <div className="flex gap-3 rounded-lg border border-brand-info/20 bg-brand-subtle/60 p-3 text-sm dark:border-blue-800/50 dark:bg-blue-950/30">
+                      <Coffee className="mt-0.5 size-4 shrink-0 text-brand-info dark:text-blue-300" />
+                      <div className="space-y-1.5">
+                        <p className="font-medium leading-tight">
+                          Recreos de {grado?.nombre} – turno {turno?.nombre}
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {resumenRecreos(recreosDelGrado).map(({ dias, franjas }) => (
+                            <Badge key={dias} variant="outline" className="h-auto gap-1.5 bg-background py-0.5 font-normal">
+                              <span className="font-medium">{dias}</span>
+                              <span className="font-mono text-muted-foreground">{franjas}</span>
+                            </Badge>
+                          ))}
+                        </div>
+                        <p className="text-xs text-muted-foreground">Las clases no pueden cruzarse con estos horarios.</p>
+                      </div>
+                    </div>
+                  )}
+                  {/* Encabezados de las columnas (en móvil cada campo ya tiene su texto). */}
+                  <div className="hidden grid-cols-[2fr_1.3fr_1fr_1fr_2.25rem] gap-2 px-3 text-xs font-medium text-muted-foreground sm:grid">
+                    <span>Aula</span>
+                    <span>Día</span>
+                    <span>Inicio</span>
+                    <span>Fin</span>
+                    <span />
+                  </div>
                   {horariosArray.fields.map((fila, index) => {
                     const error = errores.horarios?.[index]
                     const dia = horarios[index]?.diaSemana
                     return (
                       <div key={fila.id} className="flex flex-col gap-1.5 rounded-lg border bg-muted/20 p-3">
-                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-[2fr_1.3fr_1fr_1fr_auto]">
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-[2fr_1.3fr_1fr_1fr_2.25rem]">
                           <Controller
                             control={form.control}
                             name={`horarios.${index}.idAula`}
@@ -563,16 +662,17 @@ function AsignacionFormDialog({
                                     <Opcion items={aulas} value={(a) => a.idAula === field.value} texto={(a) => a.nombre} vacio="Aula" />
                                   </SelectValue>
                                 </SelectTrigger>
-                                <SelectContent>
+                                {/* La lista puede ser más ancha que el botón: cada aula lleva su tipo debajo. */}
+                                <SelectContent className="w-auto min-w-(--anchor-width)">
                                   <SelectGroup>
-                                    {aulas
-                                      .filter((a) => (a.accesoId ?? ACCESO.ACTIVO) === ACCESO.ACTIVO)
-                                      .map((a) => (
-                                        <SelectItem key={a.idAula} value={String(a.idAula)}>
-                                          {a.nombre}
-                                          {a.usoCompartido ? " · Compartido" : ""}
-                                        </SelectItem>
-                                      ))}
+                                    {aulasPermitidas.map((a) => (
+                                      <SelectItem key={a.idAula} value={String(a.idAula)} className="py-1.5">
+                                        <span className="flex flex-col">
+                                          <span>{a.nombre}</span>
+                                          <span className="text-xs text-muted-foreground">{TIPO_AULA_EN_HORARIO[a.tipo]}</span>
+                                        </span>
+                                      </SelectItem>
+                                    ))}
                                   </SelectGroup>
                                 </SelectContent>
                               </Select>
@@ -604,11 +704,22 @@ function AsignacionFormDialog({
                             render={({ field }) => (
                               <SelectorHora
                                 value={field.value}
-                                onChange={field.onChange}
+                                onChange={(inicio) => {
+                                  field.onChange(inicio)
+                                  // Un fin que ya no encaja con el nuevo inicio se borra.
+                                  const fin = form.getValues(`horarios.${index}.horaFin`)
+                                  const minutos = (h: string) => Number(h.slice(0, 2)) * 60 + Number(h.slice(3, 5))
+                                  const duracion = fin ? minutos(fin) - minutos(inicio) : 0
+                                  if (fin && (duracion <= 0 || (minutosBloque != null && duracion % minutosBloque !== 0))) {
+                                    form.setValue(`horarios.${index}.horaFin`, "")
+                                  }
+                                }}
                                 min={turno ? horaCorta(turno.horaEntrada) : null}
                                 max={turno ? horaCorta(turno.horaSalida) : null}
                                 invalido={!!error?.horaInicio}
                                 ariaLabel="Hora de inicio"
+                                // No se empieza una clase dentro del recreo de ese día.
+                                deshabilitada={(hora) => recreosDelDia(dia).some((r) => hora >= r.inicio && hora < r.fin)}
                               />
                             )}
                           />
@@ -623,6 +734,13 @@ function AsignacionFormDialog({
                                 max={turno ? horaCorta(turno.horaSalida) : null}
                                 invalido={!!error?.horaFin}
                                 ariaLabel="Hora de fin"
+                                // Ni se termina una clase que atraviesa el recreo.
+                                deshabilitada={(hora) => {
+                                  const inicio = horarios[index]?.horaInicio
+                                  return !!inicio && recreosDelDia(dia).some((r) => inicio < r.fin && r.inicio < hora)
+                                }}
+                                // Con hora académica: bloques completos desde el inicio.
+                                {...(minutosBloque ? { bloquesDesde: horarios[index]?.horaInicio || null, minutosBloque } : {})}
                               />
                             )}
                           />
@@ -646,18 +764,10 @@ function AsignacionFormDialog({
                       </div>
                     )
                   })}
-                  <Button type="button" variant="outline" size="sm" className="w-fit" onClick={() => horariosArray.append(HORARIO_VACIO)}>
+                  <Button type="button" variant="outline" size="sm" className="w-fit" onClick={() => horariosArray.append(horarioVacio)}>
                     <Plus data-icon="inline-start" />
                     Agregar horario
                   </Button>
-                  {recreosDelGrado.length > 0 && (
-                    <p className="text-xs text-muted-foreground">
-                      Recreos de {grado?.nombre}:{" "}
-                      {recreosDelGrado
-                        .map((r) => `${nombreDia(r.diaSemana).slice(0, 3)} ${horaCorta(r.horaInicio)}–${horaCorta(r.horaFin)}`)
-                        .join(" · ")}
-                    </p>
-                  )}
                   <FieldError errors={[errores.horarios?.root ?? (Array.isArray(errores.horarios) ? undefined : errores.horarios)]} />
                 </div>
               </FieldContent>

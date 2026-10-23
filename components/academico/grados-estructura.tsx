@@ -75,6 +75,7 @@ import type {
   TurnoResponse,
 } from "@/lib/api/academico"
 import { gradoSchema, type GradoValues } from "@/lib/schemas/academico"
+import { SelectorSalon } from "@/components/academico/selector-salon"
 
 interface GradosEstructuraProps {
   /** Navega a la subpestaña de Turnos. undefined si el usuario no puede verla. */
@@ -339,7 +340,7 @@ function GradoDialog({
       idNivel: grado?.idNivel ?? 0,
       idAnio: grado?.idAnio ?? anioVigente?.idAnio ?? 0,
       idTurno: grado?.idTurno ?? turnoActivo?.idTurno ?? 0,
-      secciones: grado?.secciones.map((s) => s.nombre) ?? [],
+      secciones: grado?.secciones.map((s) => ({ nombre: s.nombre, idAula: s.idAula ?? 0 })) ?? [],
       accesoId: grado?.accesoId ?? 1,
     },
   })
@@ -354,7 +355,7 @@ function GradoDialog({
       idNivel: grado?.idNivel ?? 0,
       idAnio: grado?.idAnio ?? anioVigente?.idAnio ?? 0,
       idTurno: grado?.idTurno ?? turnoActivo?.idTurno ?? 0,
-      secciones: grado?.secciones.map((s) => s.nombre) ?? [],
+      secciones: grado?.secciones.map((s) => ({ nombre: s.nombre, idAula: s.idAula ?? 0 })) ?? [],
       accesoId: grado?.accesoId ?? 1,
     })
   }, [open, grado, anioVigente, turnoActivo, form])
@@ -374,7 +375,9 @@ function GradoDialog({
       idNivel: values.idNivel,
       idAnio: values.idAnio,
       idTurno: values.idTurno,
-      secciones: values.secciones.map((s) => s.trim()).filter(Boolean),
+      secciones: values.secciones
+        .map((s) => ({ nombre: s.nombre.trim(), idAula: s.idAula }))
+        .filter((s) => s.nombre),
       ...(esEdicion ? { accesoId: values.accesoId } : {}),
     }
   }
@@ -401,7 +404,62 @@ function GradoDialog({
             <Controller control={form.control} name="nombre" render={({ field }) => (<Field><FieldLabel>Nombre del grado</FieldLabel><FieldContent><Input placeholder="Primero de Secundaria" autoFocus {...field} /><FieldError errors={[form.formState.errors.nombre]} /></FieldContent></Field>)} />
             <Controller control={form.control} name="idNivel" render={({ field }) => (<Field><FieldLabel>Nivel</FieldLabel><FieldContent><Select value={field.value ? String(field.value) : ""} onValueChange={(v) => field.onChange(Number(v))}><SelectTrigger className="w-full"><SelectValue>{niveles.find((n) => n.idNivel === field.value)?.nombre ?? "Selecciona"}</SelectValue></SelectTrigger><SelectContent><SelectGroup>{niveles.map((n) => (<SelectItem key={n.idNivel} value={String(n.idNivel)}>{n.nombre}</SelectItem>))}</SelectGroup></SelectContent></Select><FieldError errors={[form.formState.errors.idNivel]} /></FieldContent></Field>)} />
             <FieldSet><div className="grid grid-cols-1 gap-4 sm:grid-cols-2"><Controller control={form.control} name="idAnio" render={({ field }) => (<Field><FieldLabel>Año escolar</FieldLabel><FieldContent><Select value={field.value ? String(field.value) : ""} onValueChange={(v) => field.onChange(Number(v))}><SelectTrigger className="w-full"><SelectValue>{anios.find((a) => a.idAnio === field.value)?.anio ?? "Selecciona"}</SelectValue></SelectTrigger><SelectContent><SelectGroup>{anios.map((a) => (<SelectItem key={a.idAnio} value={String(a.idAnio)}>{a.anio}</SelectItem>))}</SelectGroup></SelectContent></Select><FieldError errors={[form.formState.errors.idAnio]} /></FieldContent></Field>)} /><Controller control={form.control} name="idTurno" render={({ field }) => (<Field><FieldLabel>Turno</FieldLabel><FieldContent><Select value={field.value ? String(field.value) : ""} onValueChange={(v) => field.onChange(Number(v))}><SelectTrigger className="w-full"><SelectValue>{turnos.find((t) => t.idTurno === field.value)?.nombre ?? "Selecciona"}</SelectValue></SelectTrigger><SelectContent><SelectGroup>{turnos.map((t) => (<SelectItem key={t.idTurno} value={String(t.idTurno)}>{t.nombre}</SelectItem>))}</SelectGroup></SelectContent></Select><FieldError errors={[form.formState.errors.idTurno]} /></FieldContent></Field>)} /></div></FieldSet>
-            <Field><FieldLabel>Secciones</FieldLabel><FieldContent><Controller control={form.control} name="secciones" render={({ field }) => (<div className="flex flex-col gap-2">{field.value.map((seccion, index) => (<div key={index} className="flex gap-2"><Input className="flex-1" placeholder="A" value={seccion} onChange={(e) => { const next = [...field.value]; next[index] = e.target.value; field.onChange(next) }} /><Button type="button" variant="outline" size="icon" disabled={field.value.length <= 1} onClick={() => field.onChange(field.value.filter((_, i) => i !== index))} aria-label={`Quitar sección ${index + 1}`}>X</Button></div>))}<Button type="button" variant="outline" size="sm" onClick={() => field.onChange([...field.value, ""])}>Agregar sección</Button></div>)} /><FieldError errors={[form.formState.errors.secciones]} /></FieldContent></Field>
+            <Field>
+              <FieldLabel>Secciones y su salón</FieldLabel>
+              <FieldContent>
+                <Controller
+                  control={form.control}
+                  name="secciones"
+                  render={({ field }) => (
+                    <div className="flex flex-col gap-2">
+                      {field.value.map((seccion, index) => {
+                        // Una sección ya guardada no compite consigo misma por su salón,
+                        // y con cursos asignados su salón ya no cambia.
+                        const existente = grado?.secciones.find(
+                          (s) => s.nombre.toLowerCase() === seccion.nombre.trim().toLowerCase()
+                        )
+                        const cambiar = (patch: Partial<typeof seccion>) => {
+                          const next = [...field.value]
+                          next[index] = { ...seccion, ...patch }
+                          field.onChange(next)
+                        }
+                        return (
+                          <div key={index} className="grid grid-cols-[5rem_1fr_auto] gap-2">
+                            <Input placeholder="A" value={seccion.nombre} onChange={(e) => cambiar({ nombre: e.target.value })} aria-label={`Sección ${index + 1}`} />
+                            {existente?.tieneAsignaciones ? (
+                              <p className="flex items-center text-sm text-muted-foreground">
+                                {existente.aula ?? "Sin salón"} · tiene cursos asignados
+                              </p>
+                            ) : (
+                              <SelectorSalon
+                                value={seccion.idAula || null}
+                                onChange={(idAula) => cambiar({ idAula })}
+                                idAnio={idAnioVal}
+                                idTurno={idTurnoVal}
+                                idGradoSeccionActual={existente?.idGradoSeccion}
+                                reservados={field.value.filter((_, i) => i !== index).map((s) => s.idAula)}
+                                invalido={!!form.formState.errors.secciones?.[index]?.idAula}
+                              />
+                            )}
+                            <Button type="button" variant="outline" size="icon" disabled={field.value.length <= 1} onClick={() => field.onChange(field.value.filter((_, i) => i !== index))} aria-label={`Quitar sección ${index + 1}`}>X</Button>
+                          </div>
+                        )
+                      })}
+                      <Button type="button" variant="outline" size="sm" onClick={() => field.onChange([...field.value, { nombre: "", idAula: 0 }])}>Agregar sección</Button>
+                    </div>
+                  )}
+                />
+                <FieldError
+                  errors={[
+                    form.formState.errors.secciones?.root ??
+                      (Array.isArray(form.formState.errors.secciones)
+                        ? form.formState.errors.secciones.find((e) => e?.idAula || e?.nombre)?.idAula ??
+                          form.formState.errors.secciones.find((e) => e?.nombre)?.nombre
+                        : form.formState.errors.secciones),
+                  ]}
+                />
+              </FieldContent>
+            </Field>
             {esEdicion && (<Controller control={form.control} name="accesoId" render={({ field }) => (<Field><FieldLabel>Estado</FieldLabel><FieldContent><CampoAcceso value={field.value} onChange={field.onChange} /></FieldContent></Field>)} />)}
           </FieldGroup>
           <DialogFooter><DialogTrigger render={<Button variant="outline" />}>Cancelar</DialogTrigger><BotonGuardar etiqueta={esEdicion ? "Guardar cambios" : "Crear grado"} enviando={enviando} disabled={!idNivelSeleccionado || !idAnioVal || !idTurnoVal} /></DialogFooter>
