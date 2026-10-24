@@ -5,7 +5,7 @@ import {
 } from "@tanstack/react-query"
 
 import { useAuth } from "@/components/auth-provider"
-import { useAsignaciones, useAsignacionesDocente, useDocenteDeUsuario } from "@/hooks/use-academico"
+import { useAsignaciones } from "@/hooks/use-academico"
 import { useInvalidarMutacion } from "@/hooks/use-invalidar"
 import {
   competenciasApi,
@@ -21,16 +21,9 @@ const KEYS = {
 
 // ── Asignaciones del usuario ──────────────────────────────────────────────
 
+// El back ya devuelve solo las que el usuario puede ver según su alcance.
 export function useAsignacionesUsuario() {
-  const { esAdmin, usuario } = useAuth()
-  const docente = useDocenteDeUsuario(usuario?.idUsuario)
-  const todas = useAsignaciones()
-  const delDocente = useAsignacionesDocente(esAdmin ? null : docente?.idDocente ?? null)
-
-  if (esAdmin) {
-    return { ...todas, data: todas.data }
-  }
-  return { ...delDocente, data: delDocente.data }
+  return useAsignaciones()
 }
 
 // ── Queries ──────────────────────────────────────────────────────────────

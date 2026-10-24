@@ -51,6 +51,8 @@ export interface PermisosRolResponse {
   idRol: number | null
   nombreRol: string | null
   modulos: ModuloPermisosResponse[]
+  // Con solo lectura, el docente ve lo suyo y el apoderado lo de sus hijos.
+  vinculo?: "DOCENTE" | "APODERADO" | null
 }
 
 export interface LoginResponse {
