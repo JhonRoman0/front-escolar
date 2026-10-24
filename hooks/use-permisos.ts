@@ -31,3 +31,15 @@ export function usePuedeLeer(permisoCodigo: string): boolean {
     .flatMap((m) => m.permisos)
     .some((p) => p.codigo === permisoCodigo)
 }
+export type Alcance = "todo" | "docente" | "apoderado"
+
+// Qué parte de los datos del módulo ve (lo mismo que decide el back):
+// con escritura gestiona y ve todo; con solo lectura, según su vínculo.
+export function useAlcance(permisoCodigo: string): Alcance {
+  const { permisos } = useAuth()
+  const gestiona = usePuedeEscritura(permisoCodigo)
+  if (gestiona) return "todo"
+  if (permisos?.vinculo === "DOCENTE") return "docente"
+  if (permisos?.vinculo === "APODERADO") return "apoderado"
+  return "todo"
+}

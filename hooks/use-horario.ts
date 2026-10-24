@@ -2,6 +2,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query"
 
 import { useAuth } from "@/components/auth-provider"
 import { useDocenteDeUsuario } from "@/hooks/use-academico"
+import { useAlcance } from "@/hooks/use-permisos"
 import { asistenciasApi } from "@/lib/api/asistencia"
 import { horarioApi, type HorarioFiltros } from "@/lib/api/horario"
 
@@ -10,16 +11,14 @@ const KEYS = {
   hijos: ["horarios-hijos"] as const,
 }
 
-// ── Detección de rol ────────────────────────────────────────────────────
+// ── Vista según el alcance en Horarios ──────────────────────────────────
 
+// "admin": todos los horarios con filtros; "docente": los suyos; "apoderado": los de sus hijos.
 export type RolHorario = "admin" | "docente" | "apoderado"
 
 export function useRolHorario(): RolHorario {
-  const { esAdmin, usuario } = useAuth()
-  if (esAdmin) return "admin"
-  const rol = usuario?.nombreRol?.trim().toUpperCase()
-  if (rol === "DOCENTE") return "docente"
-  return "apoderado"
+  const alcance = useAlcance("HORARIOS")
+  return alcance === "todo" ? "admin" : alcance
 }
 
 // ── Queries ──────────────────────────────────────────────────────────────
