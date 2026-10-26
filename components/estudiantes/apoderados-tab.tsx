@@ -51,20 +51,19 @@ export function ApoderadosTab() {
               <TableHead>Edad</TableHead>
               <TableHead>Correo</TableHead>
               <TableHead>Celular</TableHead>
-              <TableHead>Parentesco</TableHead>
               <TableHead>Estado</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <FilasCargando columnas={7} />
+              <FilasCargando columnas={6} />
             ) : isError ? (
               <MensajeSinDatos
-                columnas={7}
+                columnas={6}
                 mensaje="No se pudo cargar. Reintenta."
               />
             ) : !data?.length ? (
-              <MensajeSinDatos columnas={7} mensaje="Aún no hay apoderados." />
+              <MensajeSinDatos columnas={6} mensaje="Aún no hay apoderados." />
             ) : (
               data.map((apoderado) => {
                 const nombreCompleto = `${apoderado.nombre} ${apoderado.apellidoPat} ${apoderado.apellidoMat}`.trim()
@@ -102,9 +101,6 @@ export function ApoderadosTab() {
                     </TableCell>
                     <TableCell className="text-xs">
                       {apoderado.celular || "—"}
-                    </TableCell>
-                    <TableCell className="text-xs">
-                      {apoderado.parentesco || "—"}
                     </TableCell>
                     <TableCell>
                       <EstadoBadge accesoId={apoderado.accesoId} />

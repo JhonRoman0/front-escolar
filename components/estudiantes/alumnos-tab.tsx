@@ -26,21 +26,22 @@ import {
   TableRow,
 } from "@/components/ui/table"
 
-import { ConfirmarEliminar } from "@/components/seguridad/confirmar-eliminar"
 import { EstadoBadge } from "@/components/seguridad/estado-badge"
 import { TablaPaginacion } from "@/components/shared/paginacion-tabla"
 import { FilasCargando, MensajeSinDatos } from "@/components/shared/table-helpers"
-import { useCrudAlumnos, useAlumnos } from "@/hooks/use-estudiantes"
+import { useAlumnos } from "@/hooks/use-estudiantes"
 import { useGradosPorNivel, useNiveles, useSeccionesPorGrado, useTurnos } from "@/hooks/use-academico"
 import { usePuede } from "@/hooks/use-permisos"
-import type { AlumnoResponse } from "@/lib/api/estudiantes"
+import type { AlumnoResponse, ApoderadoResponse } from "@/lib/api/estudiantes"
 import { reportesApi } from "@/lib/api/reportes"
 import { generarPdfAlumnos } from "@/lib/reportes/generar-pdf"
 import { generarExcelAlumnos } from "@/lib/reportes/generar-excel"
 import { generarCsvAlumnos } from "@/lib/reportes/generar-csv"
 import { ReporteModal } from "@/components/reportes/reporte-modal"
 import { GradoSeccionCascada } from "@/components/shared/grado-seccion-cascada"
-import { AlumnoFormDialog } from "./alumno-form-dialog"
+import { AlumnoEditarDialog } from "./alumno-editar-dialog"
+import { ApoderadoAgregarDialog } from "./apoderado-agregar-dialog"
+import { ApoderadoEditarDialog } from "./apoderado-editar-dialog"
 import { AlumnoQrModal } from "./alumno-qr-modal"
 
 const TAMANIO_PAGINA = 10
@@ -94,15 +95,14 @@ export function AlumnosTab() {
   )
 
   const { data, isLoading, isError, refetch } = useAlumnos(page, TAMANIO_PAGINA, filtros)
-  const crud = useCrudAlumnos()
-  const puedeCrear = usePuede("ALUMNOS", "CREAR")
   const puedeActualizar = usePuede("ALUMNOS", "ACTUALIZAR")
-  const puedeEliminar = usePuede("ALUMNOS", "ELIMINAR")
+  const puedeEditarApoderado = usePuede("APODERADOS", "ACTUALIZAR")
+  const puedeAgregarApoderado = usePuede("APODERADOS", "CREAR")
   const puedeExportar = usePuede("ALUMNOS", "IMPRIMIR_EXPORTAR")
 
-  const [dialogOpen, setDialogOpen] = useState(false)
   const [editando, setEditando] = useState<AlumnoResponse | null>(null)
-  const [dialogSeq, setDialogSeq] = useState(0)
+  const [agregandoApoderado, setAgregandoApoderado] = useState<AlumnoResponse | null>(null)
+  const [apoderadoEditando, setApoderadoEditando] = useState<{ alumno: AlumnoResponse; apoderado: ApoderadoResponse } | null>(null)
   const [qrAlumno, setQrAlumno] = useState<AlumnoResponse | null>(null)
   const [reporteOpen, setReporteOpen] = useState(false)
   const [filtroGradoSeccion, setFiltroGradoSeccion] = useState<number | null>(null)
@@ -137,18 +137,6 @@ export function AlumnosTab() {
     else if (formato === "excel") generarExcelAlumnos({ datos, inicio, fin })
     else generarCsvAlumnos({ datos, inicio, fin })
     toast.success(`Reporte ${formato.toUpperCase()} generado (${datos.length} registros)`)
-  }
-
-  async function handleEliminar(alumno: AlumnoResponse) {
-    try {
-      await crud.eliminar.mutateAsync(alumno.idAlumno)
-      toast.success(`Alumno "${alumno.nombre} ${alumno.apellidoPat}" eliminado`)
-      if (data?.content.length === 1 && page > 0) {
-        setPage((p) => p - 1)
-      }
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Error al eliminar")
-    }
   }
 
   return (
@@ -243,20 +231,6 @@ export function AlumnosTab() {
               <Button variant="outline" size="sm" className="h-8 rounded-[8px] border-[#A9A9AA] text-[12px] font-semibold text-[#495057]" onClick={() => setReporteOpen(true)}>
                 <FileDown data-icon="inline-start" />
                 Generar reporte
-              </Button>
-            )}
-            {puedeCrear && (
-              <Button
-                variant="brand"
-                className="rounded-[8px] text-[12px] font-semibold"
-                onClick={() => {
-                  setEditando(null)
-                  setDialogSeq((s) => s + 1)
-                  setDialogOpen(true)
-                }}
-              >
-                <Plus data-icon="inline-start" />
-                Nuevo alumno
               </Button>
             )}
           </div>
@@ -368,17 +342,10 @@ export function AlumnosTab() {
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   setEditando(alumno)
-                                  setDialogSeq((s) => s + 1)
-                                  setDialogOpen(true)
                                 }}
                               >
                                 <Pencil className="size-3.5" />
                               </Button>
-                            )}
-                            {puedeEliminar && (
-                              <span onClick={(e) => e.stopPropagation()}>
-                                <ConfirmarEliminar titulo="Eliminar alumno" descripcion={`Se marcará a "${nombreCompleto}" como eliminado.`} onConfirm={() => handleEliminar(alumno)} />
-                              </span>
                             )}
                           </div>
                         </TableCell>
@@ -387,6 +354,11 @@ export function AlumnosTab() {
                         <TableRow key={`${alumno.idAlumno}-expanded`} className="bg-muted/20 hover:bg-muted/20">
                           <TableCell colSpan={10} className="p-3">
                             <div className="flex flex-col gap-3">
+                              {alumno.tieneDiscapacidad && (
+                                <p className="text-[12px] text-[#495057]">
+                                  <span className="font-semibold">Discapacidad:</span> {alumno.discapacidad}
+                                </p>
+                              )}
                               <p className="text-[12px] font-semibold text-[#495057]">Apoderados — máx 2</p>
                               {alumno.apoderados.length ? (
                                 <div className="grid gap-3 sm:grid-cols-2">
@@ -411,17 +383,40 @@ export function AlumnosTab() {
                                           {ap.parentesco || "—"} {ap.celular ? `· ${ap.celular}` : ""}
                                         </p>
                                       </div>
+                                      {puedeEditarApoderado && (
+                                        <Button
+                                          variant="outline"
+                                          size="icon-sm"
+                                          className="size-7 rounded-[8px] border-[0.50px] border-[#A9A9AA]"
+                                          aria-label={`Editar a ${ap.nombre} ${ap.apellidoPat}`}
+                                          onClick={() => setApoderadoEditando({ alumno, apoderado: ap })}
+                                        >
+                                          <Pencil className="size-3.5" />
+                                        </Button>
+                                      )}
                                     </div>
                                   ))}
                                   {alumno.apoderados.length === 1 && (
-                                    <div className="flex items-center justify-center rounded-lg border border-dashed p-3 text-[12px] text-muted-foreground">
+                                    <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-3 text-[12px] text-muted-foreground">
                                       Sin apoderado secundario
+                                      {puedeAgregarApoderado && (
+                                        <Button variant="outline" size="sm" onClick={() => setAgregandoApoderado(alumno)}>
+                                          <Plus data-icon="inline-start" />
+                                          Agregar apoderado
+                                        </Button>
+                                      )}
                                     </div>
                                   )}
                                 </div>
                               ) : (
-                                <div className="flex items-center justify-center rounded-lg border border-dashed bg-white p-3 text-[12px] text-muted-foreground">
-                                  Sin apoderados registrados — edita el alumno para agregar
+                                <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed bg-white p-3 text-[12px] text-muted-foreground">
+                                  Sin apoderados registrados
+                                  {puedeAgregarApoderado && (
+                                    <Button variant="outline" size="sm" onClick={() => setAgregandoApoderado(alumno)}>
+                                      <Plus data-icon="inline-start" />
+                                      Agregar apoderado
+                                    </Button>
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -444,11 +439,24 @@ export function AlumnosTab() {
 
         {!!data?.totalPages && data.totalPages > 1 && <TablaPaginacion data={data} onPage={setPage} />}
 
-        <AlumnoFormDialog
-          key={`${editando ? `edit-${editando.idAlumno}` : "create"}-${dialogSeq}`}
-          open={dialogOpen}
-          onOpenChange={setDialogOpen}
+        <AlumnoEditarDialog
           alumno={editando}
+          onOpenChange={(open) => {
+            if (!open) setEditando(null)
+          }}
+        />
+        <ApoderadoAgregarDialog
+          alumno={agregandoApoderado}
+          onOpenChange={(open) => {
+            if (!open) setAgregandoApoderado(null)
+          }}
+        />
+        <ApoderadoEditarDialog
+          alumno={apoderadoEditando?.alumno ?? null}
+          apoderado={apoderadoEditando?.apoderado ?? null}
+          onOpenChange={(open) => {
+            if (!open) setApoderadoEditando(null)
+          }}
         />
 
         {qrAlumno && <AlumnoQrModal alumno={qrAlumno} open={!!qrAlumno} onOpenChange={(open) => { if (!open) setQrAlumno(null) }} />}

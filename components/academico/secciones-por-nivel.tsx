@@ -110,7 +110,8 @@ const TONO_NEUTRAL = {
   icono: School,
 }
 
-const tonoDe = (nivel: string) => TONO_NIVEL[nivel] ?? TONO_NEUTRAL
+// También lo usa la pestaña Orden de grados.
+export const tonoDe = (nivel: string) => TONO_NIVEL[nivel] ?? TONO_NEUTRAL
 
 /**
  * Orden numérico de los nombres de grado: "1ro" y "3 años" arrancan con número,

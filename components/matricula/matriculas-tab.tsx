@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react"
 import { toast } from "sonner"
-import { FileDown, History, Pencil, Plus, CheckCircle, XCircle, CreditCard, Loader2 } from "lucide-react"
+import { FileDown, History, Pencil, Plus, Receipt } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -15,16 +15,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { Field, FieldContent, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
 
 import { ConfirmarEliminar } from "@/components/seguridad/confirmar-eliminar"
 import { EstadoBadge } from "@/components/seguridad/estado-badge"
@@ -36,16 +26,18 @@ import {
 import { useCrudMatriculas, useMatriculas } from "@/hooks/use-matricula"
 import { usePuede } from "@/hooks/use-permisos"
 import { useAniosEscolares } from "@/hooks/use-academico"
-import type { MatriculaResponse } from "@/lib/api/matricula"
+import { ANIO_POR_COMENZAR, type MatriculaResponse } from "@/lib/api/matricula"
 import { reportesApi } from "@/lib/api/reportes"
 import { generarPdfMatriculas } from "@/lib/reportes/generar-pdf"
 import { generarExcelMatriculas } from "@/lib/reportes/generar-excel"
 import { generarCsvMatriculas } from "@/lib/reportes/generar-csv"
 import { ReporteModal } from "@/components/reportes/reporte-modal"
 import { GradoSeccionCascada } from "@/components/shared/grado-seccion-cascada"
-import { formatoMonto, SolicitudBadge } from "./matricula-badges"
+import { formatoSoles } from "./campos-pago"
+import { EditarMatriculaDialog } from "./editar-matricula-dialog"
 import { HistorialDialog } from "./historial-dialog"
-import { MatriculaFormDialog } from "./matricula-form-dialog"
+import { NuevaMatriculaDialog } from "./nueva-matricula-dialog"
+import { PagosDialog } from "./pagos-dialog"
 
 const TAMANIO_PAGINA = 10
 
@@ -63,16 +55,13 @@ export function MatriculasTab() {
   const { data: aniosEscolares = [] } = useAniosEscolares()
 
   const [mostrarInactivas, setMostrarInactivas] = useState(false)
-  const [dialogOpen, setDialogOpen] = useState(false)
+  const [nuevaOpen, setNuevaOpen] = useState(false)
   const [editando, setEditando] = useState<MatriculaResponse | null>(null)
+  const [pagos, setPagos] = useState<MatriculaResponse | null>(null)
   const [historial, setHistorial] = useState<MatriculaResponse | null>(null)
   const [reporteOpen, setReporteOpen] = useState(false)
   const [filtroAnio, setFiltroAnio] = useState("")
   const [filtroGradoSeccion, setFiltroGradoSeccion] = useState<number | null>(null)
-  const [aprobarOpen, setAprobarOpen] = useState(false)
-  const [rechazarOpen, setRechazarOpen] = useState(false)
-  const [pagoOpen, setPagoOpen] = useState(false)
-  const [matriculaSel, setMatriculaSel] = useState<MatriculaResponse | null>(null)
 
   const opcionesAnio = useMemo(
     () =>
@@ -145,10 +134,7 @@ export function MatriculasTab() {
                 <Button
                   variant="brand"
                   className="rounded-[8px] text-[12px] font-semibold"
-                  onClick={() => {
-                    setEditando(null)
-                    setDialogOpen(true)
-                  }}
+                  onClick={() => setNuevaOpen(true)}
                 >
                   <Plus data-icon="inline-start" />
                   Nueva matrícula
@@ -166,7 +152,6 @@ export function MatriculasTab() {
                 <TableHead className="whitespace-nowrap text-[12px] font-semibold text-[#495057]">Grado - Sección</TableHead>
                 <TableHead className="whitespace-nowrap text-[12px] font-semibold text-[#495057]">Turno</TableHead>
                 <TableHead className="whitespace-nowrap text-[12px] font-semibold text-[#495057]">Año</TableHead>
-                <TableHead className="whitespace-nowrap text-[12px] font-semibold text-[#495057]">Solicitud</TableHead>
                 <TableHead className="whitespace-nowrap text-[12px] font-semibold text-[#495057]">Pago</TableHead>
                 <TableHead className="whitespace-nowrap text-[12px] font-semibold text-[#495057]">Observaciones</TableHead>
                 <TableHead className="whitespace-nowrap text-[12px] font-semibold text-[#495057]">Estado</TableHead>
@@ -175,12 +160,12 @@ export function MatriculasTab() {
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                <FilasCargando columnas={10} />
+                <FilasCargando columnas={9} />
               ) : isError ? (
-                <MensajeSinDatos columnas={10} mensaje="No se pudo cargar. Recarga la pantalla." />
+                <MensajeSinDatos columnas={9} mensaje="No se pudo cargar. Recarga la pantalla." />
               ) : !visibles.length ? (
                 <MensajeSinDatos
-                  columnas={10}
+                  columnas={9}
                   mensaje={
                     mostrarInactivas
                       ? "Aún no hay matrículas."
@@ -200,19 +185,15 @@ export function MatriculasTab() {
                       {matricula.apoderado}
                     </TableCell>
                     <TableCell>
-                      {matricula.grado} {matricula.seccion}
+                      <p>{matricula.grado} {matricula.seccion}</p>
+                      <p className="text-xs text-muted-foreground">{matricula.nivel}</p>
                     </TableCell>
                     <TableCell>{matricula.turno}</TableCell>
                     <TableCell>{matricula.anio}</TableCell>
-                    <TableCell>
-                      <SolicitudBadge solicitud={matricula.solicitudMatricula} />
-                    </TableCell>
                     <TableCell className="text-xs">
                       <div className="space-y-0.5">
-                        <p>{formatoMonto(matricula.montoPago)}</p>
-                        <p className="text-muted-foreground">
-                          {matricula.fechaPago || "—"}
-                        </p>
+                        <p>{formatoSoles(matricula.pagadoNeto)}</p>
+                        <p className="text-muted-foreground">{matricula.metodoPago ?? "—"}</p>
                       </div>
                     </TableCell>
                     <TableCell className="max-w-[150px] truncate text-xs">
@@ -231,67 +212,28 @@ export function MatriculasTab() {
                         >
                           <History />
                         </Button>
+                        <Button
+                          variant="outline"
+                          size="icon-sm"
+                          aria-label={`Pagos de ${matricula.alumno}`}
+                          onClick={() => setPagos(matricula)}
+                        >
+                          <Receipt />
+                        </Button>
                         {puedeActualizar && (
                           <Button
                             variant="outline"
                             size="icon-sm"
                             aria-label={`Editar matrícula de ${matricula.alumno}`}
-                            onClick={() => {
-                              setEditando(matricula)
-                              setDialogOpen(true)
-                            }}
+                            onClick={() => setEditando(matricula)}
                           >
                             <Pencil />
                           </Button>
                         )}
-                        {matricula.solicitudMatricula === 1 && puedeActualizar && (
-                          <>
-                            <Button
-                              variant="outline"
-                              size="icon-sm"
-                              className="text-emerald-600 hover:text-emerald-700"
-                              aria-label="Aprobar"
-                              onClick={() => {
-                                setMatriculaSel(matricula)
-                                setAprobarOpen(true)
-                              }}
-                            >
-                              <CheckCircle className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="icon-sm"
-                              className="text-red-600 hover:text-red-700"
-                              aria-label="Rechazar"
-                              onClick={() => {
-                                setMatriculaSel(matricula)
-                                setRechazarOpen(true)
-                              }}
-                            >
-                              <XCircle className="h-4 w-4" />
-                            </Button>
-                          </>
-                        )}
-                        {matricula.solicitudMatricula === 2 &&
-                          !matricula.fechaPago &&
-                          puedeActualizar && (
-                            <Button
-                              variant="outline"
-                              size="icon-sm"
-                              className="text-blue-600 hover:text-blue-700"
-                              aria-label="Registrar pago"
-                              onClick={() => {
-                                setMatriculaSel(matricula)
-                                setPagoOpen(true)
-                              }}
-                            >
-                              <CreditCard className="h-4 w-4" />
-                            </Button>
-                          )}
-                        {puedeEliminar && (
+                        {puedeEliminar && matricula.estadoAnio === ANIO_POR_COMENZAR && (
                           <ConfirmarEliminar
                             titulo="Eliminar matrícula"
-                            descripcion={`Se marcará la matrícula de "${matricula.alumno}" como eliminada.`}
+                            descripcion={`Se eliminará la matrícula de "${matricula.alumno}" y se liberará su cupo. Si era su primera matrícula, también se quitan el alumno y los apoderados sin otros hijos. El pago no se devuelve.`}
                             onConfirm={() => handleEliminar(matricula)}
                           />
                         )}
@@ -312,11 +254,19 @@ export function MatriculasTab() {
 
           {!!data?.totalPages && data.totalPages > 1 && <TablaPaginacion data={data} onPage={setPage} />}
 
-          <MatriculaFormDialog
-            key={editando?.idMatricula ?? "nuevo"}
-            open={dialogOpen}
-            onOpenChange={setDialogOpen}
+          <NuevaMatriculaDialog open={nuevaOpen} onOpenChange={setNuevaOpen} />
+          <EditarMatriculaDialog
             matricula={editando}
+            open={!!editando}
+            onOpenChange={(open) => {
+              if (!open) setEditando(null)
+            }}
+          />
+          <PagosDialog
+            matricula={pagos}
+            onOpenChange={(open) => {
+              if (!open) setPagos(null)
+            }}
           />
 
           {historial && (
@@ -360,256 +310,8 @@ export function MatriculasTab() {
             onDescargar={handleDescargarReporte}
           />
 
-          <AprobarDialog
-            open={aprobarOpen}
-            onOpenChange={setAprobarOpen}
-            matricula={matriculaSel}
-            crud={crud}
-          />
-          <RechazarDialog
-            open={rechazarOpen}
-            onOpenChange={setRechazarOpen}
-            matricula={matriculaSel}
-            crud={crud}
-          />
-          <RegistroPagoDialog
-            open={pagoOpen}
-            onOpenChange={setPagoOpen}
-            matricula={matriculaSel}
-            crud={crud}
-          />
         </CardContent>
       </Card>
     </div>
-  )
-}
-
-// ── Modal Aprobar ────────────────────────────────────────────────────────
-
-function AprobarDialog({
-  open,
-  onOpenChange,
-  matricula,
-  crud,
-}: {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  matricula: MatriculaResponse | null
-  crud: ReturnType<typeof useCrudMatriculas>
-}) {
-  const [observaciones, setObservaciones] = useState("")
-
-  async function handleAprobar() {
-    if (!matricula) return
-    try {
-      await crud.aprobar.mutateAsync({
-        id: matricula.idMatricula,
-        observaciones: observaciones || undefined,
-      })
-      toast.success("Matrícula aprobada")
-      onOpenChange(false)
-      setObservaciones("")
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Error al aprobar")
-    }
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Aprobar matrícula</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Se aprobará la matrícula de{" "}
-            <strong>{matricula?.alumno}</strong>.
-          </p>
-          <Field>
-            <FieldLabel>Observaciones (opcional)</FieldLabel>
-            <FieldContent>
-              <Input
-                placeholder="Motivo de aprobación"
-                value={observaciones}
-                onChange={(e) => setObservaciones(e.target.value)}
-              />
-            </FieldContent>
-          </Field>
-          <DialogFooter>
-            <DialogTrigger render={<Button variant="outline" />}>
-              Cancelar
-            </DialogTrigger>
-            <Button
-              onClick={handleAprobar}
-              disabled={crud.aprobar.isPending}
-            >
-              {crud.aprobar.isPending && <Loader2 className="animate-spin" />}
-              Confirmar aprobación
-            </Button>
-          </DialogFooter>
-        </div>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-// ── Modal Rechazar ───────────────────────────────────────────────────────
-
-function RechazarDialog({
-  open,
-  onOpenChange,
-  matricula,
-  crud,
-}: {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  matricula: MatriculaResponse | null
-  crud: ReturnType<typeof useCrudMatriculas>
-}) {
-  const [observaciones, setObservaciones] = useState("")
-
-  async function handleRechazar() {
-    if (!matricula) return
-    try {
-      await crud.rechazar.mutateAsync({
-        id: matricula.idMatricula,
-        observaciones: observaciones || undefined,
-      })
-      toast.success("Matrícula rechazada")
-      onOpenChange(false)
-      setObservaciones("")
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Error al rechazar")
-    }
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Rechazar matrícula</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Se rechazará la matrícula de{" "}
-            <strong>{matricula?.alumno}</strong>.
-          </p>
-          <Field>
-            <FieldLabel>Motivo del rechazo</FieldLabel>
-            <FieldContent>
-              <Input
-                placeholder="Indica el motivo del rechazo"
-                value={observaciones}
-                onChange={(e) => setObservaciones(e.target.value)}
-              />
-            </FieldContent>
-          </Field>
-          <DialogFooter>
-            <DialogTrigger render={<Button variant="outline" />}>
-              Cancelar
-            </DialogTrigger>
-            <Button
-              variant="destructive"
-              onClick={handleRechazar}
-              disabled={crud.rechazar.isPending}
-            >
-              {crud.rechazar.isPending && <Loader2 className="animate-spin" />}
-              Confirmar rechazo
-            </Button>
-          </DialogFooter>
-        </div>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-// ── Modal Registrar Pago ─────────────────────────────────────────────────
-
-function RegistroPagoDialog({
-  open,
-  onOpenChange,
-  matricula,
-  crud,
-}: {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  matricula: MatriculaResponse | null
-  crud: ReturnType<typeof useCrudMatriculas>
-}) {
-  const [fechaPago, setFechaPago] = useState("")
-  const [montoPago, setMontoPago] = useState<number | undefined>(undefined)
-
-  async function handleMatricular() {
-    if (!matricula || !fechaPago || montoPago === undefined) return
-    try {
-      await crud.matricular.mutateAsync({
-        id: matricula.idMatricula,
-        fechaPago,
-        montoPago,
-      })
-      toast.success("Pago registrado y matrícula activada")
-      onOpenChange(false)
-      setFechaPago("")
-      setMontoPago(undefined)
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Error al registrar pago")
-    }
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Registrar pago</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Registra el pago de la matrícula de{" "}
-            <strong>{matricula?.alumno}</strong>.
-          </p>
-          <Field>
-            <FieldLabel>Fecha de pago</FieldLabel>
-            <FieldContent>
-              <Input
-                type="date"
-                value={fechaPago}
-                onChange={(e) => setFechaPago(e.target.value)}
-              />
-            </FieldContent>
-          </Field>
-          <Field>
-            <FieldLabel>Monto (S/)</FieldLabel>
-            <FieldContent>
-              <Input
-                type="number"
-                min="0"
-                step="0.01"
-                placeholder="0.00"
-                value={montoPago ?? ""}
-                onChange={(e) =>
-                  setMontoPago(
-                    e.target.value === "" ? undefined : Number(e.target.value)
-                  )
-                }
-              />
-            </FieldContent>
-          </Field>
-          <DialogFooter>
-            <DialogTrigger render={<Button variant="outline" />}>
-              Cancelar
-            </DialogTrigger>
-            <Button
-              onClick={handleMatricular}
-              disabled={
-                crud.matricular.isPending || !fechaPago || montoPago === undefined
-              }
-            >
-              {crud.matricular.isPending && <Loader2 className="animate-spin" />}
-              Confirmar pago
-            </Button>
-          </DialogFooter>
-        </div>
-      </DialogContent>
-    </Dialog>
   )
 }

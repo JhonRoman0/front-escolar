@@ -8,8 +8,10 @@ import { useInvalidarMutacion } from "@/hooks/use-invalidar"
 import {
   alumnosApi,
   apoderadosApi,
-  type AlumnoRequest,
+  type AlumnoEdicionRequest,
+  type ApoderadoEdicionRequest,
 } from "@/lib/api/estudiantes"
+import type { InscripcionApoderado } from "@/lib/api/matricula"
 
 const KEYS = {
   alumnos: ["alumnos"] as const,
@@ -42,34 +44,14 @@ export function useApoderados() {
   })
 }
 
-export function useApoderadoPorDocumento() {
-  return useMutation({
-    mutationFn: (documento: string) => apoderadosApi.porDocumento(documento),
-  })
-}
-
-export function useAlumnoPorDocumento() {
-  return useMutation({
-    mutationFn: (documento: string) => alumnosApi.porDocumento(documento),
-  })
-}
-
 // ── Mutaciones ───────────────────────────────────────────────────────────
 
 export function useCrudAlumnos() {
   const invalidar = useInvalidarMutacion(KEYS.alumnos, KEYS.apoderados)
   return {
-    crear: useMutation({
-      mutationFn: (data: AlumnoRequest) => alumnosApi.crear(data),
-      onSuccess: invalidar,
-    }),
     actualizar: useMutation({
-      mutationFn: ({ id, data }: { id: number; data: AlumnoRequest }) =>
+      mutationFn: ({ id, data }: { id: number; data: AlumnoEdicionRequest }) =>
         alumnosApi.actualizar(id, data),
-      onSuccess: invalidar,
-    }),
-    eliminar: useMutation({
-      mutationFn: (id: number) => alumnosApi.eliminar(id),
       onSuccess: invalidar,
     }),
   }
@@ -88,6 +70,24 @@ export function useEliminarFotoAlumno() {
   const invalidar = useInvalidarMutacion(KEYS.alumnos)
   return useMutation({
     mutationFn: (id: number) => alumnosApi.eliminarFoto(id),
+    onSuccess: invalidar,
+  })
+}
+
+export function useAgregarApoderado() {
+  const invalidar = useInvalidarMutacion(KEYS.alumnos, KEYS.apoderados)
+  return useMutation({
+    mutationFn: ({ idAlumno, data }: { idAlumno: number; data: InscripcionApoderado }) =>
+      apoderadosApi.agregar(idAlumno, data),
+    onSuccess: invalidar,
+  })
+}
+
+export function useActualizarApoderado() {
+  const invalidar = useInvalidarMutacion(KEYS.alumnos, KEYS.apoderados)
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: ApoderadoEdicionRequest }) =>
+      apoderadosApi.actualizar(id, data),
     onSuccess: invalidar,
   })
 }

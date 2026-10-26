@@ -161,6 +161,11 @@ export interface GradoResponse {
   nombre: string
   idNivel: number
   nivel: string
+  // Posición dentro del nivel (la asigna el sistema) y del nivel entre niveles.
+  orden: number | null
+  nivelOrden: number | null
+  // false: sus alumnos pasan al grado siguiente sin esperar el cierre del año.
+  repite: boolean | null
   accesoId: number | null
   idAnio: number
   anio: string
@@ -193,6 +198,7 @@ export interface SeccionNueva {
 export interface NivelResponse {
   idNivel: number
   nombre: string
+  orden: number | null
 }
 
 // ── Sección del grado (filtro cascada) ──────────────────────────────────
@@ -587,6 +593,12 @@ export const gradosApi = {
     if (idAnio) params.set("idAnio", String(idAnio))
     return apiFetch<GradoResponse[]>(`/grados?${params.toString()}`)
   },
+  async mover(id: number, subir: boolean): Promise<void> {
+    return apiFetch<void>(`/grados/${id}/orden?subir=${subir}`, { method: "PUT" })
+  },
+  async cambiarRepite(id: number, repite: boolean): Promise<GradoResponse> {
+    return apiFetch<GradoResponse>(`/grados/${id}/repite?repite=${repite}`, { method: "PATCH" })
+  },
 }
 export const aniosEscolaresApi = {
   ...crud<AnioEscolarResponse, AnioEscolarRequest>("/anios-escolares"),
@@ -606,6 +618,8 @@ export const aulasApi = crud<AulaResponse, AulaRequest>("/aulas")
 
 export const nivelesApi = {
   listar: () => apiFetch<NivelResponse[]>("/niveles"),
+  mover: (id: number, subir: boolean) =>
+    apiFetch<void>(`/niveles/${id}/orden?subir=${subir}`, { method: "PUT" }),
 }
 
 export const gradoSeccionApi = {

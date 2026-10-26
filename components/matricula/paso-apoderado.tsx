@@ -1,783 +1,373 @@
 "use client"
 
-import { useState } from "react"
 import { toast } from "sonner"
-import { Loader2, Plus, Search, Trash2 } from "lucide-react"
-import { z } from "zod"
+import { Plus, Trash2, UserCheck, Users } from "lucide-react"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { Controller, useForm } from "react-hook-form"
+import { Controller, useFieldArray, useForm, useWatch, type UseFormReturn } from "react-hook-form"
 
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Field, FieldContent, FieldError, FieldLabel } from "@/components/ui/field"
+import { Field, FieldContent, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Switch } from "@/components/ui/switch"
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
-import { useApoderadoPorDocumento } from "@/hooks/use-estudiantes"
+import { CampoContrasena } from "@/components/shared/campo-contrasena"
+import { CampoDni } from "@/components/shared/campo-dni"
+import { TarjetaSeccion } from "@/components/shared/tarjeta-seccion"
+import { useBuscarApoderadoInscripcion } from "@/hooks/use-matricula"
+import { useParentescos, useSexos } from "@/hooks/use-pagos"
 import { useConsultarDni } from "@/hooks/use-reniec"
-import { MENSAJE_CONTRASENA_SEGURA, REGEX_CONTRASENA_SEGURA } from "@/lib/schemas/comun"
-import { ApiError } from "@/lib/api"
-import type { ApoderadoResponse } from "@/lib/api/estudiantes"
+import type { ApoderadoBusqueda } from "@/lib/api/matricula"
+import { REGEX_NO_LETRAS_ESPACIOS } from "@/lib/schemas/comun"
+import {
+  apoderadoPasoDefault,
+  apoderadosPasoSchema,
+  type ApoderadoPasoValues,
+  type ApoderadosPasoValues,
+} from "@/lib/schemas/matricula"
 
-export interface ApoderadoSlotData {
-  existe: boolean
-  apoderado?: ApoderadoResponse
-  nombre?: string
-  apellidoPat?: string
-  apellidoMat?: string
-  gmail?: string
-  contraseña?: string
-  fechaNaci?: string
-  documentoIdentidad?: string
-  celular?: string
-  direccion?: string
-  parentesco?: string
-}
-
-export interface PasoApoderadoData {
-  principal: ApoderadoSlotData
-  secundario?: ApoderadoSlotData
-}
-
-const PARENTESCOS = [
-  "Madre",
-  "Padre",
-  "Hermano/a",
-  "Abuelo/a",
-  "Tío/a",
-  "Padrino/Madrina",
-  "Tutor/a",
-  "Otro",
-]
-
-const apoderadoSlotSchema = z
-  .object({
-    nombre: z.string().trim().min(1, "El nombre es obligatorio").max(50),
-    apellidoPat: z.string().trim().min(1, "El apellido paterno es obligatorio").max(50),
-    apellidoMat: z.string().trim().min(1, "El apellido materno es obligatorio").max(50),
-    gmail: z.string().email("Correo inválido").max(60).optional().or(z.literal("")),
-    contraseña: z
-      .string()
-      .max(100)
-      .optional()
-      .or(z.literal(""))
-      .superRefine((val, ctx) => {
-        if (!val) return
-        if (val.length < 8) {
-          ctx.addIssue({ code: "custom", message: "La contraseña debe tener al menos 8 caracteres" })
-          return
-        }
-        if (!REGEX_CONTRASENA_SEGURA.test(val)) {
-          ctx.addIssue({ code: "custom", message: MENSAJE_CONTRASENA_SEGURA })
-        }
-      }),
-    fechaNaci: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha requerida (aaaa-mm-dd)"),
-    documentoIdentidad: z.string().max(20).optional().or(z.literal("")).nullable(),
-    celular: z.string().max(20).optional().or(z.literal("")),
-    direccion: z.string().max(100).optional().or(z.literal("")),
-    parentesco: z.string().min(1, "El parentesco es obligatorio").max(50),
-  })
-
-type ApoderadoSlotValues = z.infer<typeof apoderadoSlotSchema>
-
-const defaultSlotValues: ApoderadoSlotValues = {
-  nombre: "",
-  apellidoPat: "",
-  apellidoMat: "",
-  gmail: "",
-  contraseña: "",
-  fechaNaci: "",
-  documentoIdentidad: "",
-  celular: "",
-  direccion: "",
-  parentesco: "",
+/** Convierte lo que devuelve la búsqueda en los valores del formulario. */
+export function apoderadoDesdeBusqueda(a: ApoderadoBusqueda): ApoderadoPasoValues {
+  return {
+    ...apoderadoPasoDefault,
+    estado: a.estado,
+    documentoIdentidad: a.documentoIdentidad,
+    nombre: a.nombre ?? "",
+    apellidoPat: a.apellidoPat ?? "",
+    apellidoMat: a.apellidoMat ?? "",
+    fechaNaci: a.fechaNaci ?? "",
+    sexo: a.sexo ?? "",
+    direccion: a.direccion ?? "",
+    idParentesco: a.idParentesco ?? 0,
+    celular: a.celular ?? "",
+    gmail: a.gmail ?? "",
+    hijos: a.hijos,
+  }
 }
 
 interface PasoApoderadoProps {
-  value: PasoApoderadoData | null
-  onChange: (data: PasoApoderadoData) => void
-  onBack: () => void
-  onNext: () => void
+  value: ApoderadoPasoValues[]
+  idAlumno: number | null
+  validando: boolean
+  onAtras: (valores: ApoderadoPasoValues[]) => void
+  onSiguiente: (valores: ApoderadoPasoValues[]) => void
 }
 
-export function PasoApoderado({ value, onChange, onBack, onNext }: PasoApoderadoProps) {
-  const buscarApoderado = useApoderadoPorDocumento()
-  const reniec = useConsultarDni()
-  const [busqueda, setBusqueda] = useState(value?.principal?.documentoIdentidad ?? "")
-  const [apoderadoSel, setApoderadoSel] = useState<ApoderadoResponse | null>(
-    value?.principal?.existe ? (value.principal.apoderado ?? null) : null
-  )
-  const [haySecundario, setHaySecundario] = useState(!!value?.secundario)
-
-  const formPrincipal = useForm<ApoderadoSlotValues>({
-    resolver: zodResolver(apoderadoSlotSchema),
-    defaultValues: value?.principal?.existe
-      ? defaultSlotValues
-      : {
-          nombre: value?.principal?.nombre ?? "",
-          apellidoPat: value?.principal?.apellidoPat ?? "",
-          apellidoMat: value?.principal?.apellidoMat ?? "",
-          gmail: value?.principal?.gmail ?? "",
-          contraseña: value?.principal?.contraseña ?? "",
-          fechaNaci: value?.principal?.fechaNaci ?? "",
-          documentoIdentidad: value?.principal?.documentoIdentidad ?? "",
-          celular: value?.principal?.celular ?? "",
-          direccion: value?.principal?.direccion ?? "",
-          parentesco: value?.principal?.parentesco ?? "",
-        },
+export function PasoApoderado({ value, idAlumno, validando, onAtras, onSiguiente }: PasoApoderadoProps) {
+  const form = useForm<ApoderadosPasoValues>({
+    resolver: zodResolver(apoderadosPasoSchema),
+    defaultValues: { apoderados: value.length ? value : [apoderadoPasoDefault] },
   })
+  const { fields, append, remove } = useFieldArray({ control: form.control, name: "apoderados" })
 
-  const formSecundario = useForm<ApoderadoSlotValues>({
-    resolver: zodResolver(apoderadoSlotSchema),
-    defaultValues: {
-      nombre: value?.secundario?.nombre ?? "",
-      apellidoPat: value?.secundario?.apellidoPat ?? "",
-      apellidoMat: value?.secundario?.apellidoMat ?? "",
-      gmail: value?.secundario?.gmail ?? "",
-      contraseña: value?.secundario?.contraseña ?? "",
-      fechaNaci: value?.secundario?.fechaNaci ?? "",
-      documentoIdentidad: value?.secundario?.documentoIdentidad ?? "",
-      celular: value?.secundario?.celular ?? "",
-      direccion: value?.secundario?.direccion ?? "",
-      parentesco: value?.secundario?.parentesco ?? "",
-    },
-  })
-
-  const [busquedaSec, setBusquedaSec] = useState(value?.secundario?.documentoIdentidad ?? "")
-  const [apoderadoSecSel, setApoderadoSecSel] = useState<ApoderadoResponse | null>(
-    value?.secundario?.existe ? (value.secundario.apoderado ?? null) : null
-  )
-
-  async function buscarPorDocumento() {
-    const dni = busqueda.trim()
-    if (!dni) return
-    try {
-      const apoderado = await buscarApoderado.mutateAsync(dni)
-      setApoderadoSel(apoderado)
-      onChange({
-        principal: { existe: true, apoderado },
-        secundario: haySecundario ? value?.secundario : undefined,
-      })
-      toast.success(
-        `Apoderado encontrado: ${apoderado.nombre} ${apoderado.apellidoPat} ${apoderado.apellidoMat}`
-      )
-    } catch (error) {
-      const isNotFound =
-        (error instanceof ApiError && error.status === 404) ||
-        (error instanceof Error && error.message.toLowerCase().includes("no encontrado"))
-      if (isNotFound) {
-        if (/^\d{8}$/.test(dni)) {
-          try {
-            const r = await reniec.mutateAsync(dni)
-            setApoderadoSel(null)
-            formPrincipal.setValue("documentoIdentidad", r.dni ?? dni)
-            formPrincipal.setValue("nombre", r.nombres ?? "", { shouldValidate: true })
-            formPrincipal.setValue("apellidoPat", r.apellidoPaterno ?? "", { shouldValidate: true })
-            formPrincipal.setValue("apellidoMat", r.apellidoMaterno ?? "", { shouldValidate: true })
-            const mensaje = r.origen === "RENIEC" || r.origen === "CACHE" ? "Datos completados desde RENIEC" : "Datos completados automáticamente"
-            toast.success(mensaje)
-            return
-          } catch (reniecError) {
-            if (reniecError instanceof ApiError && reniecError.status === 404) {
-              setApoderadoSel(null)
-              formPrincipal.setValue("documentoIdentidad", dni)
-              toast.info("No encontramos ese DNI en RENIEC. Completa los datos.")
-              return
-            }
-            toast.error(reniecError instanceof Error ? reniecError.message : "No se pudo consultar RENIEC")
-            return
-          }
-        }
-        setApoderadoSel(null)
-        formPrincipal.setValue("documentoIdentidad", dni)
-        toast.info("No encontramos ese DNI. Completa los datos del apoderado.")
-      } else {
-        const msg = error instanceof Error ? error.message : ""
-        toast.error(msg || "No se pudo buscar el apoderado")
-      }
-    }
-  }
-
-  function cambiarApoderado() {
-    setApoderadoSel(null)
-    setBusqueda("")
-    onChange({
-      principal: { existe: false },
-      secundario: haySecundario ? value?.secundario : undefined,
-    })
-  }
-
-  async function buscarSecundario() {
-    const dni = busquedaSec.trim()
-    if (!dni) return
-    try {
-      const apoderado = await buscarApoderado.mutateAsync(dni)
-      setApoderadoSecSel(apoderado)
-      toast.success(
-        `Apoderado secundario encontrado: ${apoderado.nombre} ${apoderado.apellidoPat}`
-      )
-    } catch (error) {
-      const isNotFound =
-        (error instanceof ApiError && error.status === 404) ||
-        (error instanceof Error && error.message.toLowerCase().includes("no encontrado"))
-      if (isNotFound) {
-        if (/^\d{8}$/.test(dni)) {
-          try {
-            const r = await reniec.mutateAsync(dni)
-            setApoderadoSecSel(null)
-            formSecundario.setValue("documentoIdentidad", r.dni ?? dni)
-            formSecundario.setValue("nombre", r.nombres ?? "", { shouldValidate: true })
-            formSecundario.setValue("apellidoPat", r.apellidoPaterno ?? "", { shouldValidate: true })
-            formSecundario.setValue("apellidoMat", r.apellidoMaterno ?? "", { shouldValidate: true })
-            const mensaje = r.origen === "RENIEC" || r.origen === "CACHE" ? "Datos completados desde RENIEC" : "Datos completados automáticamente"
-            toast.success(mensaje)
-            return
-          } catch (reniecError) {
-            if (reniecError instanceof ApiError && reniecError.status === 404) {
-              setApoderadoSecSel(null)
-              formSecundario.setValue("documentoIdentidad", dni)
-              toast.info("No encontramos ese DNI en RENIEC. Completa los datos.")
-              return
-            }
-            toast.error(reniecError instanceof Error ? reniecError.message : "No se pudo consultar RENIEC")
-            return
-          }
-        }
-        setApoderadoSecSel(null)
-        formSecundario.setValue("documentoIdentidad", dni)
-        toast.info("No encontramos ese DNI. Completa los datos del apoderado secundario.")
-      } else {
-        const msg = error instanceof Error ? error.message : ""
-        toast.error(msg || "No se pudo buscar el apoderado")
-      }
-    }
-  }
-
-  function handleSiguiente() {
-    if (!apoderadoSel) {
-      formPrincipal.handleSubmit((vals) => {
-        const principalData: ApoderadoSlotData = {
-          existe: false,
-          nombre: vals.nombre,
-          apellidoPat: vals.apellidoPat,
-          apellidoMat: vals.apellidoMat,
-          gmail: vals.gmail || undefined,
-          contraseña: vals.contraseña || undefined,
-          fechaNaci: vals.fechaNaci,
-          documentoIdentidad: vals.documentoIdentidad || busqueda || undefined,
-          celular: vals.celular || undefined,
-          direccion: vals.direccion || undefined,
-          parentesco: vals.parentesco,
-        }
-        continuarConSecundario(principalData)
-      })()
-    } else {
-      continuarConSecundario({ existe: true, apoderado: apoderadoSel })
-    }
-  }
-
-  function continuarConSecundario(principalData: ApoderadoSlotData) {
-    let secundarioData: ApoderadoSlotData | undefined
-
-    if (haySecundario) {
-      if (apoderadoSecSel) {
-        secundarioData = { existe: true, apoderado: apoderadoSecSel }
-      } else {
-        formSecundario.handleSubmit((vals) => {
-          secundarioData = {
-            existe: false,
-            nombre: vals.nombre,
-            apellidoPat: vals.apellidoPat,
-            apellidoMat: vals.apellidoMat,
-            gmail: vals.gmail || undefined,
-            contraseña: vals.contraseña || undefined,
-            fechaNaci: vals.fechaNaci,
-            documentoIdentidad: vals.documentoIdentidad || busquedaSec || undefined,
-            celular: vals.celular || undefined,
-            direccion: vals.direccion || undefined,
-            parentesco: vals.parentesco,
-          }
-          onChange({ principal: principalData, secundario: secundarioData })
-          onNext()
-        })()
-        return
-      }
-    }
-
-    onChange({ principal: principalData, secundario: secundarioData })
-    onNext()
-  }
+  const handleSiguiente = form.handleSubmit((valores) => onSiguiente(valores.apoderados))
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h3 className="text-lg font-semibold">Paso 2 — Apoderado</h3>
-        <p className="text-sm text-muted-foreground">
-          Busca el apoderado por DNI o regístralo si es nuevo.
-        </p>
-      </div>
-
-      {apoderadoSel ? (
-        <div className="flex items-center justify-between rounded-lg border p-3">
-          <div>
-            <p className="font-medium">
-              {apoderadoSel.nombre} {apoderadoSel.apellidoPat} {apoderadoSel.apellidoMat}
+    <div className="flex flex-col gap-4">
+      {fields.map((field, indice) => (
+        <TarjetaSeccion key={field.id}>
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <p className="text-sm font-semibold">
+              {indice === 0 ? "Apoderado principal" : "Apoderado secundario"}
             </p>
-            <p className="font-mono text-xs text-muted-foreground">
-              {apoderadoSel.documentoIdentidad ?? "S/D"}
-              {apoderadoSel.parentesco ? ` · ${apoderadoSel.parentesco}` : ""}
-            </p>
-          </div>
-          <Button type="button" variant="outline" size="sm" onClick={cambiarApoderado}>
-            Cambiar
-          </Button>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          <div className="flex gap-2">
-            <Input
-              placeholder="Buscar apoderado por DNI..."
-              value={busqueda}
-              onChange={(e) => setBusqueda(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && buscarPorDocumento()}
-            />
-            <Button
-              type="button"
-              variant="outline"
-              onClick={buscarPorDocumento}
-              disabled={buscarApoderado.isPending}
-            >
-              {buscarApoderado.isPending ? (
-                <Loader2 className="animate-spin" />
-              ) : (
-                <Search />
-              )}
-            </Button>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="h-px flex-1 bg-border" />
-            <span className="text-xs text-muted-foreground">o completa los datos</span>
-            <div className="h-px flex-1 bg-border" />
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <Controller
-              control={formPrincipal.control}
-              name="nombre"
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel>Nombres</FieldLabel>
-                  <FieldContent>
-                    <Input placeholder="María" {...field} />
-                    <FieldError errors={[formPrincipal.formState.errors.nombre]} />
-                  </FieldContent>
-                </Field>
-              )}
-            />
-            <Controller
-              control={formPrincipal.control}
-              name="apellidoPat"
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel>Ap. paterno</FieldLabel>
-                  <FieldContent>
-                    <Input placeholder="García" {...field} />
-                    <FieldError errors={[formPrincipal.formState.errors.apellidoPat]} />
-                  </FieldContent>
-                </Field>
-              )}
-            />
-            <Controller
-              control={formPrincipal.control}
-              name="apellidoMat"
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel>Ap. materno</FieldLabel>
-                  <FieldContent>
-                    <Input placeholder="Ríos" {...field} />
-                    <FieldError errors={[formPrincipal.formState.errors.apellidoMat]} />
-                  </FieldContent>
-                </Field>
-              )}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Controller
-              control={formPrincipal.control}
-              name="documentoIdentidad"
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel>Documento de identidad</FieldLabel>
-                  <FieldContent>
-                    <Input
-                      placeholder="DNI"
-                      value={field.value ?? ""}
-                      onChange={field.onChange}
-                      onBlur={field.onBlur}
-                      name={field.name}
-                      ref={field.ref}
-                    />
-                    <FieldError errors={[formPrincipal.formState.errors.documentoIdentidad]} />
-                  </FieldContent>
-                </Field>
-              )}
-            />
-            <Controller
-              control={formPrincipal.control}
-              name="fechaNaci"
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel>Fecha de nacimiento</FieldLabel>
-                  <FieldContent>
-                    <Input type="date" {...field} />
-                    <FieldError errors={[formPrincipal.formState.errors.fechaNaci]} />
-                  </FieldContent>
-                </Field>
-              )}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Controller
-              control={formPrincipal.control}
-              name="celular"
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel>Celular</FieldLabel>
-                  <FieldContent>
-                    <Input placeholder="987654321" {...field} />
-                    <FieldError errors={[formPrincipal.formState.errors.celular]} />
-                  </FieldContent>
-                </Field>
-              )}
-            />
-            <Controller
-              control={formPrincipal.control}
-              name="parentesco"
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel>Parentesco</FieldLabel>
-                  <FieldContent>
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Selecciona" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {PARENTESCOS.map((p) => (
-                          <SelectItem key={p} value={p}>
-                            {p}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FieldError errors={[formPrincipal.formState.errors.parentesco]} />
-                  </FieldContent>
-                </Field>
-              )}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Controller
-              control={formPrincipal.control}
-              name="gmail"
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel>Correo electrónico</FieldLabel>
-                  <FieldContent>
-                    <Input
-                      type="email"
-                      placeholder="apoderado@correo.com"
-                      {...field}
-                    />
-                    <FieldError errors={[formPrincipal.formState.errors.gmail]} />
-                  </FieldContent>
-                </Field>
-              )}
-            />
-            <Controller
-              control={formPrincipal.control}
-              name="contraseña"
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel>Contraseña</FieldLabel>
-                  <FieldContent>
-                    <Input
-                      type="password"
-                      placeholder="Mín 8: mayúscula, número y símbolo"
-                      {...field}
-                    />
-                    <FieldError errors={[formPrincipal.formState.errors.contraseña]} />
-                  </FieldContent>
-                </Field>
-              )}
-            />
-          </div>
-
-          <Controller
-            control={formPrincipal.control}
-            name="direccion"
-            render={({ field }) => (
-              <Field>
-                <FieldLabel>Dirección</FieldLabel>
-                <FieldContent>
-                  <Input placeholder="Opcional" {...field} />
-                  <FieldError errors={[formPrincipal.formState.errors.direccion]} />
-                </FieldContent>
-              </Field>
+            {indice > 0 && (
+              <Button type="button" variant="ghost" size="sm" onClick={() => remove(indice)}>
+                <Trash2 className="text-destructive" data-icon="inline-start" />
+                Quitar
+              </Button>
             )}
-          />
-        </div>
+          </div>
+          <FormularioApoderado form={form} indice={indice} idAlumno={idAlumno} />
+        </TarjetaSeccion>
+      ))}
+
+      {fields.length < 2 && (
+        <Button type="button" variant="outline" className="self-start" onClick={() => append(apoderadoPasoDefault)}>
+          <Plus data-icon="inline-start" />
+          Agregar apoderado secundario
+        </Button>
       )}
 
-      <div className="flex items-center justify-between rounded-lg border p-3">
-        <div>
-          <p className="text-sm font-medium">Apoderado secundario</p>
-          <p className="text-xs text-muted-foreground">Opcional, solo si aplica</p>
-        </div>
-        <Switch
-          checked={haySecundario}
-          onCheckedChange={(checked) => {
-            setHaySecundario(checked)
-            if (!checked) {
-              setApoderadoSecSel(null)
-              setBusquedaSec("")
-            }
-          }}
-        />
+      <div className="flex justify-end gap-2">
+        <Button type="button" variant="outline" onClick={() => onAtras(form.getValues("apoderados"))}>
+          Atrás
+        </Button>
+        <Button type="button" variant="brand" onClick={handleSiguiente} disabled={validando}>
+          {validando ? "Validando..." : "Siguiente"}
+        </Button>
       </div>
+    </div>
+  )
+}
 
-      {haySecundario && (
-        <div className="space-y-3 rounded-lg border p-3">
-          <p className="text-sm font-medium">Apoderado secundario</p>
+/** Búsqueda por DNI y campos de un apoderado; también lo usa Estudiantes al agregar uno. */
+export function FormularioApoderado({
+  form,
+  indice,
+  idAlumno,
+}: {
+  form: UseFormReturn<ApoderadosPasoValues>
+  indice: number
+  idAlumno: number | null
+}) {
+  const buscar = useBuscarApoderadoInscripcion()
+  const consultarDni = useConsultarDni()
+  const { data: parentescos = [] } = useParentescos()
+  const { data: sexos = [] } = useSexos()
+  const estado = useWatch({ control: form.control, name: `apoderados.${indice}.estado` })
+  const hijos = useWatch({ control: form.control, name: `apoderados.${indice}.hijos` })
+  const errores = form.formState.errors.apoderados?.[indice]
+  const base = `apoderados.${indice}` as const
 
-          {apoderadoSecSel ? (
-            <div className="flex items-center justify-between rounded-lg border p-3">
-              <div>
-                <p className="font-medium">
-                  {apoderadoSecSel.nombre} {apoderadoSecSel.apellidoPat}{" "}
-                  {apoderadoSecSel.apellidoMat}
-                </p>
-                <p className="font-mono text-xs text-muted-foreground">
-                  {apoderadoSecSel.documentoIdentidad ?? "S/D"}
-                  {apoderadoSecSel.parentesco ? ` · ${apoderadoSecSel.parentesco}` : ""}
-                </p>
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setApoderadoSecSel(null)}
-              >
-                Cambiar
-              </Button>
-            </div>
-          ) : (
-            <>
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Buscar apoderado secundario por DNI..."
-                  value={busquedaSec}
-                  onChange={(e) => setBusquedaSec(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && buscarSecundario()}
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={buscarSecundario}
-                  disabled={buscarApoderado.isPending}
-                >
-                  {buscarApoderado.isPending ? (
-                    <Loader2 className="animate-spin" />
-                  ) : (
-                    <Search />
-                  )}
-                </Button>
-              </div>
+  async function handleBuscar() {
+    const dni = form.getValues(`${base}.documentoIdentidad`).trim()
+    try {
+      const encontrado = await buscar.mutateAsync({ dni, idAlumno })
+      const valores = apoderadoDesdeBusqueda(encontrado)
+      if (encontrado.estado === "NUEVO") {
+        const r = await consultarDni.mutateAsync(dni)
+        valores.nombre = r.nombres ?? ""
+        valores.apellidoPat = r.apellidoPaterno ?? ""
+        valores.apellidoMat = r.apellidoMaterno ?? ""
+      }
+      form.setValue(base, valores)
+      form.clearErrors(base)
+      if (encontrado.estado === "APODERADO") toast.success("Ya es apoderado: solo se vinculará a este alumno")
+      else if (encontrado.estado === "USUARIO") toast.info("Ya tiene cuenta: se le añadirá el rol Apoderado")
+      else toast.success("Datos completados desde RENIEC")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo consultar el DNI")
+    }
+  }
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <Controller
-                  control={formSecundario.control}
-                  name="nombre"
-                  render={({ field }) => (
-                    <Field>
-                      <FieldLabel>Nombres</FieldLabel>
-                      <FieldContent>
-                        <Input placeholder="María" {...field} />
-                        <FieldError errors={[formSecundario.formState.errors.nombre]} />
-                      </FieldContent>
-                    </Field>
-                  )}
-                />
-                <Controller
-                  control={formSecundario.control}
-                  name="apellidoPat"
-                  render={({ field }) => (
-                    <Field>
-                      <FieldLabel>Ap. paterno</FieldLabel>
-                      <FieldContent>
-                        <Input placeholder="García" {...field} />
-                        <FieldError errors={[formSecundario.formState.errors.apellidoPat]} />
-                      </FieldContent>
-                    </Field>
-                  )}
-                />
-                <Controller
-                  control={formSecundario.control}
-                  name="apellidoMat"
-                  render={({ field }) => (
-                    <Field>
-                      <FieldLabel>Ap. materno</FieldLabel>
-                      <FieldContent>
-                        <Input placeholder="Ríos" {...field} />
-                        <FieldError errors={[formSecundario.formState.errors.apellidoMat]} />
-                      </FieldContent>
-                    </Field>
-                  )}
-                />
-              </div>
+  function handleCambiarDni(dni: string) {
+    // Otro DNI es otra persona: hay que volver a buscarlo.
+    form.setValue(base, { ...apoderadoPasoDefault, documentoIdentidad: dni })
+  }
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Controller
-                  control={formSecundario.control}
-                  name="documentoIdentidad"
-                  render={({ field }) => (
-                    <Field>
-                      <FieldLabel>Documento de identidad</FieldLabel>
-                      <FieldContent>
-                        <Input
-                          placeholder="DNI"
-                          value={field.value ?? ""}
-                          onChange={field.onChange}
-                          onBlur={field.onBlur}
-                          name={field.name}
-                          ref={field.ref}
-                        />
-                        <FieldError errors={[formSecundario.formState.errors.documentoIdentidad]} />
-                      </FieldContent>
-                    </Field>
-                  )}
-                />
-                <Controller
-                  control={formSecundario.control}
-                  name="fechaNaci"
-                  render={({ field }) => (
-                    <Field>
-                      <FieldLabel>Fecha de nacimiento</FieldLabel>
-                      <FieldContent>
-                        <Input type="date" {...field} />
-                        <FieldError errors={[formSecundario.formState.errors.fechaNaci]} />
-                      </FieldContent>
-                    </Field>
-                  )}
-                />
-              </div>
+  const yaEsApoderado = estado === "APODERADO"
+  const tieneCuenta = estado === "APODERADO" || estado === "USUARIO"
+  const buscado = estado !== ""
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Controller
-                  control={formSecundario.control}
-                  name="celular"
-                  render={({ field }) => (
-                    <Field>
-                      <FieldLabel>Celular</FieldLabel>
-                      <FieldContent>
-                        <Input placeholder="987654321" {...field} />
-                        <FieldError errors={[formSecundario.formState.errors.celular]} />
-                      </FieldContent>
-                    </Field>
-                  )}
-                />
-                <Controller
-                  control={formSecundario.control}
-                  name="parentesco"
-                  render={({ field }) => (
-                    <Field>
-                      <FieldLabel>Parentesco</FieldLabel>
-                      <FieldContent>
-                        <Select value={field.value} onValueChange={field.onChange}>
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Selecciona" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {PARENTESCOS.map((p) => (
-                              <SelectItem key={p} value={p}>
-                                {p}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FieldError errors={[formSecundario.formState.errors.parentesco]} />
-                      </FieldContent>
-                    </Field>
-                  )}
-                />
-              </div>
+  return (
+    <div className="flex flex-col gap-4">
+      <Controller
+        control={form.control}
+        name={`${base}.documentoIdentidad`}
+        render={({ field }) => (
+          <CampoDni
+            value={field.value}
+            onChange={handleCambiarDni}
+            onBlur={field.onBlur}
+            name={field.name}
+            inputRef={field.ref}
+            cargando={buscar.isPending || consultarDni.isPending}
+            onBuscar={handleBuscar}
+            error={errores?.documentoIdentidad}
+            label="Documento de identidad *"
+            placeholder="Ingrese el DNI"
+          />
+        )}
+      />
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Controller
-                  control={formSecundario.control}
-                  name="gmail"
-                  render={({ field }) => (
-                    <Field>
-                      <FieldLabel>Correo electrónico</FieldLabel>
-                      <FieldContent>
-                        <Input
-                          type="email"
-                          placeholder="apoderado@correo.com"
-                          {...field}
-                        />
-                        <FieldError errors={[formSecundario.formState.errors.gmail]} />
-                      </FieldContent>
-                    </Field>
-                  )}
-                />
-                <Controller
-                  control={formSecundario.control}
-                  name="contraseña"
-                  render={({ field }) => (
-                    <Field>
-                      <FieldLabel>Contraseña</FieldLabel>
-                      <FieldContent>
-                        <Input
-                          type="password"
-                          placeholder="Mín 8: mayúscula, número y símbolo"
-                          {...field}
-                        />
-                        <FieldError errors={[formSecundario.formState.errors.contraseña]} />
-                      </FieldContent>
-                    </Field>
-                  )}
-                />
-              </div>
+      {yaEsApoderado && (
+        <Aviso icono={Users} titulo="Ya es apoderado en el colegio">
+          {hijos.length ? `Apoderado de: ${hijos.join(", ")}. ` : ""}
+          No se registra de nuevo: solo se vincula a este alumno. Sus datos se editan desde Estudiantes.
+        </Aviso>
+      )}
+      {estado === "USUARIO" && (
+        <Aviso icono={UserCheck} titulo="Ya tiene cuenta en el sistema">
+          Se reutiliza su cuenta y se le añade el rol Apoderado: no se le pide correo ni contraseña.
+        </Aviso>
+      )}
 
+      {buscado && (
+        <>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            {(["nombre", "apellidoPat", "apellidoMat"] as const).map((campo) => (
               <Controller
-                control={formSecundario.control}
-                name="direccion"
+                key={campo}
+                control={form.control}
+                name={`${base}.${campo}`}
                 render={({ field }) => (
                   <Field>
-                    <FieldLabel>Dirección</FieldLabel>
+                    <FieldLabel>{campo === "nombre" ? "Nombres *" : campo === "apellidoPat" ? "Ap. paterno *" : "Ap. materno *"}</FieldLabel>
                     <FieldContent>
-                      <Input placeholder="Opcional" {...field} />
-                      <FieldError errors={[formSecundario.formState.errors.direccion]} />
+                      <Input
+                        maxLength={30}
+                        disabled={tieneCuenta}
+                        {...field}
+                        onChange={(e) => field.onChange(e.target.value.replace(REGEX_NO_LETRAS_ESPACIOS, ""))}
+                      />
+                      <FieldError errors={[errores?.[campo]]} />
                     </FieldContent>
                   </Field>
                 )}
               />
-            </>
-          )}
-        </div>
-      )}
+            ))}
+          </div>
 
-      <div className="flex justify-between">
-        <Button type="button" variant="outline" onClick={onBack}>
-          Volver
-        </Button>
-        <Button type="button" onClick={handleSiguiente}>
-          Siguiente
-        </Button>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Controller
+              control={form.control}
+              name={`${base}.fechaNaci`}
+              render={({ field }) => (
+                <Field>
+                  <FieldLabel>Fecha de nacimiento *</FieldLabel>
+                  <FieldContent>
+                    <Input type="date" disabled={tieneCuenta} {...field} />
+                    <FieldError errors={[errores?.fechaNaci]} />
+                  </FieldContent>
+                </Field>
+              )}
+            />
+            <Controller
+              control={form.control}
+              name={`${base}.idParentesco`}
+              render={({ field }) => (
+                <Field>
+                  <FieldLabel>Parentesco con el alumno *</FieldLabel>
+                  <FieldContent>
+                    <Select
+                      value={field.value ? String(field.value) : ""}
+                      onValueChange={(v) => field.onChange(Number(v))}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Padre, madre...">
+                          {parentescos.find((p) => p.idParentesco === field.value)?.nombre}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          {parentescos.map((p) => (
+                            <SelectItem key={p.idParentesco} value={String(p.idParentesco)}>{p.nombre}</SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                    <FieldError errors={[errores?.idParentesco]} />
+                  </FieldContent>
+                </Field>
+              )}
+            />
+          </div>
+
+          <fieldset disabled={yaEsApoderado} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Controller
+              control={form.control}
+              name={`${base}.sexo`}
+              render={({ field }) => (
+                <Field>
+                  <FieldLabel>Sexo *</FieldLabel>
+                  <FieldContent>
+                    <Select value={field.value} onValueChange={(v) => field.onChange(v ?? "")} disabled={yaEsApoderado}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Selecciona">
+                          {sexos.find((s) => s.valor === field.value)?.nombre}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          {sexos.map((s) => (
+                            <SelectItem key={s.valor} value={s.valor}>{s.nombre}</SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                    <FieldError errors={[errores?.sexo]} />
+                  </FieldContent>
+                </Field>
+              )}
+            />
+            <Controller
+              control={form.control}
+              name={`${base}.celular`}
+              render={({ field }) => (
+                <Field>
+                  <FieldLabel>Celular *</FieldLabel>
+                  <FieldContent>
+                    <Input
+                      placeholder="982323412"
+                      maxLength={9}
+                      inputMode="numeric"
+                      {...field}
+                      onChange={(e) => field.onChange(e.target.value.replace(/\D/g, ""))}
+                    />
+                    <FieldError errors={[errores?.celular]} />
+                  </FieldContent>
+                </Field>
+              )}
+            />
+            <Controller
+              control={form.control}
+              name={`${base}.direccion`}
+              render={({ field }) => (
+                <Field className="sm:col-span-2">
+                  <FieldLabel>Dirección *</FieldLabel>
+                  <FieldContent>
+                    <Input placeholder="Av. Villahermosa 123" maxLength={120} {...field} />
+                    <FieldError errors={[errores?.direccion]} />
+                  </FieldContent>
+                </Field>
+              )}
+            />
+          </fieldset>
+
+          {!tieneCuenta && (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Controller
+                control={form.control}
+                name={`${base}.gmail`}
+                render={({ field }) => (
+                  <Field>
+                    <FieldLabel>Correo electrónico *</FieldLabel>
+                    <FieldContent>
+                      <Input type="email" placeholder="apoderado@correo.com" {...field} />
+                      <FieldDescription className="text-xs">Aquí le llegarán sus accesos.</FieldDescription>
+                      <FieldError errors={[errores?.gmail]} />
+                    </FieldContent>
+                  </Field>
+                )}
+              />
+              <Controller
+                control={form.control}
+                name={`${base}.contraseña`}
+                render={({ field }) => (
+                  <CampoContrasena
+                    value={field.value}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                    name={field.name}
+                    inputRef={field.ref}
+                    error={errores?.contraseña}
+                    label="Contraseña *"
+                    descripcion="Temporal: se le pedirá cambiarla al ingresar."
+                  />
+                )}
+              />
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
+function Aviso({
+  icono: Icono,
+  titulo,
+  children,
+}: {
+  icono: React.ElementType
+  titulo: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className="flex gap-3 rounded-lg border border-brand/25 bg-brand-subtle/40 p-3 text-sm">
+      <Icono className="mt-0.5 size-4 shrink-0 text-brand" />
+      <div>
+        <p className="font-medium">{titulo}</p>
+        <p className="text-xs text-muted-foreground">{children}</p>
       </div>
     </div>
   )

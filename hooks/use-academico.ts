@@ -502,6 +502,25 @@ export function useCrudTurnos() {
   )
 }
 
+/** Orden de niveles y grados, y si un grado repite: cambian la secuencia de matrícula. */
+export function useOrdenGrados() {
+  const invalidar = useInvalidarMutacion(KEYS.grados, KEYS.niveles, ["matriculas"])
+  return {
+    moverGrado: useMutation({
+      mutationFn: ({ id, subir }: { id: number; subir: boolean }) => gradosApi.mover(id, subir),
+      onSuccess: invalidar,
+    }),
+    moverNivel: useMutation({
+      mutationFn: ({ id, subir }: { id: number; subir: boolean }) => nivelesApi.mover(id, subir),
+      onSuccess: invalidar,
+    }),
+    cambiarRepite: useMutation({
+      mutationFn: ({ id, repite }: { id: number; repite: boolean }) => gradosApi.cambiarRepite(id, repite),
+      onSuccess: invalidar,
+    }),
+  }
+}
+
 export function useCrudGrados() {
   return useCrud(
     KEYS.grados,

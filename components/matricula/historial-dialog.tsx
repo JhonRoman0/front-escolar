@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Badge } from "@/components/ui/badge"
 
 import type { MatriculaResponse } from "@/lib/api/matricula"
+import { formatearFecha } from "@/lib/fechas"
 
 interface HistorialDialogProps {
   matricula: MatriculaResponse
@@ -45,14 +46,14 @@ export function HistorialDialog({
                     <span className="absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full bg-primary" />
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="font-medium">
-                        {h.grado} {h.seccion}
+                        {h.grado} {h.seccion} · {h.nivel}
                       </p>
                       <Badge variant="secondary">{h.turno}</Badge>
-                      <Badge variant="outline">Año {h.idAnio}</Badge>
+                      <Badge variant="outline">{h.anio}</Badge>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      {h.fechaInicio}
-                      {h.fechaFinal ? ` → ${h.fechaFinal}` : " → actual"}
+                      {formatearFecha(h.fechaInicio)}
+                      {h.fechaFinal ? ` → ${formatearFecha(h.fechaFinal)}` : " → actual"}
                     </p>
                     {h.motivo && (
                       <p className="text-xs italic text-muted-foreground">

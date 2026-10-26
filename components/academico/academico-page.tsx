@@ -20,12 +20,13 @@ export default function AcademicoPage() {
   const puedeAulas = usePuedeLeer("AULAS")
   const puedeGrados = usePuedeLeer("GRADOS")
   const puedeConfiguracion = usePuedeLeer("CONFIGURACION_ACADEMICA")
+  const puedeOrdenGrados = usePuedeLeer("ORDEN_GRADOS")
   const puedeAsignaciones = usePuedeLeer("ASIGNACIONES")
   const puedeSuspensiones = usePuedeLeer("SUSPENSIONES_DOCENTE")
   const puedeCambiosDocente = usePuedeLeer("CAMBIOS_DOCENTE")
   const puedeRecreos = usePuedeLeer("RECREOS")
 
-  const tieneEstructura = puedeAnios || puedeGrados || puedeTurnos || puedeAulas || puedeConfiguracion
+  const tieneEstructura = puedeAnios || puedeGrados || puedeTurnos || puedeAulas || puedeConfiguracion || puedeOrdenGrados
 
   // Estructura académica va primero: es el catálogo base del módulo y el resto
   // de pestañas dependen de lo que se registre ahí.
@@ -60,6 +61,7 @@ export default function AcademicoPage() {
               puedeAulas={puedeAulas}
               puedeGrados={puedeGrados}
               puedeConfiguracion={puedeConfiguracion}
+              puedeOrdenGrados={puedeOrdenGrados}
             />
           </TabsContent>
         )}

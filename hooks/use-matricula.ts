@@ -7,11 +7,15 @@ import {
 import { useInvalidarMutacion } from "@/hooks/use-invalidar"
 import {
   matriculasApi,
-  type MatriculaRequest,
+  type InscripcionRequest,
+  type MatriculaEdicionRequest,
 } from "@/lib/api/matricula"
 
 const KEYS = {
   matriculas: ["matriculas"] as const,
+  // Alumnos y apoderados se crean desde la matrícula.
+  alumnos: ["alumnos"] as const,
+  apoderados: ["apoderados"] as const,
 }
 
 export function useMatriculas(page: number, size = 10) {
@@ -30,16 +34,48 @@ export function useMatricula(id?: number) {
   })
 }
 
+export function usePagosMatricula(id?: number) {
+  return useQuery({
+    queryKey: [...KEYS.matriculas, "pagos", id],
+    queryFn: () => matriculasApi.pagos(id as number),
+    enabled: !!id,
+  })
+}
+
+/** Grados y secciones con cupo en los que el alumno puede matricularse ese año. */
+export function useOpcionesMatricula(idAnio: number | null, idAlumno?: number | null, idMatricula?: number | null) {
+  return useQuery({
+    queryKey: [...KEYS.matriculas, "opciones", idAnio, idAlumno ?? null, idMatricula ?? null],
+    queryFn: () => matriculasApi.opciones(idAnio as number, idAlumno, idMatricula),
+    enabled: !!idAnio,
+  })
+}
+
+export function useBuscarAlumnoInscripcion() {
+  return useMutation({ mutationFn: (dni: string) => matriculasApi.buscarAlumno(dni) })
+}
+
+export function useBuscarApoderadoInscripcion() {
+  return useMutation({
+    mutationFn: ({ dni, idAlumno }: { dni: string; idAlumno?: number | null }) =>
+      matriculasApi.buscarApoderado(dni, idAlumno),
+  })
+}
+
 export function useCrudMatriculas() {
-  const invalidar = useInvalidarMutacion(KEYS.matriculas)
+  const invalidar = useInvalidarMutacion(KEYS.matriculas, KEYS.alumnos, KEYS.apoderados)
   return {
-    crear: useMutation({
-      mutationFn: (data: MatriculaRequest) => matriculasApi.crear(data),
+    validar: useMutation({
+      mutationFn: (data: InscripcionRequest) => matriculasApi.validar(data),
+    }),
+    inscribir: useMutation({
+      mutationFn: ({ data, foto, comprobante }: { data: InscripcionRequest; foto: File | null; comprobante: File | null }) =>
+        matriculasApi.inscribir(data, foto, comprobante),
       onSuccess: invalidar,
     }),
-    actualizar: useMutation({
-      mutationFn: ({ id, data }: { id: number; data: MatriculaRequest }) =>
-        matriculasApi.actualizar(id, data),
+    editar: useMutation({
+      mutationFn: ({ id, data, comprobante }: { id: number; data: MatriculaEdicionRequest; comprobante: File | null }) =>
+        matriculasApi.editar(id, data, comprobante),
       onSuccess: invalidar,
     }),
     cambioSeccion: useMutation({
@@ -56,38 +92,6 @@ export function useCrudMatriculas() {
     }),
     eliminar: useMutation({
       mutationFn: (id: number) => matriculasApi.eliminar(id),
-      onSuccess: invalidar,
-    }),
-    aprobar: useMutation({
-      mutationFn: ({
-        id,
-        observaciones,
-      }: {
-        id: number
-        observaciones?: string
-      }) => matriculasApi.aprobar(id, observaciones),
-      onSuccess: invalidar,
-    }),
-    rechazar: useMutation({
-      mutationFn: ({
-        id,
-        observaciones,
-      }: {
-        id: number
-        observaciones?: string
-      }) => matriculasApi.rechazar(id, observaciones),
-      onSuccess: invalidar,
-    }),
-    matricular: useMutation({
-      mutationFn: ({
-        id,
-        fechaPago,
-        montoPago,
-      }: {
-        id: number
-        fechaPago: string
-        montoPago: number
-      }) => matriculasApi.matricular(id, fechaPago, montoPago),
       onSuccess: invalidar,
     }),
   }
