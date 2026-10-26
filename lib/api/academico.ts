@@ -26,6 +26,8 @@ export interface DocenteResponse {
   gradoAcademicoId: number | null
   gradoAcademicoNombre: string | null
   niveles: NivelResponse[]
+  // Niveles con asignaciones en un año vigente o por comenzar: no se le pueden quitar.
+  nivelesConAsignaciones: number[]
   roles: { idRol: number; nombre: string; accesoId: number | null }[]
 }
 
