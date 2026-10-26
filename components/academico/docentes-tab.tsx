@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react"
 import { toast } from "sonner"
-import { FileDown, Loader2, Pencil, RotateCcw } from "lucide-react"
+import { FileDown, Loader2, Lock, Pencil, RotateCcw } from "lucide-react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm } from "react-hook-form"
 
@@ -414,6 +414,7 @@ function DocenteFormDialog({
   const { data: gradosAcademicos = [] } = useGradosAcademicos()
   const { data: niveles = [] } = useNiveles()
   const esEdicion = !!docente
+  const nivelesConAsignaciones = docente?.nivelesConAsignaciones ?? []
 
   const [fotoNueva, setFotoNueva] = useState<File | null>(null)
   const [preview, setPreview] = useState<string | null>(
@@ -744,6 +745,8 @@ function DocenteFormDialog({
                     <FieldLabel>Niveles que atiende *</FieldLabel>
                     <FieldDescription className="text-xs">
                       Selecciona al menos un nivel.
+                      {nivelesConAsignaciones.length > 0 &&
+                        " Los niveles con candado tienen asignaciones en un año vigente o por comenzar: para quitarlos, primero reasígnalas en Cambios de docente."}
                     </FieldDescription>
                     <FieldContent>
                       {!niveles.length ? (
@@ -754,10 +757,12 @@ function DocenteFormDialog({
                         <div className="grid gap-2 sm:grid-cols-3">
                           {niveles.map((nivel) => {
                             const checked = field.value.includes(nivel.idNivel)
+                            const bloqueado = checked && nivelesConAsignaciones.includes(nivel.idNivel)
                             return (
                               <CampoChip
                                 key={nivel.idNivel}
                                 checked={checked}
+                                disabled={bloqueado}
                                 onCheckedChange={(v) =>
                                   field.onChange(
                                     v
@@ -766,7 +771,12 @@ function DocenteFormDialog({
                                   )
                                 }
                               >
-                                {nivel.nombre}
+                                <span className="inline-flex items-center gap-1.5">
+                                  {nivel.nombre}
+                                  {bloqueado && (
+                                    <Lock className="size-3.5 text-muted-foreground" aria-label="Tiene asignaciones en este nivel" />
+                                  )}
+                                </span>
                               </CampoChip>
                             )
                           })}
