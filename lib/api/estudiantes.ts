@@ -1,5 +1,6 @@
 import { apiFetch } from "@/lib/api"
 import type { Paginated } from "@/lib/api/seguridad"
+import type { InscripcionApoderado } from "@/lib/api/matricula"
 
 // ── Apoderado ─────────────────────────────────────────────────────────────
 
@@ -13,24 +14,30 @@ export interface ApoderadoResponse {
   gmail: string | null
   celular: string | null
   direccion: string | null
+  // El parentesco es del vínculo con un alumno: solo viene dentro de AlumnoResponse.
+  idParentesco: number | null
   parentesco: string | null
+  sexo: string | null
+  principal: boolean
   documentoIdentidad: string | null
   fechaNaci: string | null
   urlFoto: string | null
   accesoId: number | null
 }
 
-export interface ApoderadoRequest {
-  nombre?: string | null
-  apellidoPat?: string | null
-  apellidoMat?: string | null
-  gmail?: string | null
-  contraseña?: string
-  fechaNaci?: string | null
-  documentoIdentidad?: string | null
-  celular?: string | null
-  direccion?: string | null
-  parentesco?: string | null
+// Edición desde Estudiantes: todo obligatorio; el parentesco es el del alumno indicado.
+export interface ApoderadoEdicionRequest {
+  documentoIdentidad: string
+  nombre: string
+  apellidoPat: string
+  apellidoMat: string
+  fechaNaci: string
+  sexo: string
+  direccion: string
+  celular: string
+  gmail: string
+  idAlumno: number
+  idParentesco: number
 }
 
 // ── Alumno ────────────────────────────────────────────────────────────────
@@ -46,6 +53,9 @@ export interface AlumnoResponse {
   direccion: string | null
   documentoIdentidad: string | null
   urlFoto: string | null
+  sexo: string | null
+  tieneDiscapacidad: boolean
+  discapacidad: string | null
   accesoId: number | null
   apoderados: ApoderadoResponse[]
   // Enriquecido por GET /alumnos (matrícula vigente) — Figma 4 cols
@@ -72,15 +82,10 @@ export interface AlumnosFiltros {
   search?: string | null
 }
 
-export interface AlumnoRequest {
-  nombre: string
-  apellidoPat: string
-  apellidoMat: string
-  fechaNacimiento: string
-  direccion?: string | null
-  documentoIdentidad?: string | null
-  apoderados?: ApoderadoRequest[] | null
-  accesoId?: number | null
+// Del alumno solo se corrige la discapacidad (la foto va aparte).
+export interface AlumnoEdicionRequest {
+  tieneDiscapacidad: boolean
+  discapacidad: string | null
 }
 
 // ── API ──────────────────────────────────────────────────────────────────
@@ -107,20 +112,11 @@ export const alumnosApi = {
   async porDocumento(documento: string): Promise<AlumnoResponse> {
     return apiFetch<AlumnoResponse>(`/alumnos/dni/${encodeURIComponent(documento)}`)
   },
-  async crear(data: AlumnoRequest): Promise<AlumnoResponse> {
-    return apiFetch<AlumnoResponse>("/alumnos", {
-      method: "POST",
-      body: JSON.stringify(data),
-    })
-  },
-  async actualizar(id: number, data: AlumnoRequest): Promise<AlumnoResponse> {
+  async actualizar(id: number, data: AlumnoEdicionRequest): Promise<AlumnoResponse> {
     return apiFetch<AlumnoResponse>(`/alumnos/${id}`, {
       method: "PUT",
       body: JSON.stringify(data),
     })
-  },
-  async eliminar(id: number): Promise<void> {
-    return apiFetch<void>(`/alumnos/${id}`, { method: "DELETE" })
   },
   async subirFoto(id: number, file: File): Promise<AlumnoResponse> {
     const formData = new FormData()
@@ -146,6 +142,18 @@ export const apoderadosApi = {
     return apiFetch<ApoderadoResponse>(
       `/apoderados/dni/${encodeURIComponent(documento)}`
     )
+  },
+  async agregar(idAlumno: number, data: InscripcionApoderado): Promise<ApoderadoResponse> {
+    return apiFetch<ApoderadoResponse>(`/apoderados/alumno/${idAlumno}`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    })
+  },
+  async actualizar(id: number, data: ApoderadoEdicionRequest): Promise<ApoderadoResponse> {
+    return apiFetch<ApoderadoResponse>(`/apoderados/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    })
   },
   async subirFoto(idUsuario: number, file: File): Promise<{ urlFoto: string | null }> {
     const formData = new FormData()

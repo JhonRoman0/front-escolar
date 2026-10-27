@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react"
 import { toast } from "sonner"
-import { CalendarDays, CircleHelp, SlidersHorizontal, Clock3, Lock, CloudSun, DoorOpen, GraduationCap, Pencil, Sun, TriangleAlert, X, type LucideIcon } from "lucide-react"
+import { CalendarDays, CircleHelp, ListOrdered, SlidersHorizontal, Clock3, Lock, CloudSun, DoorOpen, GraduationCap, Pencil, Sun, TriangleAlert, X, type LucideIcon } from "lucide-react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm, useWatch } from "react-hook-form"
 
@@ -98,6 +98,7 @@ import {
 } from "@/lib/schemas/academico"
 import { usePuede } from "@/hooks/use-permisos"
 import { SeccionesEstructura } from "./secciones-estructura"
+import { OrdenGradosTab } from "./orden-grados-tab"
 
 interface CatalogosTabProps {
   puedeTurnos: boolean
@@ -105,9 +106,10 @@ interface CatalogosTabProps {
   puedeAulas: boolean
   puedeGrados: boolean
   puedeConfiguracion: boolean
+  puedeOrdenGrados: boolean
 }
 
-type EstructuraKey = "anios" | "grados" | "turnos" | "aulas" | "configuracion"
+type EstructuraKey = "anios" | "grados" | "orden" | "turnos" | "aulas" | "configuracion"
 
 export default function CatalogosTab({
   puedeTurnos,
@@ -115,6 +117,7 @@ export default function CatalogosTab({
   puedeAulas,
   puedeGrados,
   puedeConfiguracion,
+  puedeOrdenGrados,
 }: CatalogosTabProps) {
   // Orden de configuración: primero los catálogos libres (turnos, aulas), luego el
   // año escolar y al final grados, que es el único que depende de los anteriores.
@@ -124,9 +127,10 @@ export default function CatalogosTab({
       { value: "aulas", label: "Aulas", icon: DoorOpen, show: puedeAulas },
       { value: "anios", label: "Año escolar", icon: CalendarDays, show: puedeAnios },
       { value: "grados", label: "Secciones", icon: GraduationCap, show: puedeGrados },
+      { value: "orden", label: "Orden de grados", icon: ListOrdered, show: puedeOrdenGrados },
       { value: "configuracion", label: "Configuración académica", icon: SlidersHorizontal, show: puedeConfiguracion },
     ],
-    [puedeAnios, puedeAulas, puedeGrados, puedeTurnos, puedeConfiguracion]
+    [puedeAnios, puedeAulas, puedeGrados, puedeTurnos, puedeConfiguracion, puedeOrdenGrados]
   )
 
   const visibles = opciones.filter((o) => o.show)
@@ -178,6 +182,11 @@ export default function CatalogosTab({
             onIrATurnos={puedeTurnos ? () => setActivo("turnos") : undefined}
             onIrAAnios={puedeAnios ? () => setActivo("anios") : undefined}
           />
+        </TabsContent>
+      )}
+      {puedeOrdenGrados && (
+        <TabsContent value="orden">
+          <OrdenGradosTab />
         </TabsContent>
       )}
       {puedeConfiguracion && (

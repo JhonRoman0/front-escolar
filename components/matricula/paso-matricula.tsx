@@ -1,270 +1,216 @@
 "use client"
 
-import { useState } from "react"
-import { Loader2 } from "lucide-react"
-import { z } from "zod"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { Controller, useForm } from "react-hook-form"
+import { useMemo, useState } from "react"
+import { BookOpen, CircleAlert, Loader2 } from "lucide-react"
 
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Field, FieldContent, FieldError, FieldLabel } from "@/components/ui/field"
+import { Field, FieldContent, FieldDescription, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Textarea } from "@/components/ui/textarea"
 
-import { GradoSeccionCascada, type SeccionInfo } from "@/components/shared/grado-seccion-cascada"
 import { useAniosEscolares } from "@/hooks/use-academico"
-import type { PasoAlumnoData } from "./paso-alumno"
-import type { PasoApoderadoData } from "./paso-apoderado"
+import { useOpcionesMatricula } from "@/hooks/use-matricula"
+import { useMetodosPago } from "@/hooks/use-pagos"
+import { ACCESO, ESTADO_ANIO, estadoAnioTexto } from "@/lib/api/academico"
+import { formatearFecha, fechaHoyISO } from "@/lib/fechas"
+import type { ApoderadoPasoValues } from "@/lib/schemas/matricula"
 
-export interface PasoMatriculaValues {
+import type { AlumnoPaso } from "./paso-alumno"
+import { CamposPago, erroresDePago, formatoSoles } from "./campos-pago"
+import { agruparGrados, grupoDe, SELECCION_VACIA, SelectorSeccion, seleccionInicial, type SeleccionSeccion } from "./selector-seccion"
+
+export interface DatosMatriculaPaso {
   idGradoSeccion: number
-  solicitudMatricula: number
-  fechaPago: string
-  montoPago: number | undefined
+  idMetodoPago: number
+  codigoTransaccion: string
   observaciones: string
 }
 
-const matriculaStepSchema = z
-  .object({
-    idGradoSeccion: z.number().int().min(1, "Debe seleccionar un grado - sección"),
-    solicitudMatricula: z.number().int().min(1).max(3),
-    fechaPago: z.string().default(""),
-    montoPago: z.number().min(0, "El monto no puede ser negativo").optional(),
-    observaciones: z.string().max(500).default(""),
-  })
-  .superRefine((val, ctx) => {
-    if (val.solicitudMatricula === 2) {
-      if (!val.fechaPago) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["fechaPago"],
-          message: "La fecha de pago es obligatoria al aprobar la solicitud",
-        })
-      }
-      if (val.montoPago === undefined) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["montoPago"],
-          message: "El monto de pago es obligatorio al aprobar la solicitud",
-        })
-      }
-    }
-  })
-
-const SOLICITUDES = [
-  { value: "1", label: "Pendiente" },
-  { value: "2", label: "Aprobada" },
-  { value: "3", label: "Rechazada" },
-]
-
 interface PasoMatriculaProps {
-  alumno: PasoAlumnoData
-  apoderado: PasoApoderadoData
-  onSubmit: (values: PasoMatriculaValues) => void
-  onBack: () => void
-  isSubmitting: boolean
+  alumno: AlumnoPaso
+  apoderados: ApoderadoPasoValues[]
+  enviando: boolean
+  onAtras: () => void
+  onCrear: (datos: DatosMatriculaPaso, comprobante: File | null) => void
 }
 
-export function PasoMatricula({
-  alumno,
-  apoderado,
-  onSubmit,
-  onBack,
-  isSubmitting,
-}: PasoMatriculaProps) {
+export function PasoMatricula({ alumno, apoderados, enviando, onAtras, onCrear }: PasoMatriculaProps) {
   const { data: anios = [] } = useAniosEscolares()
-  const [seccionInfo, setSeccionInfo] = useState<SeccionInfo | null>(null)
+  const { data: metodos = [] } = useMetodosPago(true)
+  // Solo se matricula en un año vigente o por comenzar; primero el por comenzar.
+  const aniosMatricula = useMemo(
+    () =>
+      anios
+        .filter((a) => a.accesoId !== ACCESO.ELIMINADO)
+        .filter((a) => a.estado === ESTADO_ANIO.VIGENTE || a.estado === ESTADO_ANIO.POR_COMENZAR)
+        .sort((a, b) => b.anio.localeCompare(a.anio)),
+    [anios]
+  )
+  const [idAnioElegido, setIdAnioElegido] = useState(0)
+  const idAnio = idAnioElegido || aniosMatricula[0]?.idAnio || 0
+  const { data: opciones, isLoading } = useOpcionesMatricula(idAnio || null, alumno.idAlumno)
+  const grados = useMemo(() => agruparGrados(opciones?.grados ?? []), [opciones])
 
-  const aniosActivos = anios.filter((a) => a.estado === 1)
-  const idsAniosActivos = new Set(aniosActivos.map((a) => a.idAnio))
+  // La selección se reinicia con la sugerida cada vez que cambia el año.
+  const [elegida, setElegida] = useState<{ idAnio: number; seleccion: SeleccionSeccion } | null>(null)
+  const seleccion =
+    elegida?.idAnio === idAnio ? elegida.seleccion : opciones ? seleccionInicial(grados) : SELECCION_VACIA
+  const grado = grupoDe(grados, seleccion.idGrado)
+  const seccion = grado?.secciones.find((s) => s.idGradoSeccion === seleccion.idGradoSeccion)
 
-  const form = useForm<PasoMatriculaValues>({
-    resolver: zodResolver(matriculaStepSchema) as any,
-    defaultValues: {
-      idGradoSeccion: 0,
-      solicitudMatricula: 1,
-      fechaPago: "",
-      montoPago: undefined,
-      observaciones: "",
-    },
-  })
+  const [idMetodoPago, setIdMetodoPago] = useState(0)
+  const [codigo, setCodigo] = useState("")
+  const [comprobante, setComprobante] = useState<File | null>(null)
+  const [observaciones, setObservaciones] = useState("")
+  const [intentado, setIntentado] = useState(false)
 
-  const solicitud = form.watch("solicitudMatricula")
+  const metodo = metodos.find((m) => m.idMetodoPago === idMetodoPago)
+  const erroresPago = intentado ? erroresDePago(metodo, codigo, comprobante) : undefined
+  const erroresSeccion = intentado
+    ? {
+        idNivel: seleccion.idNivel ? undefined : "Selecciona el nivel",
+        idGrado: seleccion.idGrado ? undefined : "Selecciona el grado",
+        idTurno: seleccion.idTurno ? undefined : "Selecciona el turno",
+        idGradoSeccion: seleccion.idGradoSeccion ? undefined : "Selecciona la sección",
+      }
+    : undefined
+  const sinMonto = !!grado && grado.monto == null
 
-  const alumnoNombre = alumno.existe
-    ? `${alumno.alumno?.nombre} ${alumno.alumno?.apellidoPat} ${alumno.alumno?.apellidoMat}`
-    : `${alumno.nombre} ${alumno.apellidoPat} ${alumno.apellidoMat}`
+  function handleCrear() {
+    setIntentado(true)
+    const pago = erroresDePago(metodo, codigo, comprobante)
+    if (!seleccion.idGradoSeccion || sinMonto || pago.metodo || pago.codigo || pago.comprobante) return
+    onCrear(
+      { idGradoSeccion: seleccion.idGradoSeccion, idMetodoPago, codigoTransaccion: codigo, observaciones },
+      comprobante
+    )
+  }
 
-  const apoderadoNombre = apoderado.principal.existe
-    ? `${apoderado.principal.apoderado?.nombre} ${apoderado.principal.apoderado?.apellidoPat} ${apoderado.principal.apoderado?.apellidoMat}`
-    : `${apoderado.principal.nombre} ${apoderado.principal.apellidoPat} ${apoderado.principal.apellidoMat}`
+  const v = alumno.valores
+  const nombreAlumno = `${v.nombre} ${v.apellidoPat} ${v.apellidoMat}`
+  const principal = apoderados[0]
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h3 className="text-lg font-semibold">Paso 3 — Matrícula</h3>
-        <p className="text-sm text-muted-foreground">
-          Selecciona el grado, sección y datos de la matrícula.
-        </p>
-      </div>
+    <div className="flex flex-col gap-5">
+      <Field>
+        <FieldLabel>Año escolar *</FieldLabel>
+        <FieldContent>
+          <Select value={idAnio ? String(idAnio) : ""} onValueChange={(valor) => setIdAnioElegido(Number(valor))}>
+            <SelectTrigger className="w-full sm:w-64">
+              <SelectValue placeholder="Selecciona">
+                {aniosMatricula.find((a) => a.idAnio === idAnio)?.anio}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                {aniosMatricula.map((a) => (
+                  <SelectItem key={a.idAnio} value={String(a.idAnio)}>
+                    {a.anio} · {estadoAnioTexto(a.estado)}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+          {opciones?.ultimoGrado && (
+            <FieldDescription className="text-xs">Último grado: {opciones.ultimoGrado}</FieldDescription>
+          )}
+        </FieldContent>
+      </Field>
 
-      <div className="rounded-lg border bg-muted/30 p-3">
-        <p className="text-sm font-medium">Grado - Sección</p>
-        <GradoSeccionCascada
-          key="matricula-wizard"
-          value={form.getValues("idGradoSeccion") || null}
-          onSeccionInfo={setSeccionInfo}
-          onChange={(v) =>
-            form.setValue("idGradoSeccion", v ?? 0, { shouldValidate: true })
-          }
-          allowedAnios={idsAniosActivos}
-        />
-        <FieldError errors={[form.formState.errors.idGradoSeccion]} />
-      </div>
+      {isLoading ? (
+        <Skeleton className="h-32 w-full" />
+      ) : opciones?.bloqueo ? (
+        <AvisoError>{opciones.bloqueo}</AvisoError>
+      ) : opciones && !opciones.grados.length ? (
+        <AvisoError>No hay secciones con cupo disponible en {aniosMatricula.find((a) => a.idAnio === idAnio)?.anio}.</AvisoError>
+      ) : opciones ? (
+        <>
+          <SelectorSeccion
+            grados={grados}
+            value={seleccion}
+            onChange={(nueva) => setElegida({ idAnio, seleccion: nueva })}
+            errores={erroresSeccion}
+          />
 
-      {seccionInfo && (
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Turno:</span>
-          <Badge variant="secondary">{seccionInfo.turno}</Badge>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <Controller
-          control={form.control}
-          name="solicitudMatricula"
-          render={({ field }) => (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field>
-              <FieldLabel>Solicitud</FieldLabel>
+              <FieldLabel>Monto de matrícula</FieldLabel>
               <FieldContent>
-                <Select
-                  value={String(field.value ?? 1)}
-                  onValueChange={(v) => field.onChange(Number(v))}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue>
-                      {SOLICITUDES.find(
-                        (s) => s.value === String(field.value ?? 1)
-                      )?.label ?? "Selecciona"}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {SOLICITUDES.map((s) => (
-                      <SelectItem key={s.value} value={s.value}>
-                        {s.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FieldError errors={[form.formState.errors.solicitudMatricula]} />
+                <Input value={grado ? formatoSoles(grado.monto) : ""} placeholder="S/ 0.00" disabled />
               </FieldContent>
             </Field>
-          )}
-        />
-        <Controller
-          control={form.control}
-          name="fechaPago"
-          render={({ field }) => (
             <Field>
               <FieldLabel>Fecha de pago</FieldLabel>
               <FieldContent>
-                <Input type="date" {...field} />
-                <FieldError errors={[form.formState.errors.fechaPago]} />
+                <Input value={formatearFecha(fechaHoyISO())} disabled />
               </FieldContent>
             </Field>
+          </div>
+          {sinMonto && (
+            <AvisoError>
+              El monto de matrícula de {grado?.nivel} no está configurado para este año. Configúralo en el módulo Pagos.
+            </AvisoError>
           )}
-        />
-        <Controller
-          control={form.control}
-          name="montoPago"
-          render={({ field }) => (
-            <Field>
-              <FieldLabel>Monto de pago (S/)</FieldLabel>
-              <FieldContent>
-                <Input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="0.00"
-                  value={field.value ?? ""}
-                  onChange={(e) =>
-                    field.onChange(
-                      e.target.value === "" ? undefined : Number(e.target.value)
-                    )
-                  }
-                />
-                <FieldError errors={[form.formState.errors.montoPago]} />
-              </FieldContent>
-            </Field>
-          )}
-        />
-      </div>
 
-      {solicitud === 2 && (
-        <p className="text-xs text-muted-foreground">
-          La solicitud está aprobada: indica fecha y monto de pago.
-        </p>
-      )}
+          <CamposPago
+            metodos={metodos}
+            idMetodoPago={idMetodoPago}
+            onMetodo={setIdMetodoPago}
+            codigo={codigo}
+            onCodigo={setCodigo}
+            comprobante={comprobante}
+            onComprobante={setComprobante}
+            errores={erroresPago}
+          />
 
-      <Controller
-        control={form.control}
-        name="observaciones"
-        render={({ field }) => (
           <Field>
-            <FieldLabel>Observaciones (opcional)</FieldLabel>
+            <FieldLabel>Observaciones</FieldLabel>
             <FieldContent>
-              <textarea
-                className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                rows={3}
-                placeholder="Notas generales de la matrícula"
-                {...field}
-              />
-              <FieldError errors={[form.formState.errors.observaciones]} />
+              <Textarea rows={2} maxLength={500} placeholder="Opcional" value={observaciones} onChange={(e) => setObservaciones(e.target.value)} />
             </FieldContent>
           </Field>
-        )}
-      />
 
-      <div className="rounded-lg border bg-muted/30 p-4 space-y-2">
-        <p className="text-sm font-semibold">Resumen</p>
-        <div className="grid grid-cols-2 gap-2 text-sm">
-          <div>
-            <span className="text-muted-foreground">Alumno:</span>{" "}
-            <span className="font-medium">{alumnoNombre}</span>
+          <div className="flex gap-4 rounded-lg bg-brand-subtle/60 p-4">
+            <BookOpen className="mt-0.5 size-5 shrink-0 text-brand" />
+            <div className="space-y-1 text-sm">
+              <p className="font-semibold">Resumen</p>
+              <p className="text-brand dark:text-white">
+                {nombreAlumno}
+                {grado && seccion ? ` · ${grado.grado} ${grado.nivel} ${seccion.seccion} (${seccion.turno})` : ""}
+                {grado?.monto != null ? ` · ${formatoSoles(grado.monto)}` : ""}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Apoderado: {principal.nombre} {principal.apellidoPat}
+                {apoderados[1] ? ` y ${apoderados[1].nombre} ${apoderados[1].apellidoPat}` : ""}. Revisa la información antes de crear la matrícula.
+              </p>
+            </div>
           </div>
-          <div>
-            <span className="text-muted-foreground">Apoderado:</span>{" "}
-            <span className="font-medium">{apoderadoNombre}</span>
-          </div>
-          {seccionInfo && (
-            <>
-              <div>
-                <span className="text-muted-foreground">Sección:</span>{" "}
-                <span className="font-medium">{seccionInfo.nombreSeccion}</span>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Turno:</span>{" "}
-                <span className="font-medium">{seccionInfo.turno}</span>
-              </div>
-            </>
-          )}
-        </div>
-      </div>
+        </>
+      ) : null}
 
-      <div className="flex justify-between">
-        <Button type="button" variant="outline" onClick={onBack}>
-          Volver
-        </Button>
+      <div className="flex justify-end gap-2">
+        <Button type="button" variant="outline" onClick={onAtras} disabled={enviando}>Atrás</Button>
         <Button
           type="button"
-          onClick={form.handleSubmit((values) => onSubmit(values as PasoMatriculaValues))}
-          disabled={isSubmitting}
+          className="bg-emerald-600 text-white hover:bg-emerald-700"
+          onClick={handleCrear}
+          disabled={enviando || !opciones || !!opciones.bloqueo || sinMonto}
         >
-          {isSubmitting && <Loader2 className="animate-spin" />}
+          {enviando && <Loader2 className="animate-spin" data-icon="inline-start" />}
           Crear matrícula
         </Button>
       </div>
+    </div>
+  )
+}
+
+function AvisoError({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-950 dark:text-amber-200">
+      <CircleAlert className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
+      <p>{children}</p>
     </div>
   )
 }

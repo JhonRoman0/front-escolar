@@ -11,6 +11,7 @@ import {
   School,
   Shield,
   UserCheck,
+  Wallet,
   type LucideIcon,
 } from "lucide-react"
 
@@ -33,6 +34,7 @@ const ICONOS: Record<string, LucideIcon> = {
   portal: Newspaper,
   colegio: Building,
   horario: CalendarDays,
+  wallet: Wallet,
 }
 
 export function iconoModulo(nombreIcono: string | null | undefined): LucideIcon {
@@ -63,6 +65,7 @@ export const RUTAS_MODULOS: string[] = [
   "/colegio",
   "/asistencia",
   "/horario",
+  "/pagos",
 ]
 
 // Overrides: el back manda "Portal" pero la ruta admin es /gestion-portal
