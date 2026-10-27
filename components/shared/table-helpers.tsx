@@ -15,6 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { TableCell, TableRow } from "@/components/ui/table"
 import { ConfirmarEliminar } from "@/components/seguridad/confirmar-eliminar"
 import { ACCESO } from "@/lib/api/academico"
+import { cn } from "@/lib/utils"
 
 interface CampoAccesoProps {
   value?: number
@@ -109,6 +110,7 @@ export function AccionesFila({
   tituloEliminar,
   descripcionEliminar,
   ariaEditar,
+  className,
 }: {
   puedeActualizar: boolean
   puedeEliminar: boolean
@@ -119,9 +121,10 @@ export function AccionesFila({
   tituloEliminar?: string
   descripcionEliminar?: string
   ariaEditar: string
+  className?: string
 }) {
   return (
-    <div className="flex justify-end gap-2">
+    <div className={cn("flex justify-end gap-2", className)}>
       {puedeActualizar && (
         <Button
           variant="outline"

@@ -2,7 +2,7 @@
 
 import { Fragment, useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
-import { ChevronDown, FileDown, Pencil, Plus, QrCode, Search } from "lucide-react"
+import { ChevronDown, FileDown, Pencil, Plus, QrCode, RotateCcw, Search } from "lucide-react"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -109,6 +109,18 @@ export function AlumnosTab() {
 
   const gradosOpciones = idNivel ? (gradosPorNivel ?? []) : []
   // Si no hay nivel seleccionado, no mostrar grados (elige nivel primero)
+
+  const hayFiltros =
+    busqueda !== "" || idNivel !== null || idGrado !== null || idSeccion !== null || idTurno !== null
+
+  function limpiarFiltros() {
+    setBusqueda("")
+    setIdNivel(null)
+    setIdGrado(null)
+    setIdSeccion(null)
+    setIdTurno(null)
+    setPage(0)
+  }
 
   const alumnosFiltrados = useMemo(() => {
     if (!data?.content) return []
@@ -227,6 +239,12 @@ export function AlumnosTab() {
           </Select>
 
           <div className="ml-auto flex gap-2">
+            {hayFiltros && (
+              <Button type="button" variant="outline" size="sm" className="h-8 text-muted-foreground" onClick={limpiarFiltros}>
+                <RotateCcw className="mr-1 size-3.5" />
+                Limpiar filtros
+              </Button>
+            )}
             {puedeExportar && (
               <Button variant="outline" size="sm" className="h-8 rounded-[8px] border-[#A9A9AA] text-[12px] font-semibold text-[#495057]" onClick={() => setReporteOpen(true)}>
                 <FileDown data-icon="inline-start" />
@@ -239,18 +257,18 @@ export function AlumnosTab() {
         {/* Tabla Figma: 10 cols compactas, sin bulto */}
         <div className="overflow-x-auto rounded-[8px] border border-[#D9DBE9]">
           <Table>
-            <TableHeader>
-              <TableRow className="bg-[#F8F9FA] hover:bg-[#F8F9FA]">
-                <TableHead className="whitespace-nowrap text-[12px] font-semibold text-[#495057]">Alumno</TableHead>
-                <TableHead className="whitespace-nowrap text-[12px] font-semibold text-[#495057]">Código</TableHead>
-                <TableHead className="whitespace-nowrap text-[12px] font-semibold text-[#495057]">DNI</TableHead>
-                <TableHead className="whitespace-nowrap text-[12px] font-semibold text-[#495057]">Apoderado</TableHead>
-                <TableHead className="whitespace-nowrap text-[12px] font-semibold text-[#495057]">Nivel</TableHead>
-                <TableHead className="whitespace-nowrap text-[12px] font-semibold text-[#495057]">Grado</TableHead>
-                <TableHead className="whitespace-nowrap text-[12px] font-semibold text-[#495057]">Sección</TableHead>
-                <TableHead className="whitespace-nowrap text-[12px] font-semibold text-[#495057]">Turno</TableHead>
-                <TableHead className="whitespace-nowrap text-[12px] font-semibold text-[#495057]">Estado</TableHead>
-                <TableHead className="whitespace-nowrap text-right text-[12px] font-semibold text-[#495057]">Acciones</TableHead>
+            <TableHeader appearance="soft-gray">
+              <TableRow>
+                <TableHead>Alumno</TableHead>
+                <TableHead className="text-center">Código</TableHead>
+                <TableHead className="text-center">DNI</TableHead>
+                <TableHead>Apoderado</TableHead>
+                <TableHead className="text-center">Nivel</TableHead>
+                <TableHead className="text-center">Grado</TableHead>
+                <TableHead className="text-center">Sección</TableHead>
+                <TableHead className="text-center">Turno</TableHead>
+                <TableHead className="text-center">Estado</TableHead>
+                <TableHead className="text-center">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -297,7 +315,7 @@ export function AlumnosTab() {
                             <span className="text-[12px] font-normal text-[#212529]">{nombreCompleto}</span>
                           </div>
                         </TableCell>
-                        <TableCell className="font-mono text-[12px] text-[#7D7D7F] whitespace-nowrap">{alumno.codigo}</TableCell>
+                        <TableCell className="text-center font-mono text-[12px] text-[#7D7D7F] whitespace-nowrap">{alumno.codigo}</TableCell>
                         <TableCell className="text-center text-[12px] text-[#7D7D7F]">{alumno.documentoIdentidad || "—"}</TableCell>
                         <TableCell className="max-w-[160px] text-[12px]">
                           {alumno.apoderados.length ? (
@@ -309,21 +327,21 @@ export function AlumnosTab() {
                             <Badge variant="outline" className="text-[11px] font-normal border-dashed">Sin apoderado</Badge>
                           )}
                         </TableCell>
-                        <TableCell className="text-[12px] text-[#7D7D7F] whitespace-nowrap">
+                        <TableCell className="text-center text-[12px] text-[#7D7D7F] whitespace-nowrap">
                           {alumno.nivel === "Sin matrícula" ? <SinMatriculaBadge /> : alumno.nivel}
                         </TableCell>
-                        <TableCell className="text-[12px] text-[#7D7D7F] whitespace-nowrap">
+                        <TableCell className="text-center text-[12px] text-[#7D7D7F] whitespace-nowrap">
                           {alumno.grado === "Sin matrícula" ? <SinMatriculaBadge /> : alumno.grado}
                         </TableCell>
                         <TableCell className="text-center text-[12px] text-[#7D7D7F]">{alumno.seccion === "Sin matrícula" ? <SinMatriculaBadge /> : alumno.seccion}</TableCell>
-                        <TableCell className="text-[12px] text-[#7D7D7F] whitespace-nowrap">
+                        <TableCell className="text-center text-[12px] text-[#7D7D7F] whitespace-nowrap">
                           {alumno.turno === "Sin matrícula" ? <SinMatriculaBadge /> : alumno.turno}
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="text-center">
                           <EstadoBadge accesoId={alumno.accesoId} />
                         </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-1">
+                        <TableCell className="text-center">
+                          <div className="flex justify-center gap-1">
                             <Button
                               variant="outline"
                               size="icon-sm"

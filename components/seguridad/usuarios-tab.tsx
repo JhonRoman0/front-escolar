@@ -226,15 +226,15 @@ export default function UsuariosTab() {
 
         <div className="overflow-x-auto rounded-lg border">
           <Table>
-          <TableHeader>
+          <TableHeader appearance="soft-gray">
             <TableRow>
               <TableHead>Usuario</TableHead>
-              <TableHead>Código</TableHead>
-              <TableHead>Roles</TableHead>
+              <TableHead className="text-center">Código</TableHead>
+              <TableHead className="text-center">Roles</TableHead>
               <TableHead>Correo</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead>Bloqueado</TableHead>
-              <TableHead className="text-right">Acciones</TableHead>
+              <TableHead className="text-center">Estado</TableHead>
+              <TableHead className="text-center">Bloqueado</TableHead>
+              <TableHead className="text-center">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -279,9 +279,9 @@ export default function UsuariosTab() {
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell>{usuario.codigo}</TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1">
+                    <TableCell className="text-center">{usuario.codigo}</TableCell>
+                    <TableCell className="text-center">
+                      <div className="flex flex-wrap justify-center gap-1">
                         {usuario.roles.map((rol) => {
                           const admin = esRolAdmin(rol.nombre)
                           const bg = admin ? COLOR_ROL_ADMIN : (rol.color ?? COLOR_ROL_FALLBACK)
@@ -301,10 +301,10 @@ export default function UsuariosTab() {
                       </div>
                     </TableCell>
                     <TableCell>{usuario.gmail || "—"}</TableCell>
-                    <TableCell>
+                    <TableCell className="text-center">
                       <EstadoBadge accesoId={usuario.accesoId} />
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="text-center">
                       {estaBloqueado(usuario) ? (
                         <Badge variant="warning">
                           <Lock />
@@ -314,8 +314,8 @@ export default function UsuariosTab() {
                         <span className="text-muted-foreground">—</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
+                    <TableCell className="text-center">
+                      <div className="flex justify-center gap-2">
                         {estaBloqueado(usuario) && puedeActualizar && (
                           <Button
                             variant="outline"

@@ -193,14 +193,14 @@ export default function AsignacionesTab() {
 
           <div className="overflow-x-auto rounded-lg border">
             <Table>
-              <TableHeader>
+              <TableHeader appearance="soft-gray">
                 <TableRow>
                   <TableHead>Grado - Sección</TableHead>
                   <TableHead>Turno</TableHead>
                   <TableHead>Curso</TableHead>
                   <TableHead>Docente</TableHead>
-                  <TableHead>Horarios</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
+                  <TableHead className="text-center">Horarios</TableHead>
+                  <TableHead className="text-center">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -222,8 +222,8 @@ export default function AsignacionesTab() {
                       <TableCell>{asignacion.turno}</TableCell>
                       <TableCell>{asignacion.curso}</TableCell>
                       <TableCell>{asignacion.docente}</TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
+                      <TableCell className="text-center">
+                        <div className="flex flex-wrap justify-center gap-1">
                           {asignacion.horarios.map((h) => (
                             <Badge key={h.idHorario} variant="secondary">
                               {formatoHorario(h)}
@@ -231,8 +231,8 @@ export default function AsignacionesTab() {
                           ))}
                         </div>
                       </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
+                      <TableCell className="text-center">
+                        <div className="flex justify-center gap-2">
                           {puedeActualizar && editable && (
                             <Button
                               variant="outline"

@@ -128,18 +128,19 @@ function FormularioMontos({
       )}
       <div className="overflow-x-auto rounded-lg border">
         <Table>
-          <TableHeader>
+          <TableHeader appearance="soft-gray">
             <TableRow>
               <TableHead>Nivel</TableHead>
-              <TableHead className="w-48">Monto (S/)</TableHead>
+              <TableHead className="w-48 text-center">Monto (S/)</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {montos.map((m) => (
               <TableRow key={m.idNivel}>
                 <TableCell className="font-medium">{m.nivel}</TableCell>
-                <TableCell>
+                <TableCell className="text-center">
                   <Input
+                    className="text-center"
                     type="number"
                     min="0.01"
                     step="0.01"

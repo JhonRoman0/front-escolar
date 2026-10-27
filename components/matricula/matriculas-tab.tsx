@@ -6,7 +6,6 @@ import { FileDown, History, Pencil, Plus, Receipt } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Switch } from "@/components/ui/switch"
 import {
   Table,
   TableBody,
@@ -19,6 +18,8 @@ import {
 import { ConfirmarEliminar } from "@/components/seguridad/confirmar-eliminar"
 import { EstadoBadge } from "@/components/seguridad/estado-badge"
 import { TablaPaginacion } from "@/components/shared/paginacion-tabla"
+import { FilterSelect } from "@/components/shared/filter-select"
+import { ACCESO, OPCIONES_ESTADO_ACCESO } from "@/lib/api/academico"
 import {
   FilasCargando,
   MensajeSinDatos,
@@ -43,9 +44,11 @@ const TAMANIO_PAGINA = 10
 
 export function MatriculasTab() {
   const [page, setPage] = useState(0)
+  const [filtroEstado, setFiltroEstado] = useState("")
   const { data, isLoading, isError, refetch } = useMatriculas(
     page,
-    TAMANIO_PAGINA
+    TAMANIO_PAGINA,
+    filtroEstado ? Number(filtroEstado) : undefined
   )
   const crud = useCrudMatriculas()
   const puedeCrear = usePuede("MATRICULAS", "CREAR")
@@ -54,7 +57,6 @@ export function MatriculasTab() {
   const puedeExportar = usePuede("MATRICULAS", "IMPRIMIR_EXPORTAR")
   const { data: aniosEscolares = [] } = useAniosEscolares()
 
-  const [mostrarInactivas, setMostrarInactivas] = useState(false)
   const [nuevaOpen, setNuevaOpen] = useState(false)
   const [editando, setEditando] = useState<MatriculaResponse | null>(null)
   const [pagos, setPagos] = useState<MatriculaResponse | null>(null)
@@ -91,10 +93,12 @@ export function MatriculasTab() {
     toast.success(`Reporte ${formato.toUpperCase()} generado (${datos.length} registros)`)
   }
 
-  const visibles =
-    data?.content.filter(
-      (m) => mostrarInactivas || m.accesoId === 1
-    ) ?? []
+  const visibles = data?.content ?? []
+
+  function cambiarEstadoFiltro(value: string) {
+    setFiltroEstado(value)
+    setPage(0)
+  }
 
   async function handleEliminar(matricula: MatriculaResponse) {
     try {
@@ -120,10 +124,13 @@ export function MatriculasTab() {
               <p className="text-[14px] leading-5 text-muted-foreground">Alumnos matriculados por año escolar y sección.</p>
             </div>
             <div className="flex flex-wrap items-center gap-3">
-              <label className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Switch checked={mostrarInactivas} onCheckedChange={setMostrarInactivas} />
-                Ver inactivas
-              </label>
+              <FilterSelect
+                label="Estado"
+                value={filtroEstado}
+                onValueChange={cambiarEstadoFiltro}
+                options={OPCIONES_ESTADO_ACCESO}
+                allLabel="Todos los estados"
+              />
               {puedeExportar && (
                 <Button variant="outline" size="sm" className="h-8 rounded-[8px] border-[#A9A9AA] text-[12px]" onClick={() => setReporteOpen(true)}>
                   <FileDown data-icon="inline-start" />
@@ -145,17 +152,17 @@ export function MatriculasTab() {
 
           <div className="overflow-x-auto rounded-[8px] border border-[#D9DBE9]">
             <Table>
-            <TableHeader>
-              <TableRow className="bg-[#F8F9FA] hover:bg-[#F8F9FA]">
-                <TableHead className="whitespace-nowrap text-[12px] font-semibold text-[#495057]">Alumno</TableHead>
-                <TableHead className="whitespace-nowrap text-[12px] font-semibold text-[#495057]">Apoderado</TableHead>
-                <TableHead className="whitespace-nowrap text-[12px] font-semibold text-[#495057]">Grado - Sección</TableHead>
-                <TableHead className="whitespace-nowrap text-[12px] font-semibold text-[#495057]">Turno</TableHead>
-                <TableHead className="whitespace-nowrap text-[12px] font-semibold text-[#495057]">Año</TableHead>
-                <TableHead className="whitespace-nowrap text-[12px] font-semibold text-[#495057]">Pago</TableHead>
-                <TableHead className="whitespace-nowrap text-[12px] font-semibold text-[#495057]">Observaciones</TableHead>
-                <TableHead className="whitespace-nowrap text-[12px] font-semibold text-[#495057]">Estado</TableHead>
-                <TableHead className="whitespace-nowrap text-right text-[12px] font-semibold text-[#495057]">Acciones</TableHead>
+            <TableHeader appearance="soft-gray">
+              <TableRow>
+                <TableHead>Alumno</TableHead>
+                <TableHead>Apoderado</TableHead>
+                <TableHead>Grado - Sección</TableHead>
+                <TableHead>Turno</TableHead>
+                <TableHead className="text-center">Año</TableHead>
+                <TableHead className="text-right">Pago</TableHead>
+                <TableHead>Observaciones</TableHead>
+                <TableHead className="text-center">Estado</TableHead>
+                <TableHead className="text-center">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -167,9 +174,11 @@ export function MatriculasTab() {
                 <MensajeSinDatos
                   columnas={9}
                   mensaje={
-                    mostrarInactivas
-                      ? "Aún no hay matrículas."
-                      : "Aún no hay matrículas activas."
+                    filtroEstado
+                      ? filtroEstado === String(ACCESO.ACTIVO)
+                        ? "No hay matrículas activas para mostrar."
+                        : "No hay matrículas inactivas para mostrar."
+                      : "Aún no hay matrículas."
                   }
                 />
               ) : (
@@ -189,8 +198,8 @@ export function MatriculasTab() {
                       <p className="text-xs text-muted-foreground">{matricula.nivel}</p>
                     </TableCell>
                     <TableCell>{matricula.turno}</TableCell>
-                    <TableCell>{matricula.anio}</TableCell>
-                    <TableCell className="text-xs">
+                    <TableCell className="text-center">{matricula.anio}</TableCell>
+                    <TableCell className="text-right text-xs">
                       <div className="space-y-0.5">
                         <p>{formatoSoles(matricula.pagadoNeto)}</p>
                         <p className="text-muted-foreground">{matricula.metodoPago ?? "—"}</p>
@@ -199,11 +208,11 @@ export function MatriculasTab() {
                     <TableCell className="max-w-[150px] truncate text-xs">
                       {matricula.observaciones || "—"}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="text-center">
                       <EstadoBadge accesoId={matricula.accesoId} />
                     </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
+                    <TableCell className="text-center">
+                      <div className="flex justify-center gap-2">
                         <Button
                           variant="outline"
                           size="icon-sm"

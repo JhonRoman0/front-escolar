@@ -184,9 +184,11 @@ function formulario(datos: unknown, archivos: Record<string, File | null | undef
 // ── API ──────────────────────────────────────────────────────────────────
 
 export const matriculasApi = {
-  async listar(page = 0, size = 10): Promise<Paginated<MatriculaResponse>> {
+  async listar(page = 0, size = 10, idAcceso?: number): Promise<Paginated<MatriculaResponse>> {
+    const params = new URLSearchParams({ page: String(page), size: String(size) })
+    if (idAcceso != null) params.set("idAcceso", String(idAcceso))
     return apiFetch<Paginated<MatriculaResponse>>(
-      `/matriculas?page=${page}&size=${size}`
+      `/matriculas?${params.toString()}`
     )
   },
   async porId(id: number): Promise<MatriculaResponse> {

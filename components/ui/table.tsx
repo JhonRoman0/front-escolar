@@ -19,11 +19,22 @@ function Table({ className, ...props }: React.ComponentProps<"table">) {
   )
 }
 
-function TableHeader({ className, ...props }: React.ComponentProps<"thead">) {
+function TableHeader({
+  className,
+  appearance = "default",
+  ...props
+}: React.ComponentProps<"thead"> & {
+  appearance?: "default" | "soft-gray"
+}) {
   return (
     <thead
       data-slot="table-header"
-      className={cn("[&_tr]:border-b", className)}
+      className={cn(
+        "[&_tr]:border-b",
+        appearance === "soft-gray" &&
+          "bg-gray-50 [&_tr:hover]:bg-gray-50 dark:bg-muted dark:[&_th]:text-foreground dark:[&_tr:hover]:bg-muted",
+        className
+      )}
       {...props}
     />
   )

@@ -4,8 +4,8 @@ import { useState } from "react"
 import { toast } from "sonner"
 
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Switch } from "@/components/ui/switch"
 import {
   Table,
   TableBody,
@@ -15,15 +15,15 @@ import {
   TableRow,
 } from "@/components/ui/table"
 
-import { EstadoBadge } from "@/components/seguridad/estado-badge"
 import { FilterSelect } from "@/components/shared/filter-select"
+import { EstadoBadge } from "@/components/seguridad/estado-badge"
 import { HeaderSeccion } from "@/components/shared/header-seccion"
 import { FilasCargando, MensajeSinDatos } from "@/components/shared/table-helpers"
 import { AvisoMallaBloqueada, FiltrosMalla, useFiltrosMalla } from "@/components/academico/cursos-tab"
 import { usePuede } from "@/hooks/use-permisos"
 import { useCursos } from "@/hooks/use-academico"
 import { useCambiarEstadoCompetencia, useCompetencias } from "@/hooks/use-evaluacion"
-import { ACCESO, ESTADO_ANIO } from "@/lib/api/academico"
+import { ACCESO, ESTADO_ANIO, OPCIONES_ESTADO_ACCESO } from "@/lib/api/academico"
 
 /**
  * Competencias de cada área, tal como vienen del Excel del SIAGIE. No se
@@ -45,6 +45,10 @@ export function CompetenciasTab() {
   const puedeActualizar = usePuede("COMPETENCIAS", "ACTUALIZAR")
   const configurable = anio?.estado === ESTADO_ANIO.POR_COMENZAR
   const [cambiandoId, setCambiandoId] = useState<number | null>(null)
+  const [filtroEstado, setFiltroEstado] = useState("")
+  const competenciasFiltradas = competencias.filter(
+    (c) => !filtroEstado || c.accesoId === Number(filtroEstado)
+  )
 
   async function handleCambiarEstado(idCompetencia: number, activar: boolean) {
     setCambiandoId(idCompetencia)
@@ -91,45 +95,62 @@ export function CompetenciasTab() {
             disabled={!areas.length}
             opcionesLargas
           />
+          <FilterSelect
+            label="Estado"
+            value={filtroEstado}
+            onValueChange={setFiltroEstado}
+            options={OPCIONES_ESTADO_ACCESO}
+            allLabel="Todos los estados"
+          />
         </div>
 
         <div className="overflow-x-auto rounded-lg border">
           <Table>
-            <TableHeader>
+            <TableHeader appearance="soft-gray">
               <TableRow>
-                <TableHead className="w-[90px]">Código</TableHead>
+                <TableHead className="w-[90px] text-center">Código</TableHead>
                 <TableHead>Competencia</TableHead>
-                <TableHead className="w-[170px]">Estado</TableHead>
+                <TableHead className="w-[170px] text-center">Estado</TableHead>
+                <TableHead className="text-center">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {!area ? (
                 <MensajeSinDatos
-                  columnas={3}
+                  columnas={4}
                   mensaje="Este año y nivel aún no tienen cursos. Impórtalos desde la pestaña Cursos."
                 />
               ) : isLoading ? (
-                <FilasCargando columnas={3} />
+                <FilasCargando columnas={4} />
               ) : !competencias.length ? (
-                <MensajeSinDatos columnas={3} mensaje={`${area.nombre} no tiene competencias.`} />
+                <MensajeSinDatos columnas={4} mensaje={`${area.nombre} no tiene competencias.`} />
+              ) : !competenciasFiltradas.length ? (
+                <MensajeSinDatos columnas={4} mensaje="No hay competencias para el estado seleccionado." />
               ) : (
-                competencias.map((c) => (
+                competenciasFiltradas.map((c) => (
                   <TableRow key={c.idCompetencia}>
-                    <TableCell>
+                    <TableCell className="text-center">
                       <Badge variant="outline" className="font-mono text-[11px] font-semibold text-muted-foreground">
                         {c.codigo}
                       </Badge>
                     </TableCell>
-                    <TableCell>{c.competencia}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2.5">
-                        <Switch
-                          checked={c.accesoId === ACCESO.ACTIVO}
-                          disabled={!configurable || !puedeActualizar || cambiandoId === c.idCompetencia}
-                          onCheckedChange={(checked) => handleCambiarEstado(c.idCompetencia, checked)}
-                          aria-label={`Cambiar estado de ${c.competencia}`}
-                        />
-                        <EstadoBadge accesoId={c.accesoId} />
+                    <TableCell className="whitespace-normal break-words">{c.competencia}</TableCell>
+                    <TableCell className="text-center">
+                      <EstadoBadge accesoId={c.accesoId} />
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <div className="flex items-center justify-center">
+                        {puedeActualizar && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={!configurable || cambiandoId !== null || cambiarEstado.isPending}
+                            onClick={() => handleCambiarEstado(c.idCompetencia, c.accesoId !== ACCESO.ACTIVO)}
+                            aria-label={`${c.accesoId === ACCESO.ACTIVO ? "Inactivar" : "Activar"} ${c.competencia}`}
+                          >
+                            {c.accesoId === ACCESO.ACTIVO ? "Inactivar" : "Activar"}
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>

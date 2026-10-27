@@ -77,13 +77,13 @@ export function MetodosPagoTab() {
         />
         <div className="overflow-x-auto rounded-lg border">
           <Table>
-            <TableHeader>
+            <TableHeader appearance="soft-gray">
               <TableRow>
                 <TableHead>Método</TableHead>
-                <TableHead>Pide código</TableHead>
-                <TableHead>Pide comprobante</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
+                <TableHead className="text-center">Pide código</TableHead>
+                <TableHead className="text-center">Pide comprobante</TableHead>
+                <TableHead className="text-center">Estado</TableHead>
+                <TableHead className="text-center">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -97,13 +97,14 @@ export function MetodosPagoTab() {
                 data.map((metodo) => (
                   <TableRow key={metodo.idMetodoPago}>
                     <TableCell className="font-medium">{metodo.nombre}</TableCell>
-                    <TableCell><SiNo valor={metodo.requiereCodigo} /></TableCell>
-                    <TableCell><SiNo valor={metodo.requiereComprobante} /></TableCell>
-                    <TableCell>
+                    <TableCell className="text-center"><SiNo valor={metodo.requiereCodigo} /></TableCell>
+                    <TableCell className="text-center"><SiNo valor={metodo.requiereComprobante} /></TableCell>
+                    <TableCell className="text-center">
                       <EstadoBadge accesoId={metodo.activo ? ACCESO.ACTIVO : ACCESO.INACTIVO} />
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-center">
                       <AccionesFila
+                        className="justify-center"
                         puedeActualizar={puedeActualizar}
                         puedeEliminar={puedeEliminar}
                         onEditar={() => {

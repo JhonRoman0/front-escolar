@@ -173,14 +173,14 @@ export default function RecreosTab() {
 
         <div className="overflow-x-auto rounded-lg border">
           <Table>
-            <TableHeader>
+            <TableHeader appearance="soft-gray">
               <TableRow>
                 <TableHead>Grado</TableHead>
                 <TableHead>Turno</TableHead>
                 {DIAS_CLASE.map((d) => (
                   <TableHead key={d.value} className="text-center">{d.corto}</TableHead>
                 ))}
-                <TableHead className="w-[60px] text-right" />
+                <TableHead className="w-[60px] text-center" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -226,7 +226,7 @@ export default function RecreosTab() {
                         </TableCell>
                       )
                     })}
-                    <TableCell className="text-right">
+                    <TableCell className="text-center">
                       {editable && puedeEliminar && idAnio && (
                         <ConfirmarEliminar
                           titulo={`Quitar los recreos de ${g.grado}`}

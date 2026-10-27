@@ -375,15 +375,15 @@ export function CursosTab() {
 
         <div className="overflow-x-auto rounded-lg border">
           <Table>
-            <TableHeader>
+            <TableHeader appearance="soft-gray">
               <TableRow>
-                <TableHead className="w-[190px]">Código</TableHead>
+                <TableHead className="w-[190px] text-center">Código</TableHead>
                 <TableHead>Curso</TableHead>
-                <TableHead className="w-[110px]">Tipo</TableHead>
+                <TableHead className="w-[110px] text-center">Tipo</TableHead>
                 <TableHead className="w-[120px] text-center">Competencias</TableHead>
-                <TableHead className="w-[110px]">Subcursos</TableHead>
-                <TableHead className="w-[170px]">Estado</TableHead>
-                <TableHead className="w-[90px] text-right">Acciones</TableHead>
+                <TableHead className="w-[110px] text-center">Subcursos</TableHead>
+                <TableHead className="w-[170px] text-center">Estado</TableHead>
+                <TableHead className="w-[90px] text-center">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -410,31 +410,33 @@ export function CursosTab() {
                   return (
                     <Fragment key={curso.idCurso}>
                       <TableRow>
-                        <TableCell>
-                          <div className="flex items-center gap-1.5">
+                        <TableCell className="text-center">
+                          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5">
                             {curso.tieneSubcursos ? (
                               <Button
                                 variant="ghost"
                                 size="icon-sm"
+                                className="justify-self-end"
                                 aria-label={`${expandido ? "Ocultar" : "Ver"} subcursos de ${curso.nombre}`}
                                 onClick={() => alternarExpandido(curso.idCurso)}
                               >
                                 {expandido ? <ChevronDown /> : <ChevronRight />}
                               </Button>
                             ) : (
-                              <span className="size-7" />
+                              <span />
                             )}
                             <Badge variant="outline" className="font-mono text-[11px] font-semibold text-muted-foreground">
                               {curso.codigo}
                             </Badge>
+                            <span aria-hidden="true" />
                           </div>
                         </TableCell>
-                        <TableCell className="font-medium">{curso.nombre}</TableCell>
-                        <TableCell>
+                        <TableCell className="font-medium whitespace-normal break-words">{curso.nombre}</TableCell>
+                        <TableCell className="text-center">
                           {esArea ? <Badge variant="secondary">Área</Badge> : <Badge variant="info">Transversal</Badge>}
                         </TableCell>
                         <TableCell className="text-center tabular-nums">{curso.cantidadCompetencias}</TableCell>
-                        <TableCell>
+                        <TableCell className="text-center">
                           {esArea ? (
                             <Switch
                               checked={curso.tieneSubcursos}
@@ -446,8 +448,8 @@ export function CursosTab() {
                             <span className="text-xs text-muted-foreground">No aplica</span>
                           )}
                         </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2.5">
+                        <TableCell className="text-center">
+                          <div className="flex items-center justify-center gap-2.5">
                             <Switch
                               checked={curso.accesoId === ACCESO.ACTIVO}
                               disabled={!configurable || !puedeActualizar || ocupado}
@@ -457,8 +459,9 @@ export function CursosTab() {
                             <EstadoBadge accesoId={curso.accesoId} />
                           </div>
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="text-center">
                           <AccionesFila
+                            className="justify-center"
                             puedeActualizar={false}
                             puedeEliminar={puedeEliminar && configurable}
                             onEditar={() => {}}
@@ -592,10 +595,10 @@ function FilasSubcursos({
       {subcursos.map((subcurso) => (
         <TableRow key={subcurso.idCurso} className="bg-muted/30">
           <TableCell>
-            <CornerDownRight className="ml-9 size-4 text-muted-foreground" />
+            <CornerDownRight className="mx-auto size-4 text-muted-foreground" />
           </TableCell>
-          <TableCell className="font-medium">{subcurso.nombre}</TableCell>
-          <TableCell>
+          <TableCell className="font-medium whitespace-normal break-words">{subcurso.nombre}</TableCell>
+          <TableCell className="text-center">
             <Badge variant="outline">Subcurso</Badge>
           </TableCell>
           <TableCell>
@@ -608,8 +611,8 @@ function FilasSubcursos({
             </div>
           </TableCell>
           <TableCell />
-          <TableCell>
-            <div className="flex items-center gap-2.5">
+          <TableCell className="text-center">
+            <div className="flex items-center justify-center gap-2.5">
               <Switch
                 checked={subcurso.accesoId === ACCESO.ACTIVO}
                 disabled={!configurable || !puedeActualizar || cambiandoId === subcurso.idCurso}
@@ -619,8 +622,9 @@ function FilasSubcursos({
               <EstadoBadge accesoId={subcurso.accesoId} />
             </div>
           </TableCell>
-          <TableCell className="text-right">
+          <TableCell className="text-center">
             <AccionesFila
+              className="justify-center"
               puedeActualizar={puedeActualizar && configurable}
               puedeEliminar={puedeEliminar && configurable}
               onEditar={() => onAbrir(subcurso)}
