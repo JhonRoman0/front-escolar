@@ -310,6 +310,7 @@ function AulasTab() {
               { value: String(ACCESO.INACTIVO), label: "Inactivo" },
             ]}
             allLabel="Todos los estados"
+            className="w-[180px] max-w-full shrink-0"
           />
         </div>
         <div className="overflow-x-auto rounded-lg border">

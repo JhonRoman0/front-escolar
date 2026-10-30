@@ -123,13 +123,13 @@ export function MatriculasTab() {
               <h2 className="text-[20px] font-semibold tracking-tight">Matrículas</h2>
               <p className="text-[14px] leading-5 text-muted-foreground">Alumnos matriculados por año escolar y sección.</p>
             </div>
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex max-w-full flex-wrap items-center gap-3">
               <FilterSelect
-                label="Estado"
                 value={filtroEstado}
                 onValueChange={cambiarEstadoFiltro}
                 options={OPCIONES_ESTADO_ACCESO}
                 allLabel="Todos los estados"
+                className="w-[180px] max-w-full shrink-0"
               />
               {puedeExportar && (
                 <Button variant="outline" size="sm" className="h-8 rounded-[8px] border-[#A9A9AA] text-[12px]" onClick={() => setReporteOpen(true)}>

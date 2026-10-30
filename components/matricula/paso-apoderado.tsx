@@ -1,6 +1,6 @@
 "use client"
 
-import { toast } from "sonner"
+import { useEffect, useRef, useState } from "react"
 import { Plus, Trash2, UserCheck, Users } from "lucide-react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useFieldArray, useForm, useWatch, type UseFormReturn } from "react-hook-form"
@@ -17,7 +17,7 @@ import { useBuscarApoderadoInscripcion } from "@/hooks/use-matricula"
 import { useParentescos, useSexos } from "@/hooks/use-pagos"
 import { useConsultarDni } from "@/hooks/use-reniec"
 import type { ApoderadoBusqueda } from "@/lib/api/matricula"
-import { REGEX_NO_LETRAS_ESPACIOS } from "@/lib/schemas/comun"
+import { REGEX_DNI, REGEX_NO_LETRAS_ESPACIOS } from "@/lib/schemas/comun"
 import {
   apoderadoPasoDefault,
   apoderadosPasoSchema,
@@ -117,36 +117,132 @@ export function FormularioApoderado({
   const hijos = useWatch({ control: form.control, name: `apoderados.${indice}.hijos` })
   const errores = form.formState.errors.apoderados?.[indice]
   const base = `apoderados.${indice}` as const
+  const [comprobando, setComprobando] = useState(false)
+  const [consultando, setConsultando] = useState(false)
+  const [avisoConsulta, setAvisoConsulta] = useState("")
+  const version = useRef(0)
+  const consultaExterna = useRef(0)
+  const edicionesNombres = useRef({ nombre: 0, apellidoPat: 0, apellidoMat: 0 })
+  const comprobacion = useRef<{
+    dni: string
+    version: number
+    promesa: Promise<ApoderadoPasoValues["estado"] | null>
+  } | null>(null)
+
+  // Una respuesta de un formulario anterior nunca debe actualizar el actual.
+  useEffect(() => () => {
+    version.current += 1
+    consultaExterna.current += 1
+    comprobacion.current = null
+  }, [idAlumno, indice])
+
+  function sigueVigente(dni: string, solicitud: number) {
+    return version.current === solicitud && form.getValues(`${base}.documentoIdentidad`).trim() === dni
+  }
+
+  function comprobarInternamente(): Promise<ApoderadoPasoValues["estado"] | null> {
+    const dni = form.getValues(`${base}.documentoIdentidad`).trim()
+    if (!REGEX_DNI.test(dni)) return Promise.resolve(null)
+    if (comprobacion.current?.dni === dni && comprobacion.current.version === version.current) {
+      return comprobacion.current.promesa
+    }
+    const estadoActual = form.getValues(`${base}.estado`)
+    if (estadoActual !== "") return Promise.resolve(estadoActual)
+
+    const solicitud = version.current
+    setComprobando(true)
+    const promesa = (async () => {
+      try {
+        const encontrado = await buscar.mutateAsync({ dni, idAlumno })
+        if (!sigueVigente(dni, solicitud)) return null
+        if (encontrado.documentoIdentidad !== dni || !["NUEVO", "APODERADO", "USUARIO"].includes(encontrado.estado)) {
+          throw new Error("La comprobación interna devolvió una respuesta incompleta. Reintenta con la lupa.")
+        }
+        const actuales = form.getValues(base)
+        if (encontrado.estado === "NUEVO") {
+          // La búsqueda interna solo clasifica: no borra lo escrito manualmente.
+          form.setValue(`${base}.estado`, "NUEVO")
+        } else {
+          const valores = apoderadoDesdeBusqueda(encontrado)
+          valores.idParentesco = encontrado.idParentesco ?? actuales.idParentesco
+          if (encontrado.estado === "USUARIO") {
+            valores.sexo = encontrado.sexo ?? actuales.sexo
+            valores.direccion = encontrado.direccion ?? actuales.direccion
+            valores.celular = encontrado.celular ?? actuales.celular
+          }
+          form.setValue(base, valores)
+        }
+        form.clearErrors(`${base}.documentoIdentidad`)
+        if (form.formState.isSubmitted) void form.trigger(base)
+        return encontrado.estado
+      } catch (error) {
+        if (sigueVigente(dni, solicitud)) {
+          form.setError(`${base}.documentoIdentidad`, {
+            message: error instanceof Error ? error.message : "No se pudo comprobar el DNI en el colegio. Reintenta con la lupa.",
+          })
+        }
+        return null
+      } finally {
+        if (sigueVigente(dni, solicitud)) {
+          setComprobando(false)
+          comprobacion.current = null
+        }
+      }
+    })()
+    comprobacion.current = { dni, version: solicitud, promesa }
+    return promesa
+  }
 
   async function handleBuscar() {
     const dni = form.getValues(`${base}.documentoIdentidad`).trim()
+    if (!REGEX_DNI.test(dni) || consultando) return
+    const solicitud = version.current
+    const consulta = ++consultaExterna.current
+    const clasificacion = await comprobarInternamente()
+    if (!sigueVigente(dni, solicitud) || consulta !== consultaExterna.current || clasificacion !== "NUEVO") return
+    const ediciones = { ...edicionesNombres.current }
+    setConsultando(true)
+    setAvisoConsulta("Consultando datos del DNI. Puedes seguir escribiendo o continuar sin esperar esta ayuda.")
     try {
-      const encontrado = await buscar.mutateAsync({ dni, idAlumno })
-      const valores = apoderadoDesdeBusqueda(encontrado)
-      if (encontrado.estado === "NUEVO") {
-        const r = await consultarDni.mutateAsync(dni)
-        valores.nombre = r.nombres ?? ""
-        valores.apellidoPat = r.apellidoPaterno ?? ""
-        valores.apellidoMat = r.apellidoMaterno ?? ""
+      const r = await consultarDni.mutateAsync(dni)
+      if (!sigueVigente(dni, solicitud) || consulta !== consultaExterna.current) return
+      if (r.dni !== dni) throw new Error("La respuesta no corresponde al DNI consultado")
+      const datos = { nombre: r.nombres, apellidoPat: r.apellidoPaterno, apellidoMat: r.apellidoMaterno }
+      let completados = 0
+      for (const campo of ["nombre", "apellidoPat", "apellidoMat"] as const) {
+        if (datos[campo]?.trim() && !form.getValues(`${base}.${campo}`).trim() && ediciones[campo] === edicionesNombres.current[campo]) {
+          form.setValue(`${base}.${campo}`, datos[campo], { shouldValidate: true })
+          completados += 1
+        }
       }
-      form.setValue(base, valores)
-      form.clearErrors(base)
-      if (encontrado.estado === "APODERADO") toast.success("Ya es apoderado: solo se vinculará a este alumno")
-      else if (encontrado.estado === "USUARIO") toast.info("Ya tiene cuenta: se le añadirá el rol Apoderado")
-      else toast.success("Datos completados desde RENIEC")
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "No se pudo consultar el DNI")
+      const origen = r.origen === "LOCAL" ? "el colegio" : r.origen === "CACHE" ? "la caché de consultas" : r.origen === "RENIEC" ? "RENIEC" : "el servicio de consulta"
+      setAvisoConsulta(completados
+        ? `Se completaron campos vacíos con datos de ${origen}. Revisa la información antes de continuar.`
+        : "La consulta no añadió datos. Se conservaron los campos manuales; puedes completarlos y continuar.")
+    } catch {
+      if (sigueVigente(dni, solicitud) && consulta === consultaExterna.current) {
+        setAvisoConsulta("No se pudo obtener información de la consulta de DNI. Puedes completar los datos manualmente y continuar.")
+      }
+    } finally {
+      if (sigueVigente(dni, solicitud) && consulta === consultaExterna.current) setConsultando(false)
     }
   }
 
   function handleCambiarDni(dni: string) {
+    if (dni === form.getValues(`${base}.documentoIdentidad`)) return
+    version.current += 1
+    consultaExterna.current += 1
+    comprobacion.current = null
+    setComprobando(false)
+    setConsultando(false)
+    setAvisoConsulta("")
     // Otro DNI es otra persona: hay que volver a buscarlo.
     form.setValue(base, { ...apoderadoPasoDefault, documentoIdentidad: dni })
+    form.clearErrors(base)
   }
 
   const yaEsApoderado = estado === "APODERADO"
   const tieneCuenta = estado === "APODERADO" || estado === "USUARIO"
-  const buscado = estado !== ""
 
   return (
     <div className="flex flex-col gap-4">
@@ -157,10 +253,13 @@ export function FormularioApoderado({
           <CampoDni
             value={field.value}
             onChange={handleCambiarDni}
-            onBlur={field.onBlur}
+            onBlur={() => {
+              field.onBlur()
+              void comprobarInternamente()
+            }}
             name={field.name}
             inputRef={field.ref}
-            cargando={buscar.isPending || consultarDni.isPending}
+            cargando={consultando}
             onBuscar={handleBuscar}
             error={errores?.documentoIdentidad}
             label="Documento de identidad *"
@@ -168,6 +267,17 @@ export function FormularioApoderado({
           />
         )}
       />
+
+      <p role="status" className="text-xs text-muted-foreground">
+        {comprobando
+          ? "Comprobando el DNI en la base del colegio. Puedes seguir llenando los campos."
+          : estado === "NUEVO"
+            ? "DNI comprobado en el colegio: persona nueva. Completa los datos manualmente o usa la lupa como ayuda opcional."
+            : estado === ""
+              ? "Al salir del DNI se comprobará si ya existe en el colegio. Esta comprobación es necesaria para continuar; la consulta de datos es opcional."
+              : "Se reutilizarán los datos registrados en el colegio; no se creará una persona duplicada."}
+      </p>
+      {avisoConsulta && <p role="status" className="text-xs text-muted-foreground">{avisoConsulta}</p>}
 
       {yaEsApoderado && (
         <Aviso icono={Users} titulo="Ya es apoderado en el colegio">
@@ -181,8 +291,7 @@ export function FormularioApoderado({
         </Aviso>
       )}
 
-      {buscado && (
-        <>
+      <>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             {(["nombre", "apellidoPat", "apellidoMat"] as const).map((campo) => (
               <Controller
@@ -197,7 +306,10 @@ export function FormularioApoderado({
                         maxLength={30}
                         disabled={tieneCuenta}
                         {...field}
-                        onChange={(e) => field.onChange(e.target.value.replace(REGEX_NO_LETRAS_ESPACIOS, ""))}
+                        onChange={(e) => {
+                          edicionesNombres.current[campo] += 1
+                          field.onChange(e.target.value.replace(REGEX_NO_LETRAS_ESPACIOS, ""))
+                        }}
                       />
                       <FieldError errors={[errores?.[campo]]} />
                     </FieldContent>
@@ -347,8 +459,7 @@ export function FormularioApoderado({
               />
             </div>
           )}
-        </>
-      )}
+      </>
     </div>
   )
 }

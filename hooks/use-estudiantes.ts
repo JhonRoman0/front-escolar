@@ -1,5 +1,4 @@
 import {
-  keepPreviousData,
   useMutation,
   useQuery,
 } from "@tanstack/react-query"
@@ -10,6 +9,7 @@ import {
   apoderadosApi,
   type AlumnoEdicionRequest,
   type ApoderadoEdicionRequest,
+  type AlumnosFiltros,
 } from "@/lib/api/estudiantes"
 import type { InscripcionApoderado } from "@/lib/api/matricula"
 
@@ -20,11 +20,15 @@ const KEYS = {
 
 // ── Queries ──────────────────────────────────────────────────────────────
 
-export function useAlumnos(page: number, size = 10, filtros?: import("@/lib/api/estudiantes").AlumnosFiltros) {
+export function useAlumnos(page: number, size = 10, filtros?: AlumnosFiltros, enabled = true) {
   return useQuery({
     queryKey: [...KEYS.alumnos, page, size, filtros],
     queryFn: () => alumnosApi.listar(page, size, filtros),
-    placeholderData: keepPreviousData,
+    enabled,
+    placeholderData: (previousData, previousQuery) =>
+      enabled && (previousQuery?.queryKey[3] as AlumnosFiltros | undefined)?.idAnio === filtros?.idAnio
+        ? previousData
+        : undefined,
   })
 }
 

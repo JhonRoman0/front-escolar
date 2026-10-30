@@ -37,7 +37,8 @@ import { FilterSelect } from "@/components/shared/filter-select"
 import { HeaderSeccion } from "@/components/shared/header-seccion"
 import { SelectorHora } from "@/components/shared/selector-hora"
 import { FilasCargando, MensajeSinDatos } from "@/components/shared/table-helpers"
-import { FiltrosMalla, useFiltrosMalla } from "@/components/academico/cursos-tab"
+import { useFiltrosMalla } from "@/hooks/use-filtros-malla"
+import { FiltrosMalla } from "@/components/academico/filtros-malla"
 import { guardarConToast } from "@/hooks/guardar-con-toast"
 import {
   useActualizarRecreo,

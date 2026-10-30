@@ -1,6 +1,6 @@
 "use client"
 
-import { Fragment, useMemo, useState } from "react"
+import { Fragment, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 import {
   AlertTriangle,
@@ -11,13 +11,13 @@ import {
   CornerDownRight,
   FileCheck,
   FileSpreadsheet,
-  Lock,
+  Settings,
   Plus,
   RotateCcw,
   Upload,
 } from "lucide-react"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { Controller, useForm } from "react-hook-form"
+import { Controller, useForm, useWatch } from "react-hook-form"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -40,7 +40,14 @@ import {
   FieldLabel,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { Switch } from "@/components/ui/switch"
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import {
   Table,
   TableBody,
@@ -59,6 +66,7 @@ import { FilterSelect } from "@/components/shared/filter-select"
 import { HeaderSeccion } from "@/components/shared/header-seccion"
 import {
   AccionesFila,
+  CampoAcceso,
   FilasCargando,
   MensajeSinDatos,
 } from "@/components/shared/table-helpers"
@@ -68,7 +76,6 @@ import { useEliminarConToast } from "@/hooks/use-eliminar-toast"
 import { usePuede } from "@/hooks/use-permisos"
 import { useResetAlAbrir } from "@/hooks/use-reset-al-abrir"
 import {
-  useAniosEscolares,
   useCambiarEstadoCurso,
   useCambiarSubcursos,
   useCopiarCursos,
@@ -76,7 +83,6 @@ import {
   useEliminarCurso,
   useGuardarSubcurso,
   useImportarCursos,
-  useNiveles,
   useVistaPreviaCursos,
 } from "@/hooks/use-academico"
 import { useCompetencias } from "@/hooks/use-evaluacion"
@@ -86,110 +92,20 @@ import {
   type AnioEscolarResponse,
   type CursoImportResponse,
   type CursoResponse,
-  type CursoVistaPreviaResponse,
   type NivelResponse,
+  type CursoVistaPreviaResponse,
 } from "@/lib/api/academico"
 import { subcursoSchema, type SubcursoValues } from "@/lib/schemas/academico"
 
+import { useFiltrosMalla } from "@/hooks/use-filtros-malla"
+import { FiltrosMalla, AvisoMallaBloqueada, TEXTO_ESTADO_ANIO } from "@/components/academico/filtros-malla"
+
 const ESTADO_OPCIONES = [
-  { value: "1", label: "Activo" },
-  { value: "3", label: "Inactivo" },
+  { value: String(ACCESO.ACTIVO), label: "Activo" },
+  { value: String(ACCESO.INACTIVO), label: "Inactivo" },
 ]
 
 const COLUMNAS = 7
-
-// ── Filtro de año y nivel (compartido con la pestaña Competencias) ───────
-
-/**
- * Año y nivel de la malla que se está viendo. Mientras el usuario no elige,
- * se muestra el año por comenzar (el que se configura), o el vigente si no
- * hay otro, y el primer nivel.
- */
-export function useFiltrosMalla() {
-  const { data: anios = [] } = useAniosEscolares()
-  const { data: niveles = [] } = useNiveles()
-  const [idAnioElegido, setIdAnio] = useState<number | null>(null)
-  const [idNivelElegido, setIdNivel] = useState<number | null>(null)
-
-  const anioPorDefecto =
-    anios.find((a) => a.estado === ESTADO_ANIO.POR_COMENZAR) ??
-    anios.find((a) => a.estado === ESTADO_ANIO.VIGENTE) ??
-    anios[0]
-  const idAnio = idAnioElegido ?? anioPorDefecto?.idAnio ?? null
-  const idNivel = idNivelElegido ?? niveles[0]?.idNivel ?? null
-  const anio = anios.find((a) => a.idAnio === idAnio) ?? null
-  const nivel = niveles.find((n) => n.idNivel === idNivel) ?? null
-
-  return { anios, niveles, idAnio, setIdAnio, idNivel, setIdNivel, anio, nivel }
-}
-
-export const TEXTO_ESTADO_ANIO: Record<number, string> = {
-  [ESTADO_ANIO.VIGENTE]: "vigente",
-  [ESTADO_ANIO.CERRADO]: "cerrado",
-  [ESTADO_ANIO.POR_COMENZAR]: "por comenzar",
-}
-
-export function FiltrosMalla({
-  anios,
-  niveles,
-  idAnio,
-  idNivel,
-  onAnio,
-  onNivel,
-}: {
-  anios: AnioEscolarResponse[]
-  niveles: NivelResponse[]
-  idAnio: number | null
-  idNivel: number | null
-  onAnio: (id: number) => void
-  onNivel: (id: number) => void
-}) {
-  const opcionesAnio = [...anios]
-    .sort((a, b) => b.anio.localeCompare(a.anio))
-    .map((a) => ({ value: String(a.idAnio), label: `${a.anio} (${TEXTO_ESTADO_ANIO[a.estado] ?? ""})` }))
-  return (
-    <>
-      <FilterSelect
-        label="Año"
-        value={idAnio ? String(idAnio) : ""}
-        onValueChange={(v) => v && onAnio(Number(v))}
-        options={opcionesAnio}
-        includeAll={false}
-        allLabel="Selecciona"
-        className="w-[240px]"
-      />
-      <FilterSelect
-        label="Nivel"
-        value={idNivel ? String(idNivel) : ""}
-        onValueChange={(v) => v && onNivel(Number(v))}
-        options={niveles.map((n) => ({ value: String(n.idNivel), label: n.nombre }))}
-        includeAll={false}
-        allLabel="Selecciona"
-        className="w-[180px]"
-      />
-    </>
-  )
-}
-
-/** Aviso de solo lectura cuando el año no está por comenzar. */
-export function AvisoMallaBloqueada({ anio, extra }: { anio: AnioEscolarResponse; extra?: string }) {
-  return (
-    <div className="flex items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-950 dark:text-amber-200">
-      <Lock className="size-5 shrink-0 text-amber-600 dark:text-amber-400" />
-      <div>
-        <p className="font-semibold leading-tight">
-          Año escolar {anio.anio} {TEXTO_ESTADO_ANIO[anio.estado]}
-        </p>
-        <p className="mt-0.5 text-xs text-muted-foreground">
-          Su malla curricular es de solo lectura. Solo se configura la de un año por comenzar.
-          {extra ? ` ${extra}` : ""}
-        </p>
-      </div>
-    </div>
-  )
-}
-
-// ── Pestaña ──────────────────────────────────────────────────────────────
 
 export function CursosTab() {
   const filtros = useFiltrosMalla()
@@ -209,7 +125,7 @@ export function CursosTab() {
   const [copiarOpen, setCopiarOpen] = useState(false)
   const [expandidos, setExpandidos] = useState<Set<number>>(new Set())
   const [cambiandoId, setCambiandoId] = useState<number | null>(null)
-  const [apagando, setApagando] = useState<CursoResponse | null>(null)
+  const [configurandoId, setConfigurandoId] = useState<number | null>(null)
   const [subcursoDialog, setSubcursoDialog] = useState<{ area: CursoResponse; subcurso: CursoResponse | null } | null>(null)
 
   const [busqueda, setBusqueda] = useState("")
@@ -228,6 +144,36 @@ export function CursosTab() {
   }, [cursos])
 
   const configurable = anio?.estado === ESTADO_ANIO.POR_COMENZAR
+  const configurando = cursos.find((c) => c.idCurso === configurandoId) ?? null
+  const areaDialog = cursos.find((c) => c.idCurso === subcursoDialog?.area.idCurso) ?? null
+  const subcursoActual = cursos.find((c) => c.idCurso === subcursoDialog?.subcurso?.idCurso) ?? null
+
+  function cerrarDialogos() {
+    setConfigurandoId(null)
+    setSubcursoDialog(null)
+    setImportarOpen(false)
+    setCopiarOpen(false)
+  }
+
+  function validarOperacion(curso: CursoResponse, permitido: boolean) {
+    if (!configurable || !permitido || curso.idAnio !== idAnio || curso.idNivel !== idNivel) {
+      throw new Error("No puedes modificar este curso en el contexto actual")
+    }
+  }
+
+  async function eliminarCurso(id: number) {
+    const curso = cursos.find((c) => c.idCurso === id)
+    if (!curso) throw new Error("El curso ya no está disponible")
+    validarOperacion(curso, puedeEliminar)
+    await eliminar.mutateAsync(id)
+  }
+
+  async function sincronizarCurso(id: number) {
+    const resultado = await refetch({ throwOnError: true })
+    const actualizado = resultado.data?.find((c) => c.idCurso === id)
+    if (!actualizado) throw new Error("El curso ya no está disponible")
+    return actualizado
+  }
   // Un vigente sin cursos en el nivel admite una importación inicial (igual que el backend).
   const vigenteVacio = anio?.estado === ESTADO_ANIO.VIGENTE && !isLoading && principales.length === 0
   const origenesCopia = filtros.anios.filter(
@@ -263,45 +209,27 @@ export function CursosTab() {
   }
 
   async function handleCambiarEstado(curso: CursoResponse, activar: boolean) {
-    setCambiandoId(curso.idCurso)
     try {
+      validarOperacion(curso, puedeActualizar)
+      setCambiandoId(curso.idCurso)
       await cambiarEstado.mutateAsync({
         id: curso.idCurso,
         accesoId: activar ? ACCESO.ACTIVO : ACCESO.INACTIVO,
       })
-      toast.success(`"${curso.nombre}" ${activar ? "activado" : "inactivado"}`)
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Error al cambiar el estado")
     } finally {
       setCambiandoId(null)
     }
   }
 
   async function aplicarSubcursos(area: CursoResponse, tieneSubcursos: boolean) {
-    setCambiandoId(area.idCurso)
     try {
+      validarOperacion(area, puedeActualizar)
+      setCambiandoId(area.idCurso)
       await cambiarSubcursos.mutateAsync({ id: area.idCurso, tieneSubcursos })
       alternarExpandido(area.idCurso, tieneSubcursos)
-      toast.success(
-        tieneSubcursos
-          ? `Ya puedes agregar subcursos a "${area.nombre}"`
-          : `"${area.nombre}" vuelve a dictarse como un solo curso`
-      )
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Error al cambiar los subcursos")
-      throw error
     } finally {
       setCambiandoId(null)
     }
-  }
-
-  function handleSwitchSubcursos(area: CursoResponse, tieneSubcursos: boolean) {
-    // Apagarlo elimina los subcursos: si hay alguno, se confirma antes.
-    if (!tieneSubcursos && (subcursosPorArea.get(area.idCurso)?.length ?? 0) > 0) {
-      setApagando(area)
-      return
-    }
-    aplicarSubcursos(area, tieneSubcursos).catch(() => {})
   }
 
   return (
@@ -336,19 +264,19 @@ export function CursosTab() {
         )}
 
         <div className="flex flex-wrap items-center gap-2">
-          <FiltrosMalla
-            anios={filtros.anios}
-            niveles={filtros.niveles}
-            idAnio={idAnio}
-            idNivel={idNivel}
-            onAnio={filtros.setIdAnio}
-            onNivel={filtros.setIdNivel}
-          />
           <BuscadorTabla
             value={busqueda}
             onValueChange={setBusqueda}
             placeholder="Buscar por código o nombre..."
             className="min-w-[200px] max-w-[320px] flex-1"
+          />
+          <FiltrosMalla
+            anios={filtros.anios}
+            niveles={filtros.niveles}
+            idAnio={idAnio}
+            idNivel={idNivel}
+            onAnio={(id) => { cerrarDialogos(); filtros.setIdAnio(id) }}
+            onNivel={(id) => { cerrarDialogos(); filtros.setIdNivel(id) }}
           />
           <FilterSelect
             value={filtroEstado}
@@ -406,7 +334,6 @@ export function CursosTab() {
                 filtrados.map((curso) => {
                   const esArea = curso.tipo === "AREA"
                   const expandido = curso.tieneSubcursos && expandidos.has(curso.idCurso)
-                  const ocupado = cambiandoId === curso.idCurso
                   return (
                     <Fragment key={curso.idCurso}>
                       <TableRow>
@@ -436,49 +363,18 @@ export function CursosTab() {
                           {esArea ? <Badge variant="secondary">Área</Badge> : <Badge variant="info">Transversal</Badge>}
                         </TableCell>
                         <TableCell className="text-center tabular-nums">{curso.cantidadCompetencias}</TableCell>
-                        <TableCell className="text-center">
+                        <TableCell className="text-center tabular-nums">
                           {esArea ? (
-                            <Switch
-                              checked={curso.tieneSubcursos}
-                              disabled={!configurable || !puedeActualizar || ocupado}
-                              onCheckedChange={(checked) => handleSwitchSubcursos(curso, checked)}
-                              aria-label={`Subcursos de ${curso.nombre}`}
-                            />
+                            subcursosPorArea.get(curso.idCurso)?.length ?? 0
                           ) : (
                             <span className="text-xs text-muted-foreground">No aplica</span>
                           )}
                         </TableCell>
                         <TableCell className="text-center">
-                          <div className="flex items-center justify-center gap-2.5">
-                            <Switch
-                              checked={curso.accesoId === ACCESO.ACTIVO}
-                              disabled={!configurable || !puedeActualizar || ocupado}
-                              onCheckedChange={(checked) => handleCambiarEstado(curso, checked)}
-                              aria-label={`Cambiar estado de ${curso.nombre}`}
-                            />
-                            <EstadoBadge accesoId={curso.accesoId} />
-                          </div>
+                          <EstadoBadge accesoId={curso.accesoId} />
                         </TableCell>
                         <TableCell className="text-center">
-                          <AccionesFila
-                            className="justify-center"
-                            puedeActualizar={false}
-                            puedeEliminar={puedeEliminar && configurable}
-                            onEditar={() => {}}
-                            onEliminar={() =>
-                              eliminarConToast(eliminar.mutateAsync, {
-                                id: curso.idCurso,
-                                mensaje: `"${curso.nombre}" eliminado`,
-                              })
-                            }
-                            tituloEliminar={`Eliminar ${curso.nombre}`}
-                            descripcionEliminar={
-                              curso.tieneSubcursos
-                                ? `Se eliminarán "${curso.nombre}" y sus subcursos de la malla del ${anio?.anio}.`
-                                : `Se eliminará "${curso.nombre}" de la malla del ${anio?.anio}.`
-                            }
-                            ariaEditar=""
-                          />
+                          <div className="flex justify-center gap-2">{puedeActualizar && configurable && <Button variant="outline" size="icon-sm" disabled={!esArea} title={esArea ? "Configurar subcursos" : "No aplica a transversales"} aria-label={"Configurar subcursos de " + curso.nombre} onClick={() => setConfigurandoId(curso.idCurso)}><Settings /></Button>}</div>
                         </TableCell>
                       </TableRow>
                       {expandido && (
@@ -489,10 +385,8 @@ export function CursosTab() {
                           puedeCrear={puedeCrear}
                           puedeActualizar={puedeActualizar}
                           puedeEliminar={puedeEliminar}
-                          cambiandoId={cambiandoId}
-                          onCambiarEstado={handleCambiarEstado}
                           onEliminar={(subcurso) =>
-                            eliminarConToast(eliminar.mutateAsync, {
+                            eliminarConToast(eliminarCurso, {
                               id: subcurso.idCurso,
                               mensaje: `Subcurso "${subcurso.nombre}" eliminado`,
                             })
@@ -510,23 +404,30 @@ export function CursosTab() {
 
         {isError && <BotonReintentar refetch={refetch} />}
 
-        {apagando && (
-          <ConfirmarEliminar
-            open
-            onOpenChange={(abierto) => !abierto && setApagando(null)}
-            titulo={`Quitar los subcursos de ${apagando.nombre}`}
-            descripcion={`Se eliminarán sus ${subcursosPorArea.get(apagando.idCurso)?.length ?? 0} subcursos y "${apagando.nombre}" volverá a dictarse como un solo curso.`}
-            textoBoton="Quitar subcursos"
-            onConfirm={() => aplicarSubcursos(apagando, false)}
+        {configurando && configurando.tipo === "AREA" && configurable && puedeActualizar && (
+          <ConfiguracionCursoDialog
+            key={configurando.idCurso}
+            curso={configurando}
+            cantidadSubcursos={subcursosPorArea.get(configurando.idCurso)?.length ?? 0}
+            ocupado={cambiandoId !== null}
+            onCerrar={() => setConfigurandoId(null)}
+            onSubcursos={(curso, habilitados) => aplicarSubcursos(curso, habilitados)}
+            onSincronizar={() => sincronizarCurso(configurando.idCurso)}
           />
         )}
 
-        {subcursoDialog && (
+        {subcursoDialog && areaDialog && configurable &&
+          (subcursoDialog.subcurso ? puedeActualizar && subcursoActual : puedeCrear) && (
           <SubcursoDialog
+            key={subcursoActual?.idCurso ?? `nuevo-${areaDialog.idCurso}`}
             open
             onOpenChange={(abierto) => !abierto && setSubcursoDialog(null)}
-            area={subcursoDialog.area}
-            subcurso={subcursoDialog.subcurso}
+            area={areaDialog}
+            subcurso={subcursoActual}
+            ocupado={cambiandoId !== null}
+            onEstado={(curso, activar) => handleCambiarEstado(curso, activar)}
+            onSincronizar={() => sincronizarCurso(subcursoActual?.idCurso ?? areaDialog.idCurso)}
+            validarGuardar={() => validarOperacion(areaDialog, subcursoDialog.subcurso ? puedeActualizar : puedeCrear)}
           />
         )}
 
@@ -562,8 +463,6 @@ function FilasSubcursos({
   puedeCrear,
   puedeActualizar,
   puedeEliminar,
-  cambiandoId,
-  onCambiarEstado,
   onEliminar,
   onAbrir,
 }: {
@@ -573,8 +472,6 @@ function FilasSubcursos({
   puedeCrear: boolean
   puedeActualizar: boolean
   puedeEliminar: boolean
-  cambiandoId: number | null
-  onCambiarEstado: (curso: CursoResponse, activar: boolean) => void
   onEliminar: (subcurso: CursoResponse) => Promise<void>
   /** Sin subcurso abre el diálogo para crear uno. */
   onAbrir: (subcurso: CursoResponse | null) => void
@@ -612,15 +509,7 @@ function FilasSubcursos({
           </TableCell>
           <TableCell />
           <TableCell className="text-center">
-            <div className="flex items-center justify-center gap-2.5">
-              <Switch
-                checked={subcurso.accesoId === ACCESO.ACTIVO}
-                disabled={!configurable || !puedeActualizar || cambiandoId === subcurso.idCurso}
-                onCheckedChange={(checked) => onCambiarEstado(subcurso, checked)}
-                aria-label={`Cambiar estado de ${subcurso.nombre}`}
-              />
-              <EstadoBadge accesoId={subcurso.accesoId} />
-            </div>
+            <EstadoBadge accesoId={subcurso.accesoId} />
           </TableCell>
           <TableCell className="text-center">
             <AccionesFila
@@ -664,18 +553,198 @@ function FilasSubcursos({
   )
 }
 
+/** Los endpoints son independientes: conserva éxitos parciales y refresca la base para reintentar. */
+function useGuardadoCurso(curso: CursoResponse, onSincronizar: () => Promise<CursoResponse>) {
+  const [original, setOriginal] = useState(curso)
+  const [enviando, setEnviando] = useState(false)
+  const [errorSincronizacion, setErrorSincronizacion] = useState(false)
+  const [resultado, setResultado] = useState("")
+  const bloqueo = useRef(false)
+
+  async function sincronizar() {
+    try {
+      setOriginal(await onSincronizar())
+      setErrorSincronizacion(false)
+      return true
+    } catch {
+      setErrorSincronizacion(true)
+      return false
+    }
+  }
+
+  async function ejecutar(operaciones: { nombre: string; guardar: () => Promise<unknown>; exito: string }[], ocupado: boolean) {
+    if (bloqueo.current || ocupado || errorSincronizacion || !operaciones.length) return false
+    bloqueo.current = true
+    setEnviando(true)
+    setResultado("")
+    const completadas: string[] = []
+    let operacion = "los cambios"
+    let errorGuardado: unknown
+    try {
+      for (const pendiente of operaciones) {
+        operacion = pendiente.nombre
+        await pendiente.guardar()
+        completadas.push(pendiente.exito)
+      }
+    } catch (error) {
+      errorGuardado = error
+    }
+    try {
+      const sincronizado = await sincronizar()
+      const mensaje = errorGuardado
+        ? `${completadas.length ? `Guardado parcial. ${completadas.join(" ")} ` : ""}No se pudo guardar ${operacion}: ${errorGuardado instanceof Error ? errorGuardado.message : "Error al guardar"}.`
+        : "Cambios guardados correctamente."
+      const detalle = sincronizado ? mensaje : `${mensaje} No se pudieron sincronizar los datos. Reintenta la sincronización antes de guardar de nuevo.`
+      setResultado(detalle)
+      if (errorGuardado || !sincronizado) toast.error(detalle)
+      else toast.success(detalle)
+      return !errorGuardado && sincronizado
+    } finally {
+      bloqueo.current = false
+      setEnviando(false)
+    }
+  }
+
+  async function reintentarSincronizacion(ocupado: boolean) {
+    if (bloqueo.current || ocupado) return
+    bloqueo.current = true
+    setEnviando(true)
+    try {
+      if (await sincronizar()) {
+        setResultado("Datos sincronizados. Revisa los cambios pendientes antes de guardar.")
+      } else {
+        toast.error("No se pudieron sincronizar los datos. Vuelve a intentarlo.")
+      }
+    } finally {
+      bloqueo.current = false
+      setEnviando(false)
+    }
+  }
+
+  return { original, enviando, errorSincronizacion, resultado, bloqueo, ejecutar, reintentarSincronizacion }
+}
+
+function ConfiguracionCursoDialog({
+  curso,
+  cantidadSubcursos,
+  ocupado,
+  onCerrar,
+  onSubcursos,
+  onSincronizar,
+}: {
+  curso: CursoResponse
+  cantidadSubcursos: number
+  ocupado: boolean
+  onCerrar: () => void
+  onSubcursos: (curso: CursoResponse, habilitados: boolean) => Promise<void>
+  onSincronizar: () => Promise<CursoResponse>
+}) {
+  const [habilitados, setHabilitados] = useState(curso.tieneSubcursos)
+  const [confirmando, setConfirmando] = useState(false)
+  const { original, enviando, errorSincronizacion, resultado, bloqueo, ejecutar, reintentarSincronizacion } = useGuardadoCurso(curso, onSincronizar)
+  const cambioSubcursos = curso.tipo === "AREA" && habilitados !== original.tieneSubcursos
+  const hayCambios = cambioSubcursos
+
+  async function guardar(confirmado = false) {
+    if (bloqueo.current || ocupado || errorSincronizacion || !hayCambios || (confirmando && !confirmado)) return
+    if (!confirmado && cambioSubcursos && !habilitados && cantidadSubcursos > 0) {
+      setConfirmando(true)
+      return
+    }
+    setConfirmando(false)
+    await ejecutar([
+      ...(cambioSubcursos ? [{
+        nombre: "la configuración de subcursos",
+        guardar: () => onSubcursos(curso, habilitados),
+        exito: !habilitados && cantidadSubcursos > 0
+          ? "Se deshabilitaron los subcursos y se eliminaron sus hijos."
+          : `Se ${habilitados ? "habilitaron" : "deshabilitaron"} los subcursos.`,
+      }] : []),
+    ], ocupado)
+  }
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && !bloqueo.current && !ocupado && !confirmando && onCerrar()}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Configurar subcursos</DialogTitle>
+          <DialogDescription>
+            {curso.codigo} · {curso.nombre}. Los datos del curso se actualizan mediante la importación.
+          </DialogDescription>
+        </DialogHeader>
+        <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); void guardar() }}>
+          <fieldset disabled={ocupado || enviando || confirmando || errorSincronizacion} className="space-y-4">
+            {curso.tipo === "AREA" && (
+              <div className="space-y-3 border-t pt-4">
+                <Field>
+                  <FieldLabel>Configuración de subcursos</FieldLabel>
+                  <FieldContent>
+                    <Select value={String(habilitados)} onValueChange={(value) => value !== null && setHabilitados(value === "true")}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue>{habilitados ? "Habilitados" : "Deshabilitados"}</SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          <SelectItem value="true">Habilitados</SelectItem>
+                          <SelectItem value="false">Deshabilitados</SelectItem>
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                    <FieldDescription>
+                      Habilitarlos permite agregar subcursos
+                    </FieldDescription>
+                  </FieldContent>
+                </Field>
+              </div>
+            )}
+          </fieldset>
+          {resultado && <p role="status" className="text-sm text-muted-foreground">{resultado}</p>}
+          {errorSincronizacion && (
+            <fieldset disabled={ocupado || enviando}>
+              <BotonReintentar refetch={() => void reintentarSincronizacion(ocupado)} />
+            </fieldset>
+          )}
+          <DialogFooter>
+            <Button type="button" variant="outline" disabled={ocupado || enviando || confirmando} onClick={onCerrar}>Cerrar</Button>
+            <BotonGuardar etiqueta="Guardar" enviando={enviando} disabled={ocupado || confirmando || errorSincronizacion || !hayCambios} />
+          </DialogFooter>
+        </form>
+        <ConfirmarEliminar
+          open={confirmando}
+          onOpenChange={setConfirmando}
+          disabled={ocupado || enviando}
+          titulo={`Quitar los subcursos de ${curso.nombre}`}
+          descripcion={`Se eliminarán sus ${cantidadSubcursos} subcursos y "${curso.nombre}" volverá a dictarse como un solo curso.`}
+          textoBoton="Confirmar y guardar"
+          onConfirm={() => guardar(true)}
+        />
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 function SubcursoDialog({
   open,
   onOpenChange,
   area,
   subcurso,
+  ocupado,
+  onEstado,
+  validarGuardar,
+  onSincronizar,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   area: CursoResponse
   subcurso: CursoResponse | null
+  ocupado: boolean
+  onEstado: (curso: CursoResponse, activar: boolean) => Promise<void>
+  validarGuardar: () => void
+  onSincronizar: () => Promise<CursoResponse>
 }) {
   const guardar = useGuardarSubcurso()
+  const { original, enviando, errorSincronizacion, resultado, bloqueo, ejecutar, reintentarSincronizacion } = useGuardadoCurso(subcurso ?? area, onSincronizar)
+  const [accesoId, setAccesoId] = useState(subcurso?.accesoId ?? ACCESO.ACTIVO)
   const { data: competencias = [], isLoading } = useCompetencias(area.idCurso)
   const nombre = subcurso?.nombre ?? ""
   const idCompetencias = useMemo(() => subcurso?.idCompetencias ?? [], [subcurso])
@@ -684,7 +753,16 @@ function SubcursoDialog({
     resolver: zodResolver(subcursoSchema),
     defaultValues: { nombre, idCompetencias },
   })
-  useResetAlAbrir(open, form, { nombre, idCompetencias }, [nombre, idCompetencias])
+  // El diálogo se monta por id. Un refetch tras guardar solo el estado no debe
+  // borrar los cambios pendientes de nombre o competencias.
+  useResetAlAbrir(open, form, { nombre, idCompetencias }, [subcurso?.idCurso, area.idCurso])
+  const nombreActual = useWatch({ control: form.control, name: "nombre" })
+  const competenciasActuales = useWatch({ control: form.control, name: "idCompetencias" })
+  const cambioAcademico = !subcurso || nombreActual.trim() !== original.nombre.trim() ||
+    competenciasActuales.length !== original.idCompetencias.length ||
+    competenciasActuales.some((id) => !original.idCompetencias.includes(id))
+  const cambioEstado = !!subcurso && accesoId !== original.accesoId
+  const hayCambios = cambioAcademico || cambioEstado
 
   // Las inactivas solo aparecen si el subcurso ya las tenía, para poder quitarlas.
   const opciones = competencias.filter(
@@ -692,19 +770,36 @@ function SubcursoDialog({
   )
 
   async function onSubmit(values: SubcursoValues) {
-    await guardarConToast(async () => {
-      await guardar.mutateAsync({
+    if (ocupado || guardar.isPending || bloqueo.current || errorSincronizacion || !hayCambios) return
+    const guardarAcademico = async () => {
+      validarGuardar()
+      return guardar.mutateAsync({
         idArea: area.idCurso,
         idSubcurso: subcurso?.idCurso,
         data: { nombre: values.nombre, idCompetencias: values.idCompetencias },
       })
-      toast.success(subcurso ? "Subcurso actualizado" : "Subcurso creado")
-      onOpenChange(false)
-    })
+    }
+    if (!subcurso) {
+      await guardarConToast(async () => {
+        await guardarAcademico()
+        toast.success("Subcurso creado")
+        onOpenChange(false)
+      })
+      return
+    }
+    const exito = await ejecutar([
+      ...(cambioAcademico ? [{ nombre: "los datos académicos", guardar: guardarAcademico, exito: "Se guardaron el nombre y las competencias." }] : []),
+      ...(cambioEstado ? [{
+        nombre: "el estado del subcurso",
+        guardar: () => { validarGuardar(); return onEstado(subcurso, accesoId === ACCESO.ACTIVO) },
+        exito: `Se guardó el estado ${accesoId === ACCESO.ACTIVO ? "Activo" : "Inactivo"}.`,
+      }] : []),
+    ], ocupado)
+    if (exito) onOpenChange(false)
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(abierto) => !bloqueo.current && !ocupado && !form.formState.isSubmitting && onOpenChange(abierto)}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="text-lg font-semibold tracking-tight">
@@ -715,6 +810,7 @@ function SubcursoDialog({
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" noValidate>
+          <fieldset disabled={ocupado || enviando || form.formState.isSubmitting || errorSincronizacion} className="space-y-4">
           <FieldGroup>
             <Controller
               control={form.control}
@@ -775,14 +871,30 @@ function SubcursoDialog({
                 </Field>
               )}
             />
+            {subcurso && (
+              <Field>
+                <FieldLabel>Estado del subcurso</FieldLabel>
+                <FieldContent>
+                  <CampoAcceso value={accesoId} onChange={setAccesoId} />
+                </FieldContent>
+              </Field>
+            )}
           </FieldGroup>
+          </fieldset>
+          {resultado && <p role="status" className="text-sm text-muted-foreground">{resultado}</p>}
+          {errorSincronizacion && (
+            <fieldset disabled={ocupado || enviando || form.formState.isSubmitting}>
+              <BotonReintentar refetch={() => void reintentarSincronizacion(ocupado)} />
+            </fieldset>
+          )}
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" disabled={ocupado || enviando || form.formState.isSubmitting} onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
             <BotonGuardar
               etiqueta={subcurso ? "Guardar cambios" : "Crear subcurso"}
-              enviando={form.formState.isSubmitting}
+              enviando={enviando || form.formState.isSubmitting}
+              disabled={ocupado || errorSincronizacion || !hayCambios}
             />
           </DialogFooter>
         </form>
@@ -871,10 +983,9 @@ function ImportarCursosModal({
               <CheckCircle2 className="size-6 shrink-0 text-emerald-600 dark:text-emerald-400" />
               <p className="font-semibold leading-tight">Importación completada</p>
             </div>
-            <div className="grid grid-cols-3 gap-2.5">
+            <div className="grid grid-cols-2 gap-2.5">
               <Contador valor={resultado.creados} texto="Nuevos" />
               <Contador valor={resultado.actualizados} texto="Actualizados" />
-              <Contador valor={resultado.inactivados} texto="Inactivados" />
             </div>
             <DialogFooter>
               <Button variant="brand" className="w-full" onClick={() => handleOpenChange(false)}>

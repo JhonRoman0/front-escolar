@@ -47,8 +47,8 @@ export default function AcademicoPage() {
           {puedeDocentes && <TabsTrigger value="docentes">Docentes</TabsTrigger>}
           {puedeCursos && <TabsTrigger value="cursos">Cursos</TabsTrigger>}
           {puedeCompetencias && <TabsTrigger value="competencias">Competencias</TabsTrigger>}
-          {puedeAsignaciones && <TabsTrigger value="asignaciones">Asignaciones</TabsTrigger>}
           {puedeRecreos && <TabsTrigger value="recreos">Recreos</TabsTrigger>}
+          {puedeAsignaciones && <TabsTrigger value="asignaciones">Asignaciones</TabsTrigger>}
           {puedeSuspensiones && <TabsTrigger value="suspensiones">Suspensiones</TabsTrigger>}
           {puedeCambiosDocente && <TabsTrigger value="cambios">Cambios docente</TabsTrigger>}
         </TabsList>

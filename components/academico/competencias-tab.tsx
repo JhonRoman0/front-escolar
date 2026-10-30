@@ -1,10 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import { toast } from "sonner"
 
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import {
   Table,
@@ -19,15 +17,15 @@ import { FilterSelect } from "@/components/shared/filter-select"
 import { EstadoBadge } from "@/components/seguridad/estado-badge"
 import { HeaderSeccion } from "@/components/shared/header-seccion"
 import { FilasCargando, MensajeSinDatos } from "@/components/shared/table-helpers"
-import { AvisoMallaBloqueada, FiltrosMalla, useFiltrosMalla } from "@/components/academico/cursos-tab"
-import { usePuede } from "@/hooks/use-permisos"
+import { useFiltrosMalla } from "@/hooks/use-filtros-malla"
+import { AvisoMallaBloqueada, FiltrosMalla } from "@/components/academico/filtros-malla"
 import { useCursos } from "@/hooks/use-academico"
-import { useCambiarEstadoCompetencia, useCompetencias } from "@/hooks/use-evaluacion"
-import { ACCESO, ESTADO_ANIO, OPCIONES_ESTADO_ACCESO } from "@/lib/api/academico"
+import { useCompetencias } from "@/hooks/use-evaluacion"
+import { ESTADO_ANIO, OPCIONES_ESTADO_ACCESO } from "@/lib/api/academico"
 
 /**
  * Competencias de cada área, tal como vienen del Excel del SIAGIE. No se
- * escriben a mano: solo se activan o desactivan en un año por comenzar.
+ * escriben a mano: esta pantalla permite consultarlas y filtrarlas.
  */
 export function CompetenciasTab() {
   const filtros = useFiltrosMalla()
@@ -41,29 +39,11 @@ export function CompetenciasTab() {
   const area = areas.find((a) => a.idCurso === idAreaElegida) ?? areas[0] ?? null
 
   const { data: competencias = [], isLoading } = useCompetencias(area?.idCurso)
-  const cambiarEstado = useCambiarEstadoCompetencia()
-  const puedeActualizar = usePuede("COMPETENCIAS", "ACTUALIZAR")
   const configurable = anio?.estado === ESTADO_ANIO.POR_COMENZAR
-  const [cambiandoId, setCambiandoId] = useState<number | null>(null)
   const [filtroEstado, setFiltroEstado] = useState("")
   const competenciasFiltradas = competencias.filter(
     (c) => !filtroEstado || c.accesoId === Number(filtroEstado)
   )
-
-  async function handleCambiarEstado(idCompetencia: number, activar: boolean) {
-    setCambiandoId(idCompetencia)
-    try {
-      await cambiarEstado.mutateAsync({
-        id: idCompetencia,
-        accesoId: activar ? ACCESO.ACTIVO : ACCESO.INACTIVO,
-      })
-      toast.success(`Competencia ${activar ? "activada" : "inactivada"}`)
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Error al cambiar el estado")
-    } finally {
-      setCambiandoId(null)
-    }
-  }
 
   return (
     <Card>
@@ -96,7 +76,6 @@ export function CompetenciasTab() {
             opcionesLargas
           />
           <FilterSelect
-            label="Estado"
             value={filtroEstado}
             onValueChange={setFiltroEstado}
             options={OPCIONES_ESTADO_ACCESO}
@@ -111,21 +90,20 @@ export function CompetenciasTab() {
                 <TableHead className="w-[90px] text-center">Código</TableHead>
                 <TableHead>Competencia</TableHead>
                 <TableHead className="w-[170px] text-center">Estado</TableHead>
-                <TableHead className="text-center">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {!area ? (
                 <MensajeSinDatos
-                  columnas={4}
+                  columnas={3}
                   mensaje="Este año y nivel aún no tienen cursos. Impórtalos desde la pestaña Cursos."
                 />
               ) : isLoading ? (
-                <FilasCargando columnas={4} />
+                <FilasCargando columnas={3} />
               ) : !competencias.length ? (
-                <MensajeSinDatos columnas={4} mensaje={`${area.nombre} no tiene competencias.`} />
+                <MensajeSinDatos columnas={3} mensaje={`${area.nombre} no tiene competencias.`} />
               ) : !competenciasFiltradas.length ? (
-                <MensajeSinDatos columnas={4} mensaje="No hay competencias para el estado seleccionado." />
+                <MensajeSinDatos columnas={3} mensaje="No hay competencias para el estado seleccionado." />
               ) : (
                 competenciasFiltradas.map((c) => (
                   <TableRow key={c.idCompetencia}>
@@ -137,21 +115,6 @@ export function CompetenciasTab() {
                     <TableCell className="whitespace-normal break-words">{c.competencia}</TableCell>
                     <TableCell className="text-center">
                       <EstadoBadge accesoId={c.accesoId} />
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <div className="flex items-center justify-center">
-                        {puedeActualizar && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={!configurable || cambiandoId !== null || cambiarEstado.isPending}
-                            onClick={() => handleCambiarEstado(c.idCompetencia, c.accesoId !== ACCESO.ACTIVO)}
-                            aria-label={`${c.accesoId === ACCESO.ACTIVO ? "Inactivar" : "Activar"} ${c.competencia}`}
-                          >
-                            {c.accesoId === ACCESO.ACTIVO ? "Inactivar" : "Activar"}
-                          </Button>
-                        )}
-                      </div>
                     </TableCell>
                   </TableRow>
                 ))

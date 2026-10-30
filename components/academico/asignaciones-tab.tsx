@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react"
 import { toast } from "sonner"
-import { AlertTriangle, Coffee, Lock, Pencil, Plus, X } from "lucide-react"
+import { AlertTriangle, Coffee, Lock, Pencil, Plus, RotateCcw, X } from "lucide-react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form"
 
@@ -23,6 +23,7 @@ import {
   SelectContent,
   SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
@@ -41,7 +42,8 @@ import { FilterSelect } from "@/components/shared/filter-select"
 import { HeaderSeccion } from "@/components/shared/header-seccion"
 import { SelectorHora } from "@/components/shared/selector-hora"
 import { FilasCargando, MensajeSinDatos } from "@/components/shared/table-helpers"
-import { FiltrosMalla, useFiltrosMalla } from "@/components/academico/cursos-tab"
+import { useFiltrosMalla } from "@/hooks/use-filtros-malla"
+import { FiltrosMalla } from "@/components/academico/filtros-malla"
 import {
   useAsignaciones,
   useAulas,
@@ -378,6 +380,17 @@ function AsignacionFormDialog({
       (c.tipo === "SUBCURSO" || (c.tipo === "AREA" && !c.tieneSubcursos)) &&
       !asignadosEnSeccion.has(c.idCurso)
   )
+  // Agrupar solo las opciones disponibles, conservando su orden y el de sus hijos.
+  const gruposCurso = new Map<string, { key: string; padre: (typeof cursos)[number] | null; cursos: typeof cursos }>()
+  for (const curso of cursosAsignables) {
+    const padre = curso.idCursoPadre != null ? cursos.find((c) => c.idCurso === curso.idCursoPadre) ?? null : null
+    const key = padre ? `padre-${padre.idCurso}` : `curso-${curso.idCurso}`
+    const grupo = gruposCurso.get(key)
+    if (grupo) grupo.cursos.push(curso)
+    else gruposCurso.set(key, { key, padre, cursos: [curso] })
+  }
+  const opcionesCurso = [...gruposCurso.values()]
+
   const nombreCurso = (idCurso: number) => {
     const c = cursos.find((x) => x.idCurso === idCurso)
     if (!c) return ""
@@ -587,17 +600,20 @@ function AsignacionFormDialog({
                         {/* Nombres largos (Desarrollo personal, ciudadanía y cívica): la lista
                             puede ser más ancha que el botón y el texto baja de línea. */}
                         <SelectContent className="max-h-72 w-auto min-w-(--anchor-width) max-w-[min(26rem,calc(100vw-2rem))]">
-                          <SelectGroup>
-                            {cursosAsignables.map((c) => (
-                              <SelectItem
-                                key={c.idCurso}
-                                value={String(c.idCurso)}
-                                className="py-1.5 [&>*:first-child]:shrink [&>*:first-child]:whitespace-normal"
-                              >
-                                {nombreCurso(c.idCurso)}
-                              </SelectItem>
-                            ))}
-                          </SelectGroup>
+                          {opcionesCurso.map((grupo) => (
+                            <SelectGroup key={grupo.key}>
+                              {grupo.padre && <SelectLabel className="whitespace-normal">{grupo.padre.nombre}</SelectLabel>}
+                              {grupo.cursos.map((c) => (
+                                <SelectItem
+                                  key={c.idCurso}
+                                  value={String(c.idCurso)}
+                                  className={`${grupo.padre ? "pl-5 " : ""}py-1.5 [&>*:first-child]:shrink [&>*:first-child]:whitespace-normal`}
+                                >
+                                  {c.nombre}
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
+                          ))}
                         </SelectContent>
                       </Select>
                       <FieldDescription className="text-xs">
@@ -804,6 +820,7 @@ function HorasDocenteCard() {
   const { data: docentes = [] } = useDocentes()
   const [idDocente, setIdDocente] = useState<number | null>(null)
   const { data: horas, isLoading, isError, refetch } = useHorasDocente(idDocente)
+  const docenteSeleccionado = docentes.find((d) => d.idDocente === idDocente)
 
   return (
     <Card>
@@ -815,28 +832,36 @@ function HorasDocenteCard() {
               Resumen de carga horaria semanal y mensual.
             </p>
           </div>
-          <div className="w-full sm:w-64">
-            <Select
-              value={idDocente ? String(idDocente) : ""}
-              onValueChange={(v) => setIdDocente(Number(v))}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue>
-                  {docentes.find((d) => d.idDocente === idDocente)?.nombre
-                    ? `${docentes.find((d) => d.idDocente === idDocente)?.nombre} ${docentes.find((d) => d.idDocente === idDocente)?.apellidoPat}`
-                    : "Selecciona un docente"}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  {docentes.map((d) => (
-                    <SelectItem key={d.idDocente} value={String(d.idDocente)}>
-                      {d.nombre} {d.apellidoPat} {d.apellidoMat}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
+          <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
+            {idDocente !== null && (
+              <Button variant="outline" size="sm" className="text-muted-foreground" onClick={() => setIdDocente(null)}>
+                <RotateCcw className="mr-1 size-3.5" />
+                Limpiar filtros
+              </Button>
+            )}
+            <div className="w-full sm:w-64">
+              <Select
+                value={idDocente ? String(idDocente) : ""}
+                onValueChange={(v) => setIdDocente(Number(v))}
+              >
+                <SelectTrigger className="w-full text-foreground data-placeholder:text-foreground">
+                  <SelectValue className="text-foreground">
+                    {docenteSeleccionado?.nombre
+                      ? `${docenteSeleccionado.nombre} ${docenteSeleccionado.apellidoPat}`
+                      : "Selecciona un docente"}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {docentes.map((d) => (
+                      <SelectItem key={d.idDocente} value={String(d.idDocente)}>
+                        {d.nombre} {d.apellidoPat} {d.apellidoMat}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
 
@@ -869,10 +894,8 @@ function HorasDocenteCard() {
           </div>
         )}
 
-        {isError && (
-          <Button variant="outline" size="sm" onClick={() => refetch()}>
-            Reintentar
-          </Button>
+        {idDocente !== null && isError && (
+          <BotonReintentar refetch={refetch} />
         )}
       </CardContent>
     </Card>
