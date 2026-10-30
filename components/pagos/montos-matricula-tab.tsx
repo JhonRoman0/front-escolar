@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 import { Info, Loader2 } from "lucide-react"
 
@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
 import { BotonReintentar } from "@/components/shared/boton-reintentar"
+import { ConfirmarEliminar } from "@/components/seguridad/confirmar-eliminar"
 import { FilterSelect } from "@/components/shared/filter-select"
 import { HeaderSeccion } from "@/components/shared/header-seccion"
 import { FilasCargando, MensajeSinDatos } from "@/components/shared/table-helpers"
@@ -50,6 +51,7 @@ export function MontosMatriculaTab() {
             value={idAnio ? String(idAnio) : ""}
             onValueChange={setIdAnioElegido}
             includeAll={false}
+            className="w-[280px] max-w-full shrink-0"
             options={aniosActivos.map((a) => ({
               value: String(a.idAnio),
               label: `${a.anio} · ${estadoAnioTexto(a.estado)}`,
@@ -72,8 +74,9 @@ export function MontosMatriculaTab() {
           </div>
         ) : (
           <FormularioMontos
-            key={`${idAnio}-${data.map((m) => m.monto).join("|")}`}
+            key={`${idAnio}-${JSON.stringify(data.map((m) => [m.idNivel, m.monto, m.sugerido]))}`}
             idAnio={idAnio as number}
+            anioTexto={anio ? `${anio.anio} · ${estadoAnioTexto(anio.estado)}` : ""}
             anioCerrado={anio?.estado === ESTADO_ANIO.CERRADO}
             montos={data}
             puedeActualizar={puedeActualizar}
@@ -87,35 +90,81 @@ export function MontosMatriculaTab() {
 
 function FormularioMontos({
   idAnio,
+  anioTexto,
   anioCerrado,
   montos,
   puedeActualizar,
 }: {
   idAnio: number
+  anioTexto: string
   anioCerrado: boolean
   montos: MontoMatriculaResponse[]
   puedeActualizar: boolean
 }) {
   const guardar = useGuardarMontos()
-  const copiados = montos.every((m) => m.monto == null) && montos.some((m) => m.sugerido != null)
+  const [guardados, setGuardados] = useState(montos)
+  const copiados = guardados.every((m) => m.monto == null) && guardados.some((m) => m.sugerido != null)
   const [valores, setValores] = useState<Record<number, string>>(() =>
     Object.fromEntries(montos.map((m) => [m.idNivel, String(m.monto ?? m.sugerido ?? "")]))
   )
-  const editable = puedeActualizar && !anioCerrado
+  const editable = puedeActualizar && !anioCerrado && !!anioTexto
+  const hayCambios = montos.some((m) => {
+    const texto = valores[m.idNivel]?.trim() ?? ""
+    const actual = texto === "" ? null : Number(texto)
+    return actual !== (guardados.find((g) => g.idNivel === m.idNivel)?.monto ?? null)
+  })
+  const [pendiente, setPendiente] = useState<{
+    idAnio: number
+    anio: string
+    montos: { idNivel: number; nivel: string; monto: number }[]
+  } | null>(null)
+  const envio = useRef<Promise<void> | null>(null)
 
-  async function handleGuardar() {
-    const items = montos.map((m) => ({ idNivel: m.idNivel, monto: Number(valores[m.idNivel]) }))
-    const invalido = montos.find((m) => !(Number(valores[m.idNivel]) > 0))
+  function handleGuardar() {
+    if (!editable || !hayCambios || !montos.length || pendiente || guardar.isPending || envio.current) return
+    const invalido = montos.find((m) => {
+      const texto = valores[m.idNivel]?.trim() ?? ""
+      const monto = Number(texto)
+      return !texto || !Number.isFinite(monto) || monto < 0.01
+    })
     if (invalido) {
-      toast.error(`Escribe un monto mayor a 0 para ${invalido.nivel}`)
+      toast.error(`Escribe un monto válido de al menos S/ 0.01 para ${invalido.nivel}`)
       return
     }
-    try {
-      await guardar.mutateAsync({ idAnio, montos: items })
-      toast.success("Montos de matrícula guardados")
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Error al guardar")
+    setPendiente({
+      idAnio,
+      anio: anioTexto,
+      montos: montos.map((m) => ({ idNivel: m.idNivel, nivel: m.nivel, monto: Number(valores[m.idNivel]) })),
+    })
+  }
+
+  function confirmarGuardado(): Promise<void> {
+    if (envio.current) return envio.current
+    if (!pendiente || !editable) {
+      const error = new Error("Ya no se pueden modificar los montos de este año escolar")
+      toast.error(error.message)
+      return Promise.reject(error)
     }
+    const datos = pendiente
+    const promesa = (async () => {
+      try {
+        const resultado = await guardar.mutateAsync({
+          idAnio: datos.idAnio,
+          montos: datos.montos.map(({ idNivel, monto }) => ({ idNivel, monto })),
+        })
+        setGuardados(resultado)
+        setValores(Object.fromEntries(resultado.map((m) => [m.idNivel, String(m.monto ?? m.sugerido ?? "")])))
+        toast.success("Montos de matrícula guardados")
+        setPendiente(null)
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Error al guardar")
+        throw error
+      } finally {
+        envio.current = null
+      }
+    })()
+    envio.current = promesa
+    return promesa
   }
 
   return (
@@ -128,23 +177,24 @@ function FormularioMontos({
       )}
       <div className="overflow-x-auto rounded-lg border">
         <Table>
-          <TableHeader>
+          <TableHeader appearance="soft-gray">
             <TableRow>
               <TableHead>Nivel</TableHead>
-              <TableHead className="w-48">Monto (S/)</TableHead>
+              <TableHead className="w-48 text-center">Monto (S/)</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {montos.map((m) => (
               <TableRow key={m.idNivel}>
                 <TableCell className="font-medium">{m.nivel}</TableCell>
-                <TableCell>
+                <TableCell className="text-center">
                   <Input
+                    className="text-center enabled:text-foreground enabled:font-medium enabled:border-foreground/30"
                     type="number"
                     min="0.01"
                     step="0.01"
                     placeholder="0.00"
-                    disabled={!editable}
+                    disabled={!editable || !!pendiente || guardar.isPending}
                     value={valores[m.idNivel] ?? ""}
                     onChange={(e) => setValores((v) => ({ ...v, [m.idNivel]: e.target.value }))}
                     aria-label={`Monto de ${m.nivel}`}
@@ -160,12 +210,37 @@ function FormularioMontos({
       )}
       {editable && (
         <div className="flex justify-end">
-          <Button variant="brand" onClick={handleGuardar} disabled={guardar.isPending}>
+          <Button variant="brand" onClick={handleGuardar} disabled={!hayCambios || !montos.length || !!pendiente || guardar.isPending}>
             {guardar.isPending && <Loader2 className="animate-spin" data-icon="inline-start" />}
             Guardar montos
           </Button>
         </div>
       )}
+      <ConfirmarEliminar
+        open={!!pendiente}
+        onOpenChange={(open) => {
+          if (!open && !envio.current) setPendiente(null)
+        }}
+        disabled={guardar.isPending}
+        titulo="Confirmar montos de matrícula"
+        descripcion={pendiente ? `Año escolar ${pendiente.anio}. Se guardarán los siguientes montos:` : ""}
+        contenido={pendiente && (
+          <dl className="space-y-2">
+            {pendiente.montos.map((m) => (
+              <div key={m.idNivel} className="flex items-start justify-between gap-4">
+                <dt className="min-w-0 break-words text-sm text-muted-foreground">{m.nivel}</dt>
+                <dd className="min-w-0 break-words text-right text-sm font-medium text-foreground tabular-nums">
+                  {m.monto.toLocaleString("es-PE", { style: "currency", currency: "PEN", minimumFractionDigits: 2, maximumFractionDigits: 20 })}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        )}
+        textoBoton="Confirmar y guardar"
+        variantConfirmar="brand"
+        icono={null}
+        onConfirm={confirmarGuardado}
+      />
     </div>
   )
 }

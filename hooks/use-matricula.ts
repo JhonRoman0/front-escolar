@@ -1,5 +1,4 @@
 import {
-  keepPreviousData,
   useMutation,
   useQuery,
 } from "@tanstack/react-query"
@@ -18,11 +17,12 @@ const KEYS = {
   apoderados: ["apoderados"] as const,
 }
 
-export function useMatriculas(page: number, size = 10) {
+export function useMatriculas(page: number, size = 10, idAcceso?: number) {
   return useQuery({
-    queryKey: [...KEYS.matriculas, page, size],
-    queryFn: () => matriculasApi.listar(page, size),
-    placeholderData: keepPreviousData,
+    queryKey: [...KEYS.matriculas, page, size, idAcceso ?? null],
+    queryFn: () => matriculasApi.listar(page, size, idAcceso),
+    placeholderData: (previousData, previousQuery) =>
+      previousQuery?.queryKey[3] === (idAcceso ?? null) ? previousData : undefined,
   })
 }
 

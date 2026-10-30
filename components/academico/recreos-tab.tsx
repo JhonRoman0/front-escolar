@@ -37,7 +37,8 @@ import { FilterSelect } from "@/components/shared/filter-select"
 import { HeaderSeccion } from "@/components/shared/header-seccion"
 import { SelectorHora } from "@/components/shared/selector-hora"
 import { FilasCargando, MensajeSinDatos } from "@/components/shared/table-helpers"
-import { FiltrosMalla, useFiltrosMalla } from "@/components/academico/cursos-tab"
+import { useFiltrosMalla } from "@/hooks/use-filtros-malla"
+import { FiltrosMalla } from "@/components/academico/filtros-malla"
 import { guardarConToast } from "@/hooks/guardar-con-toast"
 import {
   useActualizarRecreo,
@@ -173,14 +174,14 @@ export default function RecreosTab() {
 
         <div className="overflow-x-auto rounded-lg border">
           <Table>
-            <TableHeader>
+            <TableHeader appearance="soft-gray">
               <TableRow>
                 <TableHead>Grado</TableHead>
                 <TableHead>Turno</TableHead>
                 {DIAS_CLASE.map((d) => (
                   <TableHead key={d.value} className="text-center">{d.corto}</TableHead>
                 ))}
-                <TableHead className="w-[60px] text-right" />
+                <TableHead className="w-[60px] text-center" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -226,7 +227,7 @@ export default function RecreosTab() {
                         </TableCell>
                       )
                     })}
-                    <TableCell className="text-right">
+                    <TableCell className="text-center">
                       {editable && puedeEliminar && idAnio && (
                         <ConfirmarEliminar
                           titulo={`Quitar los recreos de ${g.grado}`}

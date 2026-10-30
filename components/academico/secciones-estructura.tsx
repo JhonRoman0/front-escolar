@@ -29,6 +29,7 @@ import {
 import { Field, FieldContent, FieldDescription, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { BotonNuevo } from "@/components/shared/boton-nuevo"
+import { BotonReintentar } from "@/components/shared/boton-reintentar"
 import { FilterSelect } from "@/components/shared/filter-select"
 import { HeaderSeccion } from "@/components/shared/header-seccion"
 import { SeccionesPorNivel } from "@/components/academico/secciones-por-nivel"
@@ -46,6 +47,7 @@ import {
 } from "@/hooks/use-academico"
 import { usePuede } from "@/hooks/use-permisos"
 import {
+  ACCESO,
   ESTADO_ANIO,
   aniosHabilitados,
   anioPorDefecto,
@@ -149,7 +151,7 @@ export function SeccionesEstructura({
     turno: "",
   })
 
-  const turnoActivo = turnos.find((t) => t.accesoId === 1) ?? null
+  const turnoActivo = turnos.find((t) => t.accesoId === ACCESO.ACTIVO) ?? null
   const faltaTurno = !turnoActivo
   const habilitados = aniosHabilitados(anios)
   // Predeterminado: siempre el vigente; sin vigente, el por comenzar iniciado
@@ -342,25 +344,32 @@ export function SeccionesEstructura({
             value={anioEfectivo || ""}
             onValueChange={aplicarAnio}
             options={aniosOptions}
-            className="min-w-48"
+            className="w-[280px] max-w-full shrink-0"
+            opcionesLargas
           />
           <FilterSelect
             value={filtros.nivel}
             onValueChange={aplicarNivel}
             options={nivelesDisponibles}
             allLabel="Todos los niveles"
+            className="w-[180px] max-w-full shrink-0"
+            opcionesLargas
           />
           <FilterSelect
             value={filtros.grado}
             onValueChange={aplicarGrado}
             options={gradosDisponibles}
             allLabel="Todos los grados"
+            className="w-[180px] max-w-full shrink-0"
+            opcionesLargas
           />
           <FilterSelect
             value={filtros.turno}
             onValueChange={aplicarTurno}
             options={turnosDisponibles}
             allLabel="Todos los turnos"
+            className="w-[180px] max-w-full shrink-0"
+            opcionesLargas
           />
           {hayFiltros && (
             <Button
@@ -390,9 +399,7 @@ export function SeccionesEstructura({
           }
         />
         {isError && (
-          <Button variant="outline" size="sm" onClick={() => refetch()}>
-            Reintentar
-          </Button>
+          <BotonReintentar refetch={refetch} />
         )}
         <NuevaSeccionDialog
           open={nuevaAbierto}

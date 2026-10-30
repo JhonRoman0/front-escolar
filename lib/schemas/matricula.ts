@@ -52,7 +52,7 @@ export const alumnoPasoDefault: AlumnoPasoValues = {
 
 // ── Paso 2: apoderados ──────────────────────────────────────────────────
 
-// "" mientras no se busca el DNI: el estado decide qué campos se piden.
+// "" hasta comprobar el DNI en el colegio; el autocompletado externo es opcional.
 const apoderadoPasoSchema = z
   .object({
     estado: z.enum(["", "APODERADO", "USUARIO", "NUEVO"]),
@@ -74,7 +74,7 @@ const apoderadoPasoSchema = z
       if (!ok) ctx.addIssue({ code: "custom", path: [path], message })
     }
     if (val.estado === "") {
-      exigir(false, "documentoIdentidad", "Busca el DNI con la lupa")
+      exigir(false, "documentoIdentidad", "Completa la comprobación del DNI en el colegio; espera o reintenta con la lupa")
       return
     }
     exigir(val.idParentesco > 0, "idParentesco", "Selecciona el parentesco")

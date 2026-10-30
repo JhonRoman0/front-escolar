@@ -1,8 +1,8 @@
 "use client"
 
-import { Fragment, useEffect, useMemo, useState } from "react"
+import { Fragment, useMemo, useState } from "react"
 import { toast } from "sonner"
-import { ChevronDown, FileDown, Pencil, Plus, QrCode, Search } from "lucide-react"
+import { ChevronDown, FileDown, Pencil, Plus, QrCode, RotateCcw, Search } from "lucide-react"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -27,10 +27,12 @@ import {
 } from "@/components/ui/table"
 
 import { EstadoBadge } from "@/components/seguridad/estado-badge"
+import { BotonReintentar } from "@/components/shared/boton-reintentar"
 import { TablaPaginacion } from "@/components/shared/paginacion-tabla"
 import { FilasCargando, MensajeSinDatos } from "@/components/shared/table-helpers"
 import { useAlumnos } from "@/hooks/use-estudiantes"
-import { useGradosPorNivel, useNiveles, useSeccionesPorGrado, useTurnos } from "@/hooks/use-academico"
+import { useAniosEscolares, useGradosPorNivel, useNiveles, useSeccionesPorGrado, useTurnos } from "@/hooks/use-academico"
+import { ESTADO_ANIO, estadoAnioTexto } from "@/lib/api/academico"
 import { usePuede } from "@/hooks/use-permisos"
 import type { AlumnoResponse, ApoderadoResponse } from "@/lib/api/estudiantes"
 import { reportesApi } from "@/lib/api/reportes"
@@ -66,35 +68,71 @@ export function AlumnosTab() {
   const [idSeccion, setIdSeccion] = useState<number | null>(null)
   const [idTurno, setIdTurno] = useState<number | null>(null)
   const [expandedId, setExpandedId] = useState<number | null>(null)
+  const [idAnioElegido, setIdAnioElegido] = useState<number | null>(null)
+  const { data: anios = [], isLoading: cargandoAnios, isError: errorAnios, refetch: reintentarAnios } = useAniosEscolares()
+  const anioVigente = anios.find((a) => a.estado === ESTADO_ANIO.VIGENTE)
+  const idAnio = idAnioElegido ?? anioVigente?.idAnio ?? null
+  const anioSeleccionado = anios.find((a) => a.idAnio === idAnio)
+  const puedeConsultar = !!anioSeleccionado && !errorAnios && !cargandoAnios
 
   const { data: niveles = [] } = useNiveles()
   const { data: gradosPorNivel } = useGradosPorNivel(idNivel)
   const { data: secciones } = useSeccionesPorGrado(idGrado)
   const { data: turnos = [] } = useTurnos()
 
-  // Reset cascada
-  useEffect(() => {
+  function cambiarAnio(valor: number) {
+    if (valor === idAnio) return
+    setIdAnioElegido(valor)
     setIdGrado(null)
     setIdSeccion(null)
-  }, [idNivel])
-  useEffect(() => {
-    setIdSeccion(null)
-  }, [idGrado])
-  useEffect(() => {
     setPage(0)
-  }, [idNivel, idGrado, idSeccion, idTurno, busqueda])
+  }
+
+  function cambiarNivel(valor: number | null) {
+    if (valor === idNivel) return
+    setIdNivel(valor)
+    setIdGrado(null)
+    setIdSeccion(null)
+    setPage(0)
+  }
+
+  function cambiarGrado(valor: number | null) {
+    if (valor === idGrado) return
+    setIdGrado(valor)
+    setIdSeccion(null)
+    setPage(0)
+  }
+
+  function cambiarSeccion(valor: number | null) {
+    if (valor === idSeccion) return
+    setIdSeccion(valor)
+    setPage(0)
+  }
+
+  function cambiarTurno(valor: number | null) {
+    if (valor === idTurno) return
+    setIdTurno(valor)
+    setPage(0)
+  }
+
+  function cambiarBusqueda(valor: string) {
+    if (valor === busqueda) return
+    setBusqueda(valor)
+    setPage(0)
+  }
 
   const filtros = useMemo(
     () => ({
+      idAnio: idAnio ?? undefined,
       idNivel: idNivel ?? undefined,
       idGrado: idGrado ?? undefined,
       idSeccion: idSeccion ?? undefined,
       idTurno: idTurno ?? undefined,
     }),
-    [idNivel, idGrado, idSeccion, idTurno]
+    [idAnio, idNivel, idGrado, idSeccion, idTurno]
   )
 
-  const { data, isLoading, isError, refetch } = useAlumnos(page, TAMANIO_PAGINA, filtros)
+  const { data, isLoading, isError, refetch } = useAlumnos(page, TAMANIO_PAGINA, filtros, puedeConsultar)
   const puedeActualizar = usePuede("ALUMNOS", "ACTUALIZAR")
   const puedeEditarApoderado = usePuede("APODERADOS", "ACTUALIZAR")
   const puedeAgregarApoderado = usePuede("APODERADOS", "CREAR")
@@ -107,24 +145,45 @@ export function AlumnosTab() {
   const [reporteOpen, setReporteOpen] = useState(false)
   const [filtroGradoSeccion, setFiltroGradoSeccion] = useState<number | null>(null)
 
-  const gradosOpciones = idNivel ? (gradosPorNivel ?? []) : []
+  const gradosOpciones = idNivel && idAnio
+    ? (gradosPorNivel ?? []).filter((g) => g.secciones.some((s) => s.idAnio === idAnio))
+    : []
+  const seccionesOpciones = (secciones ?? []).filter((s) => s.idAnio === idAnio)
+  const nombreSeccion = (s: (typeof seccionesOpciones)[number]) =>
+    seccionesOpciones.some((otra) => otra.idGradoSeccion !== s.idGradoSeccion && otra.nombre === s.nombre)
+      ? `${s.nombre} · ${s.turno}`
+      : s.nombre
+  const seccionSeleccionada = seccionesOpciones.find((s) => s.idSeccion === idSeccion)
   // Si no hay nivel seleccionado, no mostrar grados (elige nivel primero)
 
+  const hayFiltros =
+    idAnio !== (anioVigente?.idAnio ?? null) || busqueda !== "" || idNivel !== null || idGrado !== null || idSeccion !== null || idTurno !== null
+
+  function limpiarFiltros() {
+    setIdAnioElegido(null)
+    setBusqueda("")
+    setIdNivel(null)
+    setIdGrado(null)
+    setIdSeccion(null)
+    setIdTurno(null)
+    setPage(0)
+  }
+
+  const contenido = puedeConsultar ? data?.content : undefined
   const alumnosFiltrados = useMemo(() => {
-    if (!data?.content) return []
-    if (!busqueda.trim()) return data.content
+    if (!contenido) return []
+    if (!busqueda.trim()) return contenido
     const q = busqueda.trim().toLowerCase()
-    return data.content.filter((a) => {
+    return contenido.filter((a) => {
       const nombre = `${a.nombre} ${a.apellidoPat} ${a.apellidoMat}`.toLowerCase()
       return nombre.includes(q) || a.codigo.toLowerCase().includes(q) || (a.documentoIdentidad ?? "").toLowerCase().includes(q)
     })
-  }, [data?.content, busqueda])
+  }, [contenido, busqueda])
 
   async function handleDescargarReporte(
     formato: "pdf" | "excel" | "csv",
     inicio: string,
-    fin: string,
-    _filtros: Record<string, string>
+    fin: string
   ) {
     const datos = await reportesApi.alumnos(inicio, fin, {
       idGradoSeccion: filtroGradoSeccion ?? undefined,
@@ -142,20 +201,37 @@ export function AlumnosTab() {
   return (
     <Card className="rounded-[20px] border-[0.80px] border-[#D9DBE9]">
       <CardContent className="flex flex-col gap-4 p-4">
-        {/* Filtros Figma: Buscar + 4 selects + Generar reporte */}
+        {/* Búsqueda y reportes independientes del contexto académico de la tabla. */}
         <div className="flex flex-wrap items-center gap-2">
-          <div className="relative min-w-[200px] flex-1 max-w-[358px]">
+          <div className="relative min-w-0 basis-[200px] flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               placeholder="Buscar por alumno, código o DNI"
               value={busqueda}
-              onChange={(e) => setBusqueda(e.target.value)}
+              onChange={(e) => cambiarBusqueda(e.target.value)}
               className="h-8 rounded-[8px] border-[0.80px] border-[#A9A9AA] bg-white pl-9 text-[13px] placeholder:text-[12px]"
             />
           </div>
-
-          <Select value={idNivel ? String(idNivel) : "__all"} onValueChange={(v) => setIdNivel(v === "__all" ? null : Number(v))}>
-            <SelectTrigger className="h-8 w-[162px] rounded-[8px] border-[0.80px] border-[#A9A9AA] bg-white text-[12px]">
+          {puedeExportar && (
+            <Button variant="outline" size="sm" className="ml-auto h-8 rounded-[8px] border-[#A9A9AA] text-[12px] font-semibold text-[#495057]" onClick={() => setReporteOpen(true)}>
+              <FileDown data-icon="inline-start" />
+              Generar reporte
+            </Button>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Select value={idAnio ? String(idAnio) : ""} onValueChange={(v) => v && cambiarAnio(Number(v))} disabled={cargandoAnios || errorAnios || !anios.length}>
+            <SelectTrigger className="h-8 w-[240px] max-w-full shrink-0 rounded-[8px] border-[0.80px] border-[#A9A9AA] bg-white text-[12px]" aria-label="Año escolar">
+              <SelectValue>{anioSeleccionado ? `${anioSeleccionado.anio} · ${estadoAnioTexto(anioSeleccionado.estado)}` : "Selecciona un año escolar"}</SelectValue>
+            </SelectTrigger>
+            <SelectContent><SelectGroup>
+              {[...anios].sort((a, b) => b.anio.localeCompare(a.anio)).map((a) => (
+                <SelectItem key={a.idAnio} value={String(a.idAnio)}>{a.anio} · {estadoAnioTexto(a.estado)}</SelectItem>
+              ))}
+            </SelectGroup></SelectContent>
+          </Select>
+          <Select value={idNivel ? String(idNivel) : "__all"} onValueChange={(v) => cambiarNivel(v === "__all" ? null : Number(v))}>
+            <SelectTrigger className="h-8 w-[162px] max-w-full shrink-0 rounded-[8px] border-[0.80px] border-[#A9A9AA] bg-white text-[12px]">
               <SelectValue>{niveles.find((n) => n.idNivel === idNivel)?.nombre ?? "Todos los niveles"}</SelectValue>
             </SelectTrigger>
             <SelectContent>
@@ -172,10 +248,10 @@ export function AlumnosTab() {
           {/* Grados depende de nivel */}
           <Select
             value={idGrado ? String(idGrado) : "__all"}
-            onValueChange={(v) => setIdGrado(v === "__all" ? null : Number(v))}
-            disabled={!idNivel}
+            onValueChange={(v) => cambiarGrado(v === "__all" ? null : Number(v))}
+            disabled={!idNivel || !puedeConsultar}
           >
-            <SelectTrigger className="h-8 w-[162px] rounded-[8px] border-[0.80px] border-[#A9A9AA] bg-white text-[12px] disabled:opacity-50">
+            <SelectTrigger className="h-8 w-[162px] max-w-full shrink-0 rounded-[8px] border-[0.80px] border-[#A9A9AA] bg-white text-[12px] disabled:opacity-50">
               <SelectValue>{gradosOpciones.find((g) => g.idGrado === idGrado)?.nombre ?? "Todos los grados"}</SelectValue>
             </SelectTrigger>
             <SelectContent>
@@ -192,26 +268,26 @@ export function AlumnosTab() {
 
           <Select
             value={idSeccion ? String(idSeccion) : "__all"}
-            onValueChange={(v) => setIdSeccion(v === "__all" ? null : Number(v))}
-            disabled={!idGrado}
+            onValueChange={(v) => cambiarSeccion(v === "__all" ? null : Number(v))}
+            disabled={!idGrado || !puedeConsultar}
           >
-            <SelectTrigger className="h-8 w-[162px] rounded-[8px] border-[0.80px] border-[#A9A9AA] bg-white text-[12px] disabled:opacity-50">
-              <SelectValue>{secciones?.find((s) => s.idSeccion === idSeccion)?.nombre ?? "Todas las secciones"}</SelectValue>
+            <SelectTrigger className="h-8 w-[162px] max-w-full shrink-0 rounded-[8px] border-[0.80px] border-[#A9A9AA] bg-white text-[12px] disabled:opacity-50">
+              <SelectValue>{seccionSeleccionada ? nombreSeccion(seccionSeleccionada) : "Todas las secciones"}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
                 <SelectItem value="__all">Todas las secciones</SelectItem>
-                {(secciones ?? []).map((s) => (
-                  <SelectItem key={s.idSeccion} value={String(s.idSeccion)}>
-                    {s.nombre}
+                {seccionesOpciones.map((s) => (
+                  <SelectItem key={s.idGradoSeccion} value={String(s.idSeccion)}>
+                    {nombreSeccion(s)}
                   </SelectItem>
                 ))}
               </SelectGroup>
             </SelectContent>
           </Select>
 
-          <Select value={idTurno ? String(idTurno) : "__all"} onValueChange={(v) => setIdTurno(v === "__all" ? null : Number(v))}>
-            <SelectTrigger className="h-8 w-[162px] rounded-[8px] border-[0.80px] border-[#A9A9AA] bg-white text-[12px]">
+          <Select value={idTurno ? String(idTurno) : "__all"} onValueChange={(v) => cambiarTurno(v === "__all" ? null : Number(v))}>
+            <SelectTrigger className="h-8 w-[162px] max-w-full shrink-0 rounded-[8px] border-[0.80px] border-[#A9A9AA] bg-white text-[12px]">
               <SelectValue>{turnos.find((t) => t.idTurno === idTurno)?.nombre ?? "Todos los turnos"}</SelectValue>
             </SelectTrigger>
             <SelectContent>
@@ -227,34 +303,43 @@ export function AlumnosTab() {
           </Select>
 
           <div className="ml-auto flex gap-2">
-            {puedeExportar && (
-              <Button variant="outline" size="sm" className="h-8 rounded-[8px] border-[#A9A9AA] text-[12px] font-semibold text-[#495057]" onClick={() => setReporteOpen(true)}>
-                <FileDown data-icon="inline-start" />
-                Generar reporte
+            {hayFiltros && (
+              <Button type="button" variant="outline" size="sm" className="h-8 text-muted-foreground" onClick={limpiarFiltros}>
+                <RotateCcw className="mr-1 size-3.5" />
+                Limpiar filtros
               </Button>
             )}
+
           </div>
         </div>
+
+        <p className="text-xs text-muted-foreground">La consulta por año incluye solo matrículas activas; no representa un histórico completo de matrículas.</p>
 
         {/* Tabla Figma: 10 cols compactas, sin bulto */}
         <div className="overflow-x-auto rounded-[8px] border border-[#D9DBE9]">
           <Table>
-            <TableHeader>
-              <TableRow className="bg-[#F8F9FA] hover:bg-[#F8F9FA]">
-                <TableHead className="whitespace-nowrap text-[12px] font-semibold text-[#495057]">Alumno</TableHead>
-                <TableHead className="whitespace-nowrap text-[12px] font-semibold text-[#495057]">Código</TableHead>
-                <TableHead className="whitespace-nowrap text-[12px] font-semibold text-[#495057]">DNI</TableHead>
-                <TableHead className="whitespace-nowrap text-[12px] font-semibold text-[#495057]">Apoderado</TableHead>
-                <TableHead className="whitespace-nowrap text-[12px] font-semibold text-[#495057]">Nivel</TableHead>
-                <TableHead className="whitespace-nowrap text-[12px] font-semibold text-[#495057]">Grado</TableHead>
-                <TableHead className="whitespace-nowrap text-[12px] font-semibold text-[#495057]">Sección</TableHead>
-                <TableHead className="whitespace-nowrap text-[12px] font-semibold text-[#495057]">Turno</TableHead>
-                <TableHead className="whitespace-nowrap text-[12px] font-semibold text-[#495057]">Estado</TableHead>
-                <TableHead className="whitespace-nowrap text-right text-[12px] font-semibold text-[#495057]">Acciones</TableHead>
+            <TableHeader appearance="soft-gray">
+              <TableRow>
+                <TableHead>Alumno</TableHead>
+                <TableHead className="text-center">Código</TableHead>
+                <TableHead className="text-center">DNI</TableHead>
+                <TableHead>Apoderado</TableHead>
+                <TableHead className="text-center">Nivel</TableHead>
+                <TableHead className="text-center">Grado</TableHead>
+                <TableHead className="text-center">Sección</TableHead>
+                <TableHead className="text-center">Turno</TableHead>
+                <TableHead className="text-center">Estado</TableHead>
+                <TableHead className="text-center">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading ? (
+              {cargandoAnios ? (
+                <FilasCargando columnas={10} />
+              ) : errorAnios ? (
+                <MensajeSinDatos columnas={10} mensaje="No se pudieron cargar los años escolares." />
+              ) : !puedeConsultar ? (
+                <MensajeSinDatos columnas={10} mensaje={anios.length ? "Selecciona un año escolar para consultar alumnos." : "No hay años escolares disponibles."} />
+              ) : isLoading ? (
                 <FilasCargando columnas={10} />
               ) : isError ? (
                 <MensajeSinDatos columnas={10} mensaje="No se pudo cargar. Recarga la pantalla." />
@@ -297,7 +382,7 @@ export function AlumnosTab() {
                             <span className="text-[12px] font-normal text-[#212529]">{nombreCompleto}</span>
                           </div>
                         </TableCell>
-                        <TableCell className="font-mono text-[12px] text-[#7D7D7F] whitespace-nowrap">{alumno.codigo}</TableCell>
+                        <TableCell className="text-center font-mono text-[12px] text-[#7D7D7F] whitespace-nowrap">{alumno.codigo}</TableCell>
                         <TableCell className="text-center text-[12px] text-[#7D7D7F]">{alumno.documentoIdentidad || "—"}</TableCell>
                         <TableCell className="max-w-[160px] text-[12px]">
                           {alumno.apoderados.length ? (
@@ -309,21 +394,21 @@ export function AlumnosTab() {
                             <Badge variant="outline" className="text-[11px] font-normal border-dashed">Sin apoderado</Badge>
                           )}
                         </TableCell>
-                        <TableCell className="text-[12px] text-[#7D7D7F] whitespace-nowrap">
+                        <TableCell className="text-center text-[12px] text-[#7D7D7F] whitespace-nowrap">
                           {alumno.nivel === "Sin matrícula" ? <SinMatriculaBadge /> : alumno.nivel}
                         </TableCell>
-                        <TableCell className="text-[12px] text-[#7D7D7F] whitespace-nowrap">
+                        <TableCell className="text-center text-[12px] text-[#7D7D7F] whitespace-nowrap">
                           {alumno.grado === "Sin matrícula" ? <SinMatriculaBadge /> : alumno.grado}
                         </TableCell>
                         <TableCell className="text-center text-[12px] text-[#7D7D7F]">{alumno.seccion === "Sin matrícula" ? <SinMatriculaBadge /> : alumno.seccion}</TableCell>
-                        <TableCell className="text-[12px] text-[#7D7D7F] whitespace-nowrap">
+                        <TableCell className="text-center text-[12px] text-[#7D7D7F] whitespace-nowrap">
                           {alumno.turno === "Sin matrícula" ? <SinMatriculaBadge /> : alumno.turno}
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="text-center">
                           <EstadoBadge accesoId={alumno.accesoId} />
                         </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-1">
+                        <TableCell className="text-center">
+                          <div className="flex justify-center gap-1">
                             <Button
                               variant="outline"
                               size="icon-sm"
@@ -431,13 +516,12 @@ export function AlumnosTab() {
           </Table>
         </div>
 
-        {isError && (
-          <Button variant="outline" size="sm" onClick={() => refetch()}>
-            Reintentar
-          </Button>
+        {puedeConsultar && isError && (
+          <BotonReintentar refetch={refetch} />
         )}
 
-        {!!data?.totalPages && data.totalPages > 1 && <TablaPaginacion data={data} onPage={setPage} />}
+        {errorAnios && <BotonReintentar refetch={reintentarAnios} />}
+        {puedeConsultar && !!data?.totalPages && data.totalPages > 1 && <TablaPaginacion data={data} onPage={setPage} />}
 
         <AlumnoEditarDialog
           alumno={editando}

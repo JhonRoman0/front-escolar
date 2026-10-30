@@ -38,16 +38,6 @@ export function useCompetencias(idCurso?: number) {
   })
 }
 
-export function useCambiarEstadoCompetencia() {
-  // Los cursos muestran cuántas competencias activas tienen.
-  const invalidar = useInvalidarMutacion(KEYS.competencias, ["cursos"])
-  return useMutation({
-    mutationFn: ({ id, accesoId }: { id: number; accesoId: number }) =>
-      competenciasApi.cambiarEstado(id, accesoId),
-    onSuccess: invalidar,
-  })
-}
-
 export function useNotasPorCompetencia(idCompetencia?: number, bimestre?: number) {
   return useQuery({
     queryKey: [...KEYS.notas, "competencia", idCompetencia, bimestre],

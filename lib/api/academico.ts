@@ -355,6 +355,11 @@ export const ACCESO = {
   INACTIVO: 3,
 } as const
 
+export const OPCIONES_ESTADO_ACCESO = [
+  { value: String(ACCESO.ACTIVO), label: "Activos" },
+  { value: String(ACCESO.INACTIVO), label: "Inactivos" },
+]
+
 // ── Aula ─────────────────────────────────────────────────────────────────
 
 /**

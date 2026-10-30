@@ -310,18 +310,19 @@ function AulasTab() {
               { value: String(ACCESO.INACTIVO), label: "Inactivo" },
             ]}
             allLabel="Todos los estados"
+            className="w-[180px] max-w-full shrink-0"
           />
         </div>
         <div className="overflow-x-auto rounded-lg border">
           <Table>
-            <TableHeader>
+            <TableHeader appearance="soft-gray">
               <TableRow>
                 <TableHead>Aula</TableHead>
-                <TableHead>Tipo</TableHead>
-                <TableHead>Capacidad</TableHead>
+                <TableHead className="text-center">Tipo</TableHead>
+                <TableHead className="text-center">Capacidad</TableHead>
                 <TableHead>Uso</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
+                <TableHead className="text-center">Estado</TableHead>
+                <TableHead className="text-center">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -340,18 +341,19 @@ function AulasTab() {
                 aulasFiltradas.map((aula) => (
                   <TableRow key={aula.idAula}>
                     <TableCell className="font-medium">{aula.nombre}</TableCell>
-                    <TableCell>
+                    <TableCell className="text-center">
                       <BadgeTipoAula tipo={aula.tipo} />
                     </TableCell>
-                    <TableCell>{aula.capacidad ?? "—"}</TableCell>
+                    <TableCell className="text-center">{aula.capacidad ?? "—"}</TableCell>
                     <TableCell>
                       <UsoAula aula={aula} />
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="text-center">
                       <EstadoBadge accesoId={aula.accesoId} />
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-center">
                       <AccionesFila
+                        className="justify-center"
                         puedeActualizar={puedeActualizar}
                         puedeEliminar={puedeEliminar}
                         onEditar={() => {
@@ -758,23 +760,23 @@ function AniosTab() {
         />
         <div className="overflow-x-auto rounded-lg border">
           <Table>
-            <TableHeader>
+            <TableHeader appearance="soft-gray">
               <TableRow>
-                <TableHead>Año</TableHead>
-                <TableHead>Inicio</TableHead>
-                <TableHead>Fin</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
+                <TableHead className="text-center">Año</TableHead>
+                <TableHead className="text-center">Inicio</TableHead>
+                <TableHead className="text-center">Fin</TableHead>
+                <TableHead className="text-center">Estado</TableHead>
+                <TableHead className="text-center">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? <FilasCargando columnas={5} /> : isError ? <MensajeSinDatos columnas={5} mensaje="No se pudo cargar. Recarga la pantalla." /> : !data?.length ? <MensajeSinDatos columnas={5} mensaje="Aún no hay años escolares." /> : data.map((anio) => (
                 <TableRow key={anio.idAnio}>
-                  <TableCell className="font-medium">{anio.anio}</TableCell>
-                  <TableCell className="text-xs">{anio.fechaInicio || "—"}</TableCell>
-                  <TableCell className="text-xs">{anio.fechaFin || "—"}</TableCell>
-                  <TableCell><AnioBadge estado={anio.estado} /></TableCell>
-                  <TableCell className="text-right"><AccionesFila puedeActualizar={puedeActualizar && anio.estado !== ESTADO_ANIO.CERRADO} puedeEliminar={puedeEliminar} onEditar={() => { setEditando(anio); setDialogOpen(true) }} onEliminar={() => handleEliminar(anio)} tituloEliminar="Eliminar año escolar" descripcionEliminar={`¿Seguro que quieres eliminar el año ${anio.anio}?`} ariaEditar={`Editar año ${anio.anio}`} /></TableCell>
+                  <TableCell className="text-center font-medium">{anio.anio}</TableCell>
+                  <TableCell className="text-center text-xs">{anio.fechaInicio || "—"}</TableCell>
+                  <TableCell className="text-center text-xs">{anio.fechaFin || "—"}</TableCell>
+                  <TableCell className="text-center"><AnioBadge estado={anio.estado} /></TableCell>
+                  <TableCell className="text-center"><AccionesFila className="justify-center" puedeActualizar={puedeActualizar && anio.estado !== ESTADO_ANIO.CERRADO} puedeEliminar={puedeEliminar} onEditar={() => { setEditando(anio); setDialogOpen(true) }} onEliminar={() => handleEliminar(anio)} tituloEliminar="Eliminar año escolar" descripcionEliminar={`¿Seguro que quieres eliminar el año ${anio.anio}?`} ariaEditar={`Editar año ${anio.anio}`} /></TableCell>
                 </TableRow>
               ))}
             </TableBody>

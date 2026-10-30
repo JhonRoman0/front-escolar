@@ -18,6 +18,7 @@ import {
 interface ConfirmarEliminarProps {
   titulo: string
   descripcion: string
+  contenido?: ReactNode
   onConfirm: () => Promise<void>
   className?: string
   disabled?: boolean
@@ -38,6 +39,7 @@ interface ConfirmarEliminarProps {
 export function ConfirmarEliminar({
   titulo,
   descripcion,
+  contenido,
   onConfirm,
   className,
   disabled,
@@ -91,6 +93,7 @@ export function ConfirmarEliminar({
           <DialogTitle>{titulo}</DialogTitle>
           <DialogDescription>{descripcion}</DialogDescription>
         </DialogHeader>
+        {contenido}
         <DialogFooter>
           <Button
             type="button"

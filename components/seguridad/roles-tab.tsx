@@ -27,6 +27,7 @@ import { Field, FieldContent, FieldError, FieldLabel } from "@/components/ui/fie
 import { Input } from "@/components/ui/input"
 
 import { FilterSelect } from "@/components/shared/filter-select"
+import { BotonReintentar } from "@/components/shared/boton-reintentar"
 import {
   useActualizarRol,
   useCrearRol,
@@ -35,6 +36,7 @@ import {
   useRolesPermiso,
 } from "@/hooks/use-seguridad"
 import type { RolResponse } from "@/lib/api/seguridad"
+import { ACCESO } from "@/lib/api/academico"
 import { rolSchema, type RolValues } from "@/lib/schemas/seguridad"
 import { usePuede } from "@/hooks/use-permisos"
 import { cn } from "@/lib/utils"
@@ -43,13 +45,13 @@ import { ConfirmarEliminar } from "./confirmar-eliminar"
 import { CampoAcceso, CargandoTarjetas } from "./shared"
 
 const ESTADO_OPCIONES = [
-  { value: "1", label: "Activo" },
-  { value: "3", label: "Inactivo" },
+  { value: String(ACCESO.ACTIVO), label: "Activo" },
+  { value: String(ACCESO.INACTIVO), label: "Inactivo" },
 ]
 
 function pesoRol(rol: RolResponse) {
   if (esRolAdmin(rol.nombre)) return 0
-  return rol.accesoId === 1 ? 1 : 2
+  return rol.accesoId === ACCESO.ACTIVO ? 1 : 2
 }
 
 export default function RolesTab() {
@@ -81,6 +83,7 @@ export default function RolesTab() {
       toast.success(`Rol "${rol.nombre}" eliminado`)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Error al eliminar")
+      throw error
     }
   }
 
@@ -92,13 +95,13 @@ export default function RolesTab() {
             <h2 className="text-[20px] font-semibold tracking-tight">Roles</h2>
             <p className="text-[14px] leading-5 text-muted-foreground">Roles que se asignan a cada usuario para definir sus accesos.</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex max-w-full flex-wrap items-center gap-2">
             <FilterSelect
-              label="Estado"
               value={filtroEstado}
               onValueChange={setFiltroEstado}
               options={ESTADO_OPCIONES}
               allLabel="Todos los estados"
+              className="w-[180px] max-w-full shrink-0"
             />
             {puedeCrear && (
               <Button variant="brand" onClick={() => { setEditando(null); setDialogOpen(true) }}>
@@ -127,7 +130,7 @@ export default function RolesTab() {
           <div className="flex flex-wrap gap-4">
             {rolesOrdenados.map((rol) => {
               const admin = esRolAdmin(rol.nombre)
-              const inactivo = rol.accesoId === 3
+              const inactivo = rol.accesoId === ACCESO.INACTIVO
               const puedeGestionar = !admin && (puedeActualizar || puedeEliminar)
               const permisos = conteoPermisos(rol.idRol)
 
@@ -225,9 +228,7 @@ export default function RolesTab() {
         )}
 
         {isError && (
-          <Button variant="outline" size="sm" onClick={() => refetch()}>
-            Reintentar
-          </Button>
+          <BotonReintentar refetch={refetch} />
         )}
 
         {rolAEliminar && (
@@ -271,7 +272,7 @@ function RolFormDialog({
 
   const form = useForm<RolValues>({
     resolver: zodResolver(rolSchema),
-    defaultValues: { nombre: "", color: COLOR_ROL_FALLBACK, accesoId: 1 },
+    defaultValues: { nombre: "", color: COLOR_ROL_FALLBACK, accesoId: ACCESO.ACTIVO },
   })
 
   useEffect(() => {
@@ -279,7 +280,7 @@ function RolFormDialog({
       form.reset({
         nombre: rol?.nombre ?? "",
         color: rol?.color ?? COLOR_ROL_FALLBACK,
-        accesoId: rol?.accesoId ?? 1,
+        accesoId: rol?.accesoId ?? ACCESO.ACTIVO,
       })
     }
   }, [open, rol, form])

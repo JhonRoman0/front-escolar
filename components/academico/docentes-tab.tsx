@@ -260,15 +260,15 @@ export default function DocentesTab() {
 
         <div className="overflow-x-auto rounded-lg border">
           <Table>
-          <TableHeader>
+          <TableHeader appearance="soft-gray">
             <TableRow>
               <TableHead>Docente</TableHead>
-              <TableHead>Código</TableHead>
+              <TableHead className="text-center">Código</TableHead>
               <TableHead>Correo</TableHead>
-              <TableHead>Contrato</TableHead>
+              <TableHead className="text-center">Contrato</TableHead>
               <TableHead>Nivel</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead className="text-right">Acciones</TableHead>
+              <TableHead className="text-center">Estado</TableHead>
+              <TableHead className="text-center">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -313,13 +313,13 @@ export default function DocentesTab() {
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell className="font-mono text-xs">
+                    <TableCell className="text-center font-mono text-xs">
                       {docente.codigo}
                     </TableCell>
                     <TableCell className="text-xs">
                       {docente.gmail || "—"}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="text-center">
                       <Badge variant="outline">
                         {docente.tipoContratoNombre || "—"}
                       </Badge>
@@ -331,11 +331,11 @@ export default function DocentesTab() {
                           : "—"}
                       </span>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="text-center">
                       <EstadoBadge accesoId={docente.accesoId} />
                     </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
+                    <TableCell className="text-center">
+                      <div className="flex justify-center gap-2">
                         {puedeActualizar && (
                           <Button
                             variant="outline"
