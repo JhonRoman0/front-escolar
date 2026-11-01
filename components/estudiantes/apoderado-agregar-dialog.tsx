@@ -47,12 +47,16 @@ function Formulario({ alumno, onCerrar }: { alumno: AlumnoResponse; onCerrar: ()
       return
     }
     try {
-      await agregar.mutateAsync({ idAlumno: alumno.idAlumno, data: aApoderadoRequest(apoderado) })
-      toast.success(
-        apoderado.estado === "NUEVO"
-          ? `Apoderado agregado. Sus accesos se enviaron a ${apoderado.gmail.trim()}`
-          : "Apoderado agregado"
-      )
+      const agregado = await agregar.mutateAsync({ idAlumno: alumno.idAlumno, data: aApoderadoRequest(apoderado) })
+      if (agregado.credencialesEnviadas === false) {
+        toast.warning("Apoderado agregado, pero no se pudieron enviar sus accesos. Revisa su correo y marca Restablecer contraseña al editarlo.")
+      } else {
+        toast.success(
+          apoderado.estado === "NUEVO"
+            ? `Apoderado agregado. Sus accesos se enviaron a ${apoderado.gmail.trim()}`
+            : "Apoderado agregado"
+        )
+      }
       onCerrar()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo agregar el apoderado")

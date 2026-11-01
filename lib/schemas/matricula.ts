@@ -1,10 +1,8 @@
 import { z } from "zod"
 
 import {
-  MENSAJE_CONTRASENA_SEGURA,
   MENSAJE_DNI,
   MENSAJE_SOLO_LETRAS_Y_ESPACIOS,
-  REGEX_CONTRASENA_SEGURA,
   REGEX_DNI,
   REGEX_SOLO_LETRAS_Y_ESPACIOS,
 } from "@/lib/schemas/comun"
@@ -66,8 +64,9 @@ const apoderadoPasoSchema = z
     idParentesco: z.number().int(),
     celular: z.string(),
     gmail: z.string(),
-    contraseña: z.string(),
     hijos: z.array(z.string()),
+    // Ya es apoderado de este alumno: su parentesco no se cambia al matricular.
+    vinculado: z.boolean(),
   })
   .superRefine((val, ctx) => {
     const exigir = (ok: boolean, path: string, message: string) => {
@@ -78,10 +77,10 @@ const apoderadoPasoSchema = z
       return
     }
     exigir(val.idParentesco > 0, "idParentesco", "Selecciona el parentesco")
-    if (val.estado === "APODERADO") return
-    exigir(!!val.sexo, "sexo", "Selecciona el sexo")
     exigir(!!val.direccion.trim(), "direccion", "La dirección es obligatoria")
     exigir(/^\d{9}$/.test(val.celular), "celular", "El celular debe tener 9 dígitos")
+    if (val.estado === "APODERADO") return
+    exigir(!!val.sexo, "sexo", "Selecciona el sexo")
     if (val.estado === "USUARIO") return
     for (const [campo, etiqueta] of [
       ["nombre", "El nombre"],
@@ -93,7 +92,6 @@ const apoderadoPasoSchema = z
     }
     exigir(!!val.fechaNaci, "fechaNaci", "La fecha de nacimiento es obligatoria")
     exigir(z.string().email().safeParse(val.gmail.trim()).success, "gmail", "Escribe un correo válido")
-    exigir(REGEX_CONTRASENA_SEGURA.test(val.contraseña), "contraseña", MENSAJE_CONTRASENA_SEGURA)
   })
 export type ApoderadoPasoValues = z.infer<typeof apoderadoPasoSchema>
 
@@ -123,8 +121,8 @@ export const apoderadoPasoDefault: ApoderadoPasoValues = {
   idParentesco: 0,
   celular: "",
   gmail: "",
-  contraseña: "",
   hijos: [],
+  vinculado: false,
 }
 
 // ── Paso 3: matrícula ───────────────────────────────────────────────────

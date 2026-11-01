@@ -52,6 +52,8 @@ export interface MatriculaResponse {
   observaciones: string | null
   accesoId: number | null
   historial: HistorialResponse[]
+  // false: algún apoderado nuevo no recibió sus accesos; null: no había a quién enviarlos.
+  credencialesEnviadas?: boolean | null
 }
 
 export interface PagoMatriculaResponse {
@@ -125,7 +127,6 @@ export interface InscripcionApoderado {
   idParentesco: number
   celular?: string | null
   gmail?: string | null
-  contraseña?: string | null
 }
 
 export interface InscripcionRequest {

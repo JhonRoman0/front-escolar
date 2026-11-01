@@ -1,6 +1,6 @@
 import * as z from "zod"
 
-import { contrasenaSeguraOpcional, emailRequerido, MENSAJE_DNI, MENSAJE_SOLO_LETRAS_Y_ESPACIOS, REGEX_DNI, REGEX_SOLO_LETRAS_Y_ESPACIOS } from "@/lib/schemas/comun"
+import { emailRequerido, MENSAJE_DNI, MENSAJE_SOLO_LETRAS_Y_ESPACIOS, REGEX_DNI, REGEX_SOLO_LETRAS_Y_ESPACIOS } from "@/lib/schemas/comun"
 import { esHoraValida, turnoAnterior, turnoSiguiente, type TurnoFranja } from "@/lib/turnos"
 
 const accesoId = z.number().int().min(1, "Selecciona un estado").max(3)
@@ -35,8 +35,8 @@ export const docenteSchema = z
       .max(30)
       .regex(REGEX_SOLO_LETRAS_Y_ESPACIOS, MENSAJE_SOLO_LETRAS_Y_ESPACIOS),
     documentoIdentidad: z.string().regex(REGEX_DNI, MENSAJE_DNI),
-    contraseña: contrasenaSeguraOpcional,
     gmail: emailRequerido.max(60),
+    restablecerContrasena: z.boolean(),
     fechaNaci: fecha,
     tipoContratoId: z
       .number({ error: "Selecciona el tipo de contrato" })

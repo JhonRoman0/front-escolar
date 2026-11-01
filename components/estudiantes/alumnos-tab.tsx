@@ -33,7 +33,7 @@ import { FilasCargando, MensajeSinDatos } from "@/components/shared/table-helper
 import { useAlumnos } from "@/hooks/use-estudiantes"
 import { useAniosEscolares, useGradosPorNivel, useNiveles, useSeccionesPorGrado, useTurnos } from "@/hooks/use-academico"
 import { ESTADO_ANIO, estadoAnioTexto } from "@/lib/api/academico"
-import { usePuede } from "@/hooks/use-permisos"
+import { usePuede, usePuedeLeer } from "@/hooks/use-permisos"
 import type { AlumnoResponse, ApoderadoResponse } from "@/lib/api/estudiantes"
 import { reportesApi } from "@/lib/api/reportes"
 import { generarPdfAlumnos } from "@/lib/reportes/generar-pdf"
@@ -134,6 +134,8 @@ export function AlumnosTab() {
 
   const { data, isLoading, isError, refetch } = useAlumnos(page, TAMANIO_PAGINA, filtros, puedeConsultar)
   const puedeActualizar = usePuede("ALUMNOS", "ACTUALIZAR")
+  const puedeVerApoderados = usePuedeLeer("APODERADOS")
+  const columnas = puedeVerApoderados ? 10 : 9
   const puedeEditarApoderado = usePuede("APODERADOS", "ACTUALIZAR")
   const puedeAgregarApoderado = usePuede("APODERADOS", "CREAR")
   const puedeExportar = usePuede("ALUMNOS", "IMPRIMIR_EXPORTAR")
@@ -323,7 +325,7 @@ export function AlumnosTab() {
                 <TableHead>Alumno</TableHead>
                 <TableHead className="text-center">Código</TableHead>
                 <TableHead className="text-center">DNI</TableHead>
-                <TableHead>Apoderado</TableHead>
+                {puedeVerApoderados && <TableHead>Apoderado</TableHead>}
                 <TableHead className="text-center">Nivel</TableHead>
                 <TableHead className="text-center">Grado</TableHead>
                 <TableHead className="text-center">Sección</TableHead>
@@ -334,29 +336,31 @@ export function AlumnosTab() {
             </TableHeader>
             <TableBody>
               {cargandoAnios ? (
-                <FilasCargando columnas={10} />
+                <FilasCargando columnas={columnas} />
               ) : errorAnios ? (
-                <MensajeSinDatos columnas={10} mensaje="No se pudieron cargar los años escolares." />
+                <MensajeSinDatos columnas={columnas} mensaje="No se pudieron cargar los años escolares." />
               ) : !puedeConsultar ? (
-                <MensajeSinDatos columnas={10} mensaje={anios.length ? "Selecciona un año escolar para consultar alumnos." : "No hay años escolares disponibles."} />
+                <MensajeSinDatos columnas={columnas} mensaje={anios.length ? "Selecciona un año escolar para consultar alumnos." : "No hay años escolares disponibles."} />
               ) : isLoading ? (
-                <FilasCargando columnas={10} />
+                <FilasCargando columnas={columnas} />
               ) : isError ? (
-                <MensajeSinDatos columnas={10} mensaje="No se pudo cargar. Recarga la pantalla." />
+                <MensajeSinDatos columnas={columnas} mensaje="No se pudo cargar. Recarga la pantalla." />
               ) : !alumnosFiltrados.length ? (
-                <MensajeSinDatos columnas={10} mensaje={busqueda ? "Sin resultados para la búsqueda." : "Aún no hay alumnos."} />
+                <MensajeSinDatos columnas={columnas} mensaje={busqueda ? "Sin resultados para la búsqueda." : "Aún no hay alumnos."} />
               ) : (
                 alumnosFiltrados.map((alumno) => {
                   const nombreCompleto = `${alumno.nombre} ${alumno.apellidoPat} ${alumno.apellidoMat}`.trim()
                   const iniciales = `${alumno.nombre[0] ?? ""}${alumno.apellidoPat[0] ?? ""}`.toUpperCase()
                   const bg = avatarColor(nombreCompleto)
                   const isExpanded = expandedId === alumno.idAlumno
+                  // Sin el permiso de Apoderados solo se despliega si hay algo que mostrar.
+                  const expandible = puedeVerApoderados || alumno.tieneDiscapacidad
                   return (
                     <Fragment key={alumno.idAlumno}>
                       <TableRow
                         key={alumno.idAlumno}
-                        className={`cursor-pointer hover:bg-muted/40 ${isExpanded ? "bg-muted/30" : ""}`}
-                        onClick={() => setExpandedId(isExpanded ? null : alumno.idAlumno)}
+                        className={`${expandible ? "cursor-pointer" : ""} hover:bg-muted/40 ${isExpanded ? "bg-muted/30" : ""}`}
+                        onClick={() => expandible && setExpandedId(isExpanded ? null : alumno.idAlumno)}
                       >
                         <TableCell className="min-w-[180px]">
                           <div className="flex items-center gap-2">
@@ -364,7 +368,8 @@ export function AlumnosTab() {
                               variant="ghost"
                               size="icon-sm"
                               className="size-6 shrink-0 rounded-md"
-                              aria-label={isExpanded ? "Contraer" : "Expandir apoderados"}
+                              aria-label={isExpanded ? "Contraer" : "Expandir"}
+                              disabled={!expandible}
                               onClick={(e) => {
                                 e.stopPropagation()
                                 setExpandedId(isExpanded ? null : alumno.idAlumno)
@@ -384,16 +389,18 @@ export function AlumnosTab() {
                         </TableCell>
                         <TableCell className="text-center font-mono text-[12px] text-[#7D7D7F] whitespace-nowrap">{alumno.codigo}</TableCell>
                         <TableCell className="text-center text-[12px] text-[#7D7D7F]">{alumno.documentoIdentidad || "—"}</TableCell>
-                        <TableCell className="max-w-[160px] text-[12px]">
-                          {alumno.apoderados.length ? (
-                            <span className="truncate text-[#212529]">
-                              {`${alumno.apoderados[0].nombre} ${alumno.apoderados[0].apellidoPat}`.trim()}
-                              {alumno.apoderados[1] ? ` +1` : ""}
-                            </span>
-                          ) : (
-                            <Badge variant="outline" className="text-[11px] font-normal border-dashed">Sin apoderado</Badge>
-                          )}
-                        </TableCell>
+                        {puedeVerApoderados && (
+                          <TableCell className="max-w-[160px] text-[12px]">
+                            {alumno.apoderados.length ? (
+                              <span className="truncate text-[#212529]">
+                                {`${alumno.apoderados[0].nombre} ${alumno.apoderados[0].apellidoPat}`.trim()}
+                                {alumno.apoderados[1] ? ` +1` : ""}
+                              </span>
+                            ) : (
+                              <Badge variant="outline" className="text-[11px] font-normal border-dashed">Sin apoderado</Badge>
+                            )}
+                          </TableCell>
+                        )}
                         <TableCell className="text-center text-[12px] text-[#7D7D7F] whitespace-nowrap">
                           {alumno.nivel === "Sin matrícula" ? <SinMatriculaBadge /> : alumno.nivel}
                         </TableCell>
@@ -437,15 +444,15 @@ export function AlumnosTab() {
                       </TableRow>
                       {isExpanded && (
                         <TableRow key={`${alumno.idAlumno}-expanded`} className="bg-muted/20 hover:bg-muted/20">
-                          <TableCell colSpan={10} className="p-3">
+                          <TableCell colSpan={columnas} className="p-3">
                             <div className="flex flex-col gap-3">
                               {alumno.tieneDiscapacidad && (
                                 <p className="text-[12px] text-[#495057]">
                                   <span className="font-semibold">Discapacidad:</span> {alumno.discapacidad}
                                 </p>
                               )}
-                              <p className="text-[12px] font-semibold text-[#495057]">Apoderados — máx 2</p>
-                              {alumno.apoderados.length ? (
+                              {puedeVerApoderados && <p className="text-[12px] font-semibold text-[#495057]">Apoderados — máx 2</p>}
+                              {!puedeVerApoderados ? null : alumno.apoderados.length ? (
                                 <div className="grid gap-3 sm:grid-cols-2">
                                   {alumno.apoderados.slice(0, 2).map((ap, idx) => (
                                     <div key={ap.idApoderado ?? idx} className="flex items-center gap-3 rounded-lg border bg-white p-3">
