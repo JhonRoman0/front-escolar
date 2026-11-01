@@ -9,6 +9,8 @@ export function horaCorta(hora?: string | null): string {
 // ── Docentes ─────────────────────────────────────────────────────────────
 
 export interface DocenteResponse {
+  // Solo al restablecer: false si el correo no salió y la contraseña no cambió.
+  credencialesEnviadas?: boolean | null
   idDocente: number
   idUsuario: number
   codigo: string
@@ -36,8 +38,8 @@ export interface DocenteRequest {
   apellidoPat: string
   apellidoMat: string
   documentoIdentidad?: string | null
-  contraseña?: string
   gmail?: string | null
+  restablecerContrasena?: boolean
   fechaNaci: string
   tipoContratoId?: number | null
   fechaContratacion?: string | null

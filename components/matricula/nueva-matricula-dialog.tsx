@@ -17,18 +17,22 @@ import { PasoMatricula, type DatosMatriculaPaso } from "./paso-matricula"
 const PASOS = ["Alumno", "Apoderado", "Matrícula"]
 
 export function aApoderadoRequest(a: ApoderadoPasoValues): InscripcionApoderado {
-  const base = { documentoIdentidad: a.documentoIdentidad, idParentesco: a.idParentesco }
-  if (a.estado === "APODERADO") return base
-  const contacto = { ...base, sexo: a.sexo, direccion: a.direccion.trim(), celular: a.celular }
-  if (a.estado === "USUARIO") return contacto
+  const contacto = {
+    documentoIdentidad: a.documentoIdentidad,
+    idParentesco: a.idParentesco,
+    direccion: a.direccion.trim(),
+    celular: a.celular,
+  }
+  if (a.estado === "APODERADO") return contacto
+  if (a.estado === "USUARIO") return { ...contacto, sexo: a.sexo }
   return {
     ...contacto,
+    sexo: a.sexo,
     nombre: a.nombre.trim(),
     apellidoPat: a.apellidoPat.trim(),
     apellidoMat: a.apellidoMat.trim(),
     fechaNaci: a.fechaNaci,
     gmail: a.gmail.trim(),
-    contraseña: a.contraseña,
   }
 }
 
@@ -80,13 +84,17 @@ function Asistente({ onCerrar }: { onCerrar: () => void }) {
   const [paso, setPaso] = useState(1)
   const [alumno, setAlumno] = useState<AlumnoPaso | null>(null)
   const [apoderados, setApoderados] = useState<ApoderadoPasoValues[]>([])
+  // Los que ya tenía el alumno: si no quedan en el formulario, dejan de ser sus apoderados.
+  const [vinculados, setVinculados] = useState<ApoderadoBusqueda[]>([])
 
   function handleAlumno(datos: AlumnoPaso, previos: ApoderadoBusqueda[] | null) {
     // Un alumno del colegio trae a sus apoderados; si se cambió de alumno, se descartan.
     if (previos?.length && datos.idAlumno !== alumno?.idAlumno) {
       setApoderados(previos.map(apoderadoDesdeBusqueda))
+      setVinculados(previos)
     } else if (alumno && datos.valores.documentoIdentidad !== alumno.valores.documentoIdentidad) {
       setApoderados([])
+      setVinculados([])
     }
     setAlumno(datos)
     setPaso(2)
@@ -116,14 +124,21 @@ function Asistente({ onCerrar }: { onCerrar: () => void }) {
     }
     const guardando = toast.loading("Creando matrícula...")
     try {
-      await crud.inscribir.mutateAsync({ data: request, foto: alumno.foto, comprobante })
+      const creada = await crud.inscribir.mutateAsync({ data: request, foto: alumno.foto, comprobante })
       const nuevos = apoderados.filter((a) => a.estado === "NUEVO").map((a) => a.gmail.trim())
-      toast.success(
-        nuevos.length
-          ? `Matrícula creada. Los accesos se enviaron a ${nuevos.join(" y ")}`
-          : "Matrícula creada",
-        { id: guardando }
-      )
+      if (creada.credencialesEnviadas === false) {
+        toast.warning(
+          "Matrícula creada, pero no se pudieron enviar los accesos del apoderado. Revisa su correo en Estudiantes y marca Restablecer contraseña.",
+          { id: guardando }
+        )
+      } else {
+        toast.success(
+          nuevos.length
+            ? `Matrícula creada. Los accesos se enviaron a ${nuevos.join(" y ")}`
+            : "Matrícula creada",
+          { id: guardando }
+        )
+      }
       onCerrar()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo crear la matrícula", { id: guardando })
@@ -139,6 +154,7 @@ function Asistente({ onCerrar }: { onCerrar: () => void }) {
           <PasoApoderado
             value={apoderados}
             idAlumno={alumno.idAlumno}
+            vinculados={vinculados}
             validando={crud.validar.isPending}
             onAtras={(valores) => {
               setApoderados(valores)

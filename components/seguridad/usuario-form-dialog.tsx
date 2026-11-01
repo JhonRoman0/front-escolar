@@ -50,7 +50,7 @@ import {
 import { REGEX_DNI } from "@/lib/schemas/comun"
 import { BloqueFoto } from "@/components/shared/bloque-foto"
 import { CampoChip } from "@/components/shared/campo-chip"
-import { CampoContrasena } from "@/components/shared/campo-contrasena"
+import { casillaTrasCambiarCorreo, CampoRestablecerContrasena } from "@/components/shared/campo-restablecer-contrasena"
 import { CampoDni } from "@/components/shared/campo-dni"
 import { CamposNombres } from "@/components/shared/campos-nombres"
 import { TarjetaSeccion } from "@/components/shared/tarjeta-seccion"
@@ -71,6 +71,10 @@ interface UsuarioFormDialogProps {
   onOpenChange: (open: boolean) => void
   usuario?: UsuarioResponse | null
 }
+
+// Sin correo nadie conoce la contraseña generada: hay que reenviarla.
+const SIN_CREDENCIALES =
+  "No se pudieron enviar los accesos. Revisa su correo y marca Restablecer contraseña al editarlo."
 
 function mensajeConCredenciales(respuesta: UsuarioResponse, textoExito: string): string {
   return respuesta.credencialesEnviadas === true
@@ -146,7 +150,7 @@ export default function UsuarioFormDialog({
       fechaNaci: usuario?.fechaNaci ?? "",
       accesoId: usuario?.accesoId ?? 1,
       rolIds: usuario?.roles.map((r) => r.idRol) ?? [],
-      contraseña: "",
+      restablecerContrasena: false,
       gradoAcademicoId: docenteActivo?.gradoAcademicoId ?? null,
       tipoContratoId: docenteActivo?.tipoContratoId ?? null,
       fechaContratacion: docenteActivo?.fechaContratacion ?? "",
@@ -176,9 +180,7 @@ export default function UsuarioFormDialog({
     }
     if (esEdicion) {
       data.accesoId = values.accesoId
-    }
-    if (values.contraseña) {
-      data.contraseña = values.contraseña
+      data.restablecerContrasena = values.restablecerContrasena
     }
     if (seleccionaDocente) {
       // Aunque el usuario ya sea docente (bloque oculto), el backend ignora
@@ -243,10 +245,6 @@ export default function UsuarioFormDialog({
   }
 
   async function onSubmit(values: UsuarioValues) {
-    if (!esEdicion && !values.contraseña) {
-      toast.error("La contraseña es obligatoria (mín 8: mayúscula, número y símbolo)")
-      return
-    }
     const guardando = toast.loading(
       esEdicion ? "Guardando usuario..." : "Creando usuario..."
     )
@@ -259,9 +257,13 @@ export default function UsuarioFormDialog({
         if (fotoNueva) {
           await subirFoto.mutateAsync({ id: usuario.idUsuario, file: fotoNueva })
         }
-        toast.success(mensajeConCredenciales(actualizado, "Usuario actualizado"), { id: guardando })
         if (actualizado.credencialesEnviadas === false) {
-          toast.warning("No se pudieron enviar las credenciales al correo del usuario", { id: guardando })
+          toast.warning("Datos guardados, pero no se pudo enviar el correo: la contraseña no se cambió.", { id: guardando })
+        } else {
+          toast.success(
+            actualizado.credencialesEnviadas ? `Usuario actualizado. Se envió una contraseña nueva a ${actualizado.gmail}` : "Usuario actualizado.",
+            { id: guardando }
+          )
         }
       } else {
         const creado = await crear.mutateAsync(buildRequest(values))
@@ -272,7 +274,7 @@ export default function UsuarioFormDialog({
           toast.success(mensaje, { id: guardando })
         }
         if (creado.credencialesEnviadas === false) {
-          toast.warning("No se pudieron enviar las credenciales al correo del usuario", { id: guardando })
+          toast.warning(SIN_CREDENCIALES, { id: guardando })
         }
       }
       onOpenChange(false)
@@ -321,7 +323,7 @@ export default function UsuarioFormDialog({
         toast.success(mensaje, { id: guardando })
       }
       if (reactivado.credencialesEnviadas === false) {
-        toast.warning("No se pudieron enviar las credenciales al correo del usuario", { id: guardando })
+        toast.warning(SIN_CREDENCIALES, { id: guardando })
       }
       setReactivacion(null)
       onOpenChange(false)
@@ -418,7 +420,16 @@ export default function UsuarioFormDialog({
                         <Field>
                           <FieldLabel>Correo electrónico *</FieldLabel>
                           <FieldContent>
-                            <Input type="email" placeholder="usuario@correo.com" {...field} />
+                            <Input
+                              type="email"
+                              placeholder="usuario@correo.com"
+                              {...field}
+                              onChange={(e) => {
+                                const marcar = casillaTrasCambiarCorreo(field.value, e.target.value, usuario?.gmail)
+                                if (usuario && marcar !== null) form.setValue("restablecerContrasena", marcar)
+                                field.onChange(e)
+                              }}
+                            />
                             <FieldDescription className="text-xs">Obligatorio para notificaciones.</FieldDescription>
                             <FieldError errors={[form.formState.errors.gmail]} />
                           </FieldContent>
@@ -453,26 +464,19 @@ export default function UsuarioFormDialog({
                 <FieldSet>
                   <FieldLegend>Acceso</FieldLegend>
                   <div className={esEdicion ? "grid grid-cols-1 gap-4 sm:grid-cols-2" : "flex flex-col gap-4"}>
-                    <Controller
-                      control={form.control}
-                      name="contraseña"
-                      render={({ field }) => (
-                        <CampoContrasena
-                          value={field.value}
-                          onChange={field.onChange}
-                          onBlur={field.onBlur}
-                          name={field.name}
-                          inputRef={field.ref}
-                          error={form.formState.errors.contraseña}
-                          label={`Contraseña ${esEdicion ? "(opcional)" : "*"}`}
-                          descripcion={
-                            esEdicion
-                              ? "Si la dejas vacía, se conserva la contraseña actual."
-                              : "Mín. 8 caracteres, 1 mayúscula, 1 número y 1 símbolo."
-                          }
-                        />
-                      )}
-                    />
+                    {usuario ? (
+                      <Controller
+                        control={form.control}
+                        name="restablecerContrasena"
+                        render={({ field }) => (
+                          <CampoRestablecerContrasena checked={field.value} onCheckedChange={field.onChange} />
+                        )}
+                      />
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        La contraseña se genera automáticamente y se envía al correo. Se pedirá cambiarla en el primer ingreso.
+                      </p>
+                    )}
                     {esEdicion && (
                       <Controller
                         control={form.control}
@@ -700,7 +704,7 @@ export default function UsuarioFormDialog({
             reactivacion.fechaCreacion
               ? `, registrado el ${reactivacion.fechaCreacion}`
               : ""
-          }). Se reutilizará ese registro con los datos ingresados y la nueva contraseña.`}
+          }). Se reutilizará ese registro con los datos ingresados y se enviará una contraseña nueva a su correo.`}
           textoBoton="Reactivar"
           icono={<RefreshCcw />}
           variantConfirmar="default"

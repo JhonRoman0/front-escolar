@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 import { FileDown, Loader2, Lock, Pencil, RotateCcw } from "lucide-react"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -46,7 +46,7 @@ import {
 } from "@/components/shared/table-helpers"
 import { BloqueFoto } from "@/components/shared/bloque-foto"
 import { CampoChip } from "@/components/shared/campo-chip"
-import { CampoContrasena } from "@/components/shared/campo-contrasena"
+import { casillaTrasCambiarCorreo, CampoRestablecerContrasena } from "@/components/shared/campo-restablecer-contrasena"
 import { CamposNombres } from "@/components/shared/campos-nombres"
 import { TarjetaSeccion } from "@/components/shared/tarjeta-seccion"
 import { BuscadorTabla } from "@/components/shared/buscador-tabla"
@@ -428,8 +428,8 @@ function DocenteFormDialog({
       apellidoPat: docente?.apellidoPat ?? "",
       apellidoMat: docente?.apellidoMat ?? "",
       documentoIdentidad: docente?.documentoIdentidad ?? "",
-      contraseña: "",
       gmail: docente?.gmail ?? "",
+      restablecerContrasena: false,
       fechaNaci: docente?.fechaNaci ?? "",
       tipoContratoId: docente?.tipoContratoId ?? null,
       fechaContratacion: docente?.fechaContratacion ?? "",
@@ -438,6 +438,11 @@ function DocenteFormDialog({
       accesoId: docente?.accesoId ?? 1,
     },
   })
+
+  // Este diálogo no se remonta al reabrir el mismo docente: la casilla no debe quedar marcada.
+  useEffect(() => {
+    if (open) form.setValue("restablecerContrasena", false)
+  }, [open, form])
 
   function buildRequest(values: DocenteValues): DocenteRequest {
     const data: DocenteRequest = {
@@ -454,9 +459,7 @@ function DocenteFormDialog({
     if (values.fechaContratacion) data.fechaContratacion = values.fechaContratacion
     if (esEdicion) {
       data.accesoId = values.accesoId
-    }
-    if (values.contraseña) {
-      data.contraseña = values.contraseña
+      data.restablecerContrasena = values.restablecerContrasena
     }
     return data
   }
@@ -500,7 +503,7 @@ function DocenteFormDialog({
     if (!docente) return
     const guardando = toast.loading("Guardando docente...")
     try {
-      await actualizar.mutateAsync({
+      const actualizado = await actualizar.mutateAsync({
         id: docente.idDocente,
         data: buildRequest(values),
       })
@@ -510,7 +513,14 @@ function DocenteFormDialog({
           file: fotoNueva,
         })
       }
-      toast.success("Docente actualizado", { id: guardando })
+      if (actualizado.credencialesEnviadas === false) {
+        toast.warning("Datos guardados, pero no se pudo enviar el correo: la contraseña no se cambió.", { id: guardando })
+      } else {
+        toast.success(
+          actualizado.credencialesEnviadas ? `Docente actualizado. Se envió una contraseña nueva a ${actualizado.gmail}` : "Docente actualizado",
+          { id: guardando }
+        )
+      }
       onOpenChange(false)
     } catch (error) {
       toast.error(
@@ -603,7 +613,16 @@ function DocenteFormDialog({
                         <Field>
                           <FieldLabel>Correo electrónico *</FieldLabel>
                           <FieldContent>
-                            <Input type="email" placeholder="docente@correo.com" {...field} />
+                            <Input
+                              type="email"
+                              placeholder="docente@correo.com"
+                              {...field}
+                              onChange={(e) => {
+                                const marcar = casillaTrasCambiarCorreo(field.value, e.target.value, docente?.gmail)
+                                if (marcar !== null) form.setValue("restablecerContrasena", marcar)
+                                field.onChange(e)
+                              }}
+                            />
                             <FieldDescription className="text-xs">Obligatorio para notificaciones.</FieldDescription>
                             <FieldError errors={[form.formState.errors.gmail]} />
                           </FieldContent>
@@ -618,22 +637,15 @@ function DocenteFormDialog({
                 <FieldSet>
                   <FieldLegend>Acceso</FieldLegend>
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <Controller
-                      control={form.control}
-                      name="contraseña"
-                      render={({ field }) => (
-                        <CampoContrasena
-                          value={field.value}
-                          onChange={field.onChange}
-                          onBlur={field.onBlur}
-                          name={field.name}
-                          inputRef={field.ref}
-                          error={form.formState.errors.contraseña}
-                          label="Contraseña (opcional)"
-                          descripcion="Si la dejas vacía, se conserva la contraseña actual."
-                        />
-                      )}
-                    />
+                    {docente && (
+                      <Controller
+                        control={form.control}
+                        name="restablecerContrasena"
+                        render={({ field }) => (
+                          <CampoRestablecerContrasena checked={field.value} onCheckedChange={field.onChange} />
+                        )}
+                      />
+                    )}
                     {esEdicion && (
                       <Controller
                         control={form.control}

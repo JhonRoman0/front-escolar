@@ -40,14 +40,6 @@ export function useAlumno(id: number | null) {
   })
 }
 
-export function useApoderados() {
-  return useQuery({
-    queryKey: KEYS.apoderados,
-    queryFn: apoderadosApi.listar,
-    staleTime: 1000 * 60 * 30,
-  })
-}
-
 // ── Mutaciones ───────────────────────────────────────────────────────────
 
 export function useCrudAlumnos() {

@@ -1,7 +1,6 @@
 import * as z from "zod"
 
 import {
-  contrasenaSeguraOpcional,
   emailRequerido,
   MENSAJE_DNI,
   MENSAJE_SOLO_LETRAS_Y_ESPACIOS,
@@ -89,7 +88,7 @@ const usuarioSchemaBase = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha requerida (aaaa-mm-dd)"),
   accesoId: accesoId.optional(),
   rolIds: z.array(z.number()).min(1, "Asigna al menos un rol"),
-  contraseña: contrasenaSeguraOpcional,
+  restablecerContrasena: z.boolean(),
   // Datos específicos del docente. Solo se exigen (vía superRefine) cuando el
   // formulario selecciona DOCENTE y el usuario no tiene ya un docente activo.
   gradoAcademicoId: z

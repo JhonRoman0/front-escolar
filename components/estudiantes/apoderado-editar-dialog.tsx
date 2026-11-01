@@ -7,11 +7,12 @@ import { z } from "zod"
 
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { Field, FieldContent, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 import { BotonGuardar } from "@/components/shared/boton-guardar"
+import { casillaTrasCambiarCorreo, CampoRestablecerContrasena } from "@/components/shared/campo-restablecer-contrasena"
 import { CamposNombres } from "@/components/shared/campos-nombres"
 import { useActualizarApoderado } from "@/hooks/use-estudiantes"
 import { useParentescos, useSexos } from "@/hooks/use-pagos"
@@ -38,6 +39,7 @@ const apoderadoSchema = z.object({
   celular: z.string().regex(/^\d{9}$/, "El celular debe tener 9 dígitos"),
   gmail: emailRequerido,
   idParentesco: z.number().int().min(1, "Selecciona el parentesco"),
+  restablecerContrasena: z.boolean(),
 })
 type ApoderadoValues = z.infer<typeof apoderadoSchema>
 
@@ -90,22 +92,26 @@ function Formulario({
       celular: apoderado.celular ?? "",
       gmail: apoderado.gmail ?? "",
       idParentesco: apoderado.idParentesco ?? 0,
+      restablecerContrasena: false,
     },
   })
   const errores = form.formState.errors
 
   async function onSubmit(values: ApoderadoValues) {
-    const cambiaCorreo = values.gmail.trim().toLowerCase() !== (apoderado.gmail ?? "").toLowerCase()
     try {
-      await actualizar.mutateAsync({
+      const actualizado = await actualizar.mutateAsync({
         id: apoderado.idApoderado,
         data: { ...values, gmail: values.gmail.trim(), direccion: values.direccion.trim(), idAlumno: alumno.idAlumno },
       })
-      toast.success(
-        cambiaCorreo
-          ? `Apoderado actualizado. Se enviaron accesos nuevos a ${values.gmail.trim()}`
-          : "Apoderado actualizado"
-      )
+      if (actualizado.credencialesEnviadas === false) {
+        toast.warning("Datos guardados, pero no se pudo enviar el correo: la contraseña no se cambió.")
+      } else {
+        toast.success(
+          actualizado.credencialesEnviadas
+            ? `Apoderado actualizado. Se envió una contraseña nueva a ${values.gmail.trim()}`
+            : "Apoderado actualizado"
+        )
+      }
       onCerrar()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo actualizar el apoderado")
@@ -213,8 +219,15 @@ function Formulario({
               <Field>
                 <FieldLabel>Correo electrónico *</FieldLabel>
                 <FieldContent>
-                  <Input type="email" {...field} />
-                  <FieldDescription className="text-xs">Si lo cambias, se le envía una contraseña temporal al correo nuevo.</FieldDescription>
+                  <Input
+                    type="email"
+                    {...field}
+                    onChange={(e) => {
+                      const marcar = casillaTrasCambiarCorreo(field.value, e.target.value, apoderado.gmail)
+                      if (marcar !== null) form.setValue("restablecerContrasena", marcar)
+                      field.onChange(e)
+                    }}
+                  />
                   <FieldError errors={[errores.gmail]} />
                 </FieldContent>
               </Field>
@@ -232,6 +245,13 @@ function Formulario({
                 <FieldError errors={[errores.direccion]} />
               </FieldContent>
             </Field>
+          )}
+        />
+        <Controller
+          control={form.control}
+          name="restablecerContrasena"
+          render={({ field }) => (
+            <CampoRestablecerContrasena checked={field.value} onCheckedChange={field.onChange} />
           )}
         />
       </FieldGroup>

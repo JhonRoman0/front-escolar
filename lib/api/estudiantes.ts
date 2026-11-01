@@ -19,6 +19,7 @@ export interface ApoderadoResponse {
   parentesco: string | null
   sexo: string | null
   principal: boolean
+  credencialesEnviadas?: boolean | null
   documentoIdentidad: string | null
   fechaNaci: string | null
   urlFoto: string | null
@@ -36,6 +37,7 @@ export interface ApoderadoEdicionRequest {
   direccion: string
   celular: string
   gmail: string
+  restablecerContrasena: boolean
   idAlumno: number
   idParentesco: number
 }

@@ -169,7 +169,7 @@ export function PasoAlumno({ value, onCancelar, onSiguiente }: PasoAlumnoProps) 
               {existente.ultimaMatricula
                 ? `Última matrícula: ${existente.ultimaMatricula}. `
                 : "Aún no tiene matrículas. "}
-              Sus datos se conservan; aquí solo puedes cambiar la foto.
+              Sus datos se conservan; aquí solo puedes actualizar la foto y la dirección.
             </p>
           </div>
         </div>
@@ -195,90 +195,95 @@ export function PasoAlumno({ value, onCancelar, onSiguiente }: PasoAlumnoProps) 
         )}
       />
 
-      <fieldset disabled={bloqueado} className="flex flex-col gap-4">
-        <CamposNombres control={form.control} errors={form.formState.errors} />
+      <div className="flex flex-col gap-4">
+        <fieldset disabled={bloqueado} className="flex flex-col gap-4">
+          <CamposNombres control={form.control} errors={form.formState.errors} />
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Controller
+              control={form.control}
+              name="fechaNacimiento"
+              render={({ field }) => (
+                <Field>
+                  <FieldLabel>Fecha de nacimiento *</FieldLabel>
+                  <FieldContent>
+                    <Input type="date" {...field} />
+                    <FieldError errors={[form.formState.errors.fechaNacimiento]} />
+                  </FieldContent>
+                </Field>
+              )}
+            />
+            <Controller
+              control={form.control}
+              name="sexo"
+              render={({ field }) => (
+                <Field>
+                  <FieldLabel>Sexo *</FieldLabel>
+                  <FieldContent>
+                    <Select value={field.value} onValueChange={(v) => field.onChange(v ?? "")} disabled={bloqueado}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Selecciona">
+                          {sexos.find((s) => s.valor === field.value)?.nombre}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          {sexos.map((s) => (
+                            <SelectItem key={s.valor} value={s.valor}>{s.nombre}</SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                    <FieldError errors={[form.formState.errors.sexo]} />
+                  </FieldContent>
+                </Field>
+              )}
+            />
+          </div>
+
+        </fieldset>
+
           <Controller
             control={form.control}
-            name="fechaNacimiento"
+            name="direccion"
             render={({ field }) => (
               <Field>
-                <FieldLabel>Fecha de nacimiento *</FieldLabel>
+                <FieldLabel>Dirección *</FieldLabel>
                 <FieldContent>
-                  <Input type="date" {...field} />
-                  <FieldError errors={[form.formState.errors.fechaNacimiento]} />
+                  <Input placeholder="Av. Villahermosa 123" maxLength={120} {...field} />
+                  <FieldError errors={[form.formState.errors.direccion]} />
                 </FieldContent>
               </Field>
             )}
           />
+
+        <fieldset disabled={bloqueado} className="flex flex-col gap-4">
           <Controller
             control={form.control}
-            name="sexo"
+            name="tieneDiscapacidad"
             render={({ field }) => (
-              <Field>
-                <FieldLabel>Sexo *</FieldLabel>
-                <FieldContent>
-                  <Select value={field.value} onValueChange={(v) => field.onChange(v ?? "")} disabled={bloqueado}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Selecciona">
-                        {sexos.find((s) => s.valor === field.value)?.nombre}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        {sexos.map((s) => (
-                          <SelectItem key={s.valor} value={s.valor}>{s.nombre}</SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                  <FieldError errors={[form.formState.errors.sexo]} />
-                </FieldContent>
-              </Field>
+              <CampoChip checked={field.value} onCheckedChange={field.onChange} disabled={bloqueado}>
+                Tiene alguna discapacidad
+              </CampoChip>
             )}
           />
-        </div>
-
-        <Controller
-          control={form.control}
-          name="direccion"
-          render={({ field }) => (
-            <Field>
-              <FieldLabel>Dirección *</FieldLabel>
-              <FieldContent>
-                <Input placeholder="Av. Villahermosa 123" maxLength={120} {...field} />
-                <FieldError errors={[form.formState.errors.direccion]} />
-              </FieldContent>
-            </Field>
+          {tieneDiscapacidad && (
+            <Controller
+              control={form.control}
+              name="discapacidad"
+              render={({ field }) => (
+                <Field>
+                  <FieldLabel>Discapacidad *</FieldLabel>
+                  <FieldContent>
+                    <Textarea placeholder="Describe la discapacidad del alumno" maxLength={255} rows={2} {...field} />
+                    <FieldError errors={[form.formState.errors.discapacidad]} />
+                  </FieldContent>
+                </Field>
+              )}
+            />
           )}
-        />
-
-        <Controller
-          control={form.control}
-          name="tieneDiscapacidad"
-          render={({ field }) => (
-            <CampoChip checked={field.value} onCheckedChange={field.onChange} disabled={bloqueado}>
-              Tiene alguna discapacidad
-            </CampoChip>
-          )}
-        />
-        {tieneDiscapacidad && (
-          <Controller
-            control={form.control}
-            name="discapacidad"
-            render={({ field }) => (
-              <Field>
-                <FieldLabel>Discapacidad *</FieldLabel>
-                <FieldContent>
-                  <Textarea placeholder="Describe la discapacidad del alumno" maxLength={255} rows={2} {...field} />
-                  <FieldError errors={[form.formState.errors.discapacidad]} />
-                </FieldContent>
-              </Field>
-            )}
-          />
-        )}
-      </fieldset>
+        </fieldset>
+      </div>
 
       <div className="flex justify-end gap-2">
         <Button type="button" variant="outline" onClick={onCancelar}>Cancelar</Button>

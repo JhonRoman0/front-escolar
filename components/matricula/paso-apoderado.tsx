@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { Plus, Trash2, UserCheck, Users } from "lucide-react"
+import { Plus, Trash2, UserCheck, UserMinus, Users } from "lucide-react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useFieldArray, useForm, useWatch, type UseFormReturn } from "react-hook-form"
 
@@ -10,7 +10,6 @@ import { Field, FieldContent, FieldDescription, FieldError, FieldLabel } from "@
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
-import { CampoContrasena } from "@/components/shared/campo-contrasena"
 import { CampoDni } from "@/components/shared/campo-dni"
 import { TarjetaSeccion } from "@/components/shared/tarjeta-seccion"
 import { useBuscarApoderadoInscripcion } from "@/hooks/use-matricula"
@@ -41,18 +40,20 @@ export function apoderadoDesdeBusqueda(a: ApoderadoBusqueda): ApoderadoPasoValue
     celular: a.celular ?? "",
     gmail: a.gmail ?? "",
     hijos: a.hijos,
+    vinculado: a.idParentesco != null,
   }
 }
 
 interface PasoApoderadoProps {
   value: ApoderadoPasoValues[]
   idAlumno: number | null
+  vinculados: ApoderadoBusqueda[]
   validando: boolean
   onAtras: (valores: ApoderadoPasoValues[]) => void
   onSiguiente: (valores: ApoderadoPasoValues[]) => void
 }
 
-export function PasoApoderado({ value, idAlumno, validando, onAtras, onSiguiente }: PasoApoderadoProps) {
+export function PasoApoderado({ value, idAlumno, vinculados, validando, onAtras, onSiguiente }: PasoApoderadoProps) {
   const form = useForm<ApoderadosPasoValues>({
     resolver: zodResolver(apoderadosPasoSchema),
     defaultValues: { apoderados: value.length ? value : [apoderadoPasoDefault] },
@@ -60,6 +61,10 @@ export function PasoApoderado({ value, idAlumno, validando, onAtras, onSiguiente
   const { fields, append, remove } = useFieldArray({ control: form.control, name: "apoderados" })
 
   const handleSiguiente = form.handleSubmit((valores) => onSiguiente(valores.apoderados))
+  const enFormulario = useWatch({ control: form.control, name: "apoderados" })
+  const salen = vinculados.filter(
+    (v) => !enFormulario.some((a) => a.documentoIdentidad === v.documentoIdentidad)
+  )
 
   return (
     <div className="flex flex-col gap-4">
@@ -79,6 +84,12 @@ export function PasoApoderado({ value, idAlumno, validando, onAtras, onSiguiente
           <FormularioApoderado form={form} indice={indice} idAlumno={idAlumno} />
         </TarjetaSeccion>
       ))}
+
+      {salen.length > 0 && (
+        <Aviso icono={UserMinus} titulo="Dejará de ser apoderado de este alumno">
+          {salen.map((v) => `${v.nombre} ${v.apellidoPat}`).join(" y ")}: perderá el acceso a sus datos al crear la matrícula. Si no tiene otros hijos en el colegio, también su cuenta de apoderado.
+        </Aviso>
+      )}
 
       {fields.length < 2 && (
         <Button type="button" variant="outline" className="self-start" onClick={() => append(apoderadoPasoDefault)}>
@@ -115,6 +126,7 @@ export function FormularioApoderado({
   const { data: sexos = [] } = useSexos()
   const estado = useWatch({ control: form.control, name: `apoderados.${indice}.estado` })
   const hijos = useWatch({ control: form.control, name: `apoderados.${indice}.hijos` })
+  const vinculado = useWatch({ control: form.control, name: `apoderados.${indice}.vinculado` })
   const errores = form.formState.errors.apoderados?.[indice]
   const base = `apoderados.${indice}` as const
   const [comprobando, setComprobando] = useState(false)
@@ -282,12 +294,12 @@ export function FormularioApoderado({
       {yaEsApoderado && (
         <Aviso icono={Users} titulo="Ya es apoderado en el colegio">
           {hijos.length ? `Apoderado de: ${hijos.join(", ")}. ` : ""}
-          No se registra de nuevo: solo se vincula a este alumno. Sus datos se editan desde Estudiantes.
+          No se registra de nuevo. Aquí solo puedes actualizar su dirección y celular; el resto se edita desde Estudiantes.
         </Aviso>
       )}
       {estado === "USUARIO" && (
         <Aviso icono={UserCheck} titulo="Ya tiene cuenta en el sistema">
-          Se reutiliza su cuenta y se le añade el rol Apoderado: no se le pide correo ni contraseña.
+          Se reutiliza su cuenta y se le añade el rol Apoderado: entra con los accesos que ya tiene.
         </Aviso>
       )}
 
@@ -343,6 +355,7 @@ export function FormularioApoderado({
                     <Select
                       value={field.value ? String(field.value) : ""}
                       onValueChange={(v) => field.onChange(Number(v))}
+                      disabled={vinculado}
                     >
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Padre, madre...">
@@ -364,7 +377,7 @@ export function FormularioApoderado({
             />
           </div>
 
-          <fieldset disabled={yaEsApoderado} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Controller
               control={form.control}
               name={`${base}.sexo`}
@@ -423,7 +436,7 @@ export function FormularioApoderado({
                 </Field>
               )}
             />
-          </fieldset>
+          </div>
 
           {!tieneCuenta && (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -435,26 +448,10 @@ export function FormularioApoderado({
                     <FieldLabel>Correo electrónico *</FieldLabel>
                     <FieldContent>
                       <Input type="email" placeholder="apoderado@correo.com" {...field} />
-                      <FieldDescription className="text-xs">Aquí le llegarán sus accesos.</FieldDescription>
+                      <FieldDescription className="text-xs">Aquí le llegarán sus accesos. La contraseña se genera sola y se pedirá cambiarla al ingresar.</FieldDescription>
                       <FieldError errors={[errores?.gmail]} />
                     </FieldContent>
                   </Field>
-                )}
-              />
-              <Controller
-                control={form.control}
-                name={`${base}.contraseña`}
-                render={({ field }) => (
-                  <CampoContrasena
-                    value={field.value}
-                    onChange={field.onChange}
-                    onBlur={field.onBlur}
-                    name={field.name}
-                    inputRef={field.ref}
-                    error={errores?.contraseña}
-                    label="Contraseña *"
-                    descripcion="Temporal: se le pedirá cambiarla al ingresar."
-                  />
                 )}
               />
             </div>

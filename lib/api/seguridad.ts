@@ -163,11 +163,11 @@ export interface UsuarioRequest {
   apellidoPat: string
   apellidoMat: string
   documentoIdentidad?: string | null
-  contraseña?: string
   gmail?: string | null
   celular?: string | null
   fechaNaci: string
   accesoId?: number | null
+  restablecerContrasena?: boolean
   urlFoto?: string | null
   pkUrlFoto?: string | null
   rolIds: number[]
