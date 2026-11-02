@@ -70,10 +70,8 @@ import type {
 import { docenteSchema, type DocenteValues } from "@/lib/schemas/academico"
 import { CampoDni } from "@/components/shared/campo-dni"
 import { usePuede } from "@/hooks/use-permisos"
-import type { DocenteReporteItem } from "@/lib/api/reportes"
-import { generarPdfDocentes } from "@/lib/reportes/generar-pdf"
-import { generarExcelDocentes } from "@/lib/reportes/generar-excel"
-import { generarCsvDocentes } from "@/lib/reportes/generar-csv"
+import { reportesApi } from "@/lib/api/reportes"
+import { descargarTabla, tablaDocentes, type FormatoReporte } from "@/lib/reportes/tablas"
 import { ReporteModal } from "@/components/reportes/reporte-modal"
 
 const ESTADO_OPCIONES = [
@@ -97,6 +95,9 @@ export default function DocentesTab() {
   const [filtroEstado, setFiltroEstado] = useState("")
   const [filtroTipoContrato, setFiltroTipoContrato] = useState("")
   const [filtroNivel, setFiltroNivel] = useState("")
+  const [reporteContrato, setReporteContrato] = useState("")
+  const [reporteNivel, setReporteNivel] = useState("")
+  const [reporteEstado, setReporteEstado] = useState("")
   const busquedaDebounced = useDebouncedValue(busqueda, 400)
 
   const opcionesContrato = useMemo(
@@ -156,33 +157,18 @@ export default function DocentesTab() {
   }
 
   async function handleDescargarReporte(
-    formato: "pdf" | "excel" | "csv",
+    formato: FormatoReporte,
     inicio: string,
-    fin: string
+    fin: string,
+    filtros: Record<string, string>,
+    contexto: { colegio: string; filtros: string[] }
   ) {
-    const datos: DocenteReporteItem[] = docentesFiltrados
-      .filter(
-        (d) =>
-          d.fechaContratacion != null &&
-          d.fechaContratacion >= inicio &&
-          d.fechaContratacion <= fin
-      )
-      .map((d) => ({
-        codigo: d.codigo,
-        nombre: `${d.nombre} ${d.apellidoPat} ${d.apellidoMat}`.trim(),
-        documentoIdentidad: d.documentoIdentidad,
-        gradoAcademico: d.gradoAcademicoNombre,
-        tipoContrato: d.tipoContratoNombre,
-        niveles: d.niveles.map((n) => n.nombre),
-        fechaContratacion: d.fechaContratacion,
-      }))
+    const datos = await reportesApi.docentes(inicio, fin, filtros)
     if (datos.length === 0) {
       toast.warning("No hay docentes en el rango y filtros seleccionados")
       return
     }
-    if (formato === "pdf") generarPdfDocentes({ datos, inicio, fin })
-    else if (formato === "excel") generarExcelDocentes({ datos, inicio, fin })
-    else generarCsvDocentes({ datos, inicio, fin })
+    descargarTabla(formato, tablaDocentes(datos, { inicio, fin, ...contexto }))
     toast.success(`Reporte ${formato.toUpperCase()} generado (${datos.length} registros)`)
   }
 
@@ -209,7 +195,12 @@ export default function DocentesTab() {
           </div>
 <div className="flex flex-wrap items-center gap-2">
             {puedeExportar && (
-              <Button variant="outline" size="sm" onClick={() => setReporteOpen(true)}>
+              <Button variant="outline" size="sm" onClick={() => {
+                setReporteContrato(filtroTipoContrato)
+                setReporteNivel(filtroNivel)
+                setReporteEstado(filtroEstado)
+                setReporteOpen(true)
+              }}>
                 <FileDown data-icon="inline-start" />
                 Generar reporte
               </Button>
@@ -389,7 +380,13 @@ export default function DocentesTab() {
           onOpenChange={setReporteOpen}
           titulo="Reporte de docentes"
           descripcion="Descarga el listado de docentes del rango en PDF, Excel o CSV."
-          presets={["ultimos_7", "este_mes", "personalizado"]}
+          presets={["todo", "ultimos_7", "este_mes", "personalizado"]}
+          etiquetaTodo="Todos los docentes"
+          filtros={[
+            { id: "tipoContratoId", label: "Tipo de contrato", opciones: opcionesContrato, valor: reporteContrato, onChange: setReporteContrato },
+            { id: "idNivel", label: "Nivel", opciones: niveles.map((n) => ({ value: String(n.idNivel), label: n.nombre })), valor: reporteNivel, onChange: setReporteNivel },
+            { id: "idAcceso", label: "Estado", opciones: ESTADO_OPCIONES, valor: reporteEstado, onChange: setReporteEstado },
+          ]}
           onDescargar={handleDescargarReporte}
         />
       </CardContent>

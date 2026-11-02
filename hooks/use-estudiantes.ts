@@ -11,7 +11,7 @@ import {
   type ApoderadoEdicionRequest,
   type AlumnosFiltros,
 } from "@/lib/api/estudiantes"
-import type { InscripcionApoderado } from "@/lib/api/matricula"
+import { matriculasApi, type InscripcionApoderado } from "@/lib/api/matricula"
 
 const KEYS = {
   alumnos: ["alumnos"] as const,
@@ -75,6 +75,33 @@ export function useAgregarApoderado() {
   return useMutation({
     mutationFn: ({ idAlumno, data }: { idAlumno: number; data: InscripcionApoderado }) =>
       apoderadosApi.agregar(idAlumno, data),
+    onSuccess: invalidar,
+  })
+}
+
+export function useQuitarApoderado() {
+  const invalidar = useInvalidarMutacion(KEYS.alumnos, KEYS.apoderados)
+  return useMutation({
+    mutationFn: ({ id, idAlumno }: { id: number; idAlumno: number }) => apoderadosApi.quitar(id, idAlumno),
+    onSuccess: invalidar,
+  })
+}
+
+/** Hijos del apoderado: deciden si su cuenta se conserva cuando deja de serlo de este alumno. */
+export function useHijosDeApoderado(dni: string | null, idAlumno: number, habilitado = true) {
+  const { data } = useQuery({
+    queryKey: [...KEYS.apoderados, "hijos", dni, idAlumno],
+    queryFn: () => matriculasApi.buscarApoderado(dni as string, idAlumno),
+    enabled: habilitado && !!dni,
+  })
+  return data?.hijos
+}
+
+export function useReemplazarApoderado() {
+  const invalidar = useInvalidarMutacion(KEYS.alumnos, KEYS.apoderados)
+  return useMutation({
+    mutationFn: ({ id, idAlumno, data }: { id: number; idAlumno: number; data: InscripcionApoderado }) =>
+      apoderadosApi.reemplazar(id, idAlumno, data),
     onSuccess: invalidar,
   })
 }

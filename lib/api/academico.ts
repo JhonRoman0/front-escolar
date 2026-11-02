@@ -323,6 +323,20 @@ export function anioPorDefecto(
   )
 }
 
+/**
+ * Año que muestran por defecto los filtros de Estudiantes y Matrícula: el vigente;
+ * si no hay, el próximo por comenzar; si tampoco, el cerrado más reciente.
+ */
+export function anioParaFiltro(anios: AnioEscolarResponse[]): AnioEscolarResponse | undefined {
+  const activos = anios.filter((a) => a.accesoId !== ACCESO.ELIMINADO)
+  const porAnio = [...activos].sort((a, b) => a.anio.localeCompare(b.anio))
+  return (
+    activos.find((a) => a.estado === ESTADO_ANIO.VIGENTE) ??
+    porAnio.find((a) => a.estado === ESTADO_ANIO.POR_COMENZAR) ??
+    porAnio[porAnio.length - 1]
+  )
+}
+
 /** Texto de estado para los contextos de diálogo ("Vigente", "Por comenzar"...). */
 export function estadoAnioTexto(estado: number): string {
   if (estado === ESTADO_ANIO.VIGENTE) return "Vigente"
@@ -377,13 +391,22 @@ export const TIPOS_AULA: { value: TipoAula; label: string; ayuda: string }[] = [
   { value: "COMPARTIDO", label: "Espacio compartido", ayuda: "Patio, losa o auditorio: admite varias clases a la misma hora." },
 ]
 
+export interface SeccionDelAula {
+  idAnio: number
+  anio: string
+  nivel: string
+  grado: string
+  seccion: string
+  turno: string
+}
+
 export interface AulaResponse {
   idAula: number
   nombre: string
   capacidad: number | null
   tipo: TipoAula
-  /** Secciones de las que es salón ("3.° A – Mañana 2027"). */
-  secciones: string[]
+  /** Secciones de las que es salón, de todos los años. */
+  secciones: SeccionDelAula[]
   accesoId: number | null
 }
 

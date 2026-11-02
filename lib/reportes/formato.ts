@@ -17,6 +17,30 @@ export function fechaHora(iso: string | null | undefined): string {
   })}`
 }
 
+export interface ColumnaReporte {
+  titulo: string
+  /** Ancho en caracteres para Excel y proporción de columna en PDF. */
+  ancho: number
+  /** codigo: conserva ceros iniciales; monto: número con dos decimales. */
+  tipo?: "codigo" | "monto"
+}
+
+/** Un reporte listo para cualquier formato. */
+export interface TablaReporte {
+  titulo: string
+  hoja: string
+  archivo: string
+  encabezado: string[]
+  columnas: ColumnaReporte[]
+  filas: (string | number | null)[][]
+}
+
+/** Texto de una celda para PDF. */
+export function celdaTexto(valor: string | number | null, columna: ColumnaReporte): string {
+  if (valor == null || valor === "") return "—"
+  return columna.tipo === "monto" ? Number(valor).toFixed(2) : String(valor)
+}
+
 export interface ConteoEstados {
   puntual: number
   tardanza: number

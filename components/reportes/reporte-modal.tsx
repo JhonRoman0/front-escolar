@@ -21,15 +21,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { useColegioPublico } from "@/hooks/use-portal"
 import { fechaHoyISO } from "@/lib/fechas"
 
 type Formato = "pdf" | "excel" | "csv"
 
-export type Preset = "hoy" | "ayer" | "ultimos_7" | "este_mes" | "personalizado"
+export type Preset = "todo" | "hoy" | "ayer" | "ultimos_7" | "este_mes" | "personalizado"
 
 const ETIQUETA_PRESET: Record<Preset, string> = {
   hoy: "Hoy",
   ayer: "Ayer",
+  todo: "Todos",
   ultimos_7: "Últimos 7 días",
   este_mes: "Este mes",
   personalizado: "Personalizado",
@@ -42,6 +44,8 @@ export interface FiltroDef {
   valor?: string
   onChange?: (valor: string) => void
   render?: () => ReactNode
+  /** Obliga a elegir un valor: no ofrece "Todos". */
+  sinTodos?: boolean
 }
 
 function aISO(fecha: Date): string {
@@ -71,6 +75,8 @@ function rangoDePreset(preset: Preset): { inicio: string; fin: string } {
         inicio: aISO(new Date(hoy.getFullYear(), hoy.getMonth(), 1)),
         fin: aISO(hoy),
       }
+    case "todo":
+      return { inicio: "", fin: "" }
     default:
       return { inicio: fechaHoyISO(), fin: fechaHoyISO() }
   }
@@ -81,28 +87,52 @@ interface ReporteModalProps {
   onOpenChange: (open: boolean) => void
   titulo: string
   descripcion?: string
+  /** El primero es el inicial. Vacío: el reporte no se filtra por fechas. */
   presets?: Preset[]
+  etiquetaTodo?: string
   filtros?: FiltroDef[]
   onDescargar: (
     formato: Formato,
     inicio: string,
     fin: string,
-    filtros: Record<string, string>
+    filtros: Record<string, string>,
+    contexto: { colegio: string; filtros: string[] }
   ) => Promise<void>
   nombreColegio?: string
 }
 
-export function ReporteModal({
-  open,
-  onOpenChange,
-  titulo,
-  descripcion,
+export function ReporteModal({ open, onOpenChange, titulo, descripcion, ...resto }: ReporteModalProps) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{titulo}</DialogTitle>
+          {descripcion && <DialogDescription>{descripcion}</DialogDescription>}
+        </DialogHeader>
+        <Contenido onCerrar={() => onOpenChange(false)} {...resto} />
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/** Filtros con valor, en texto para el encabezado del archivo. */
+function textoFiltros(filtros: FiltroDef[]): string[] {
+  return filtros.flatMap((f) => {
+    const opcion = f.valor ? f.opciones?.find((o) => o.value === f.valor) : undefined
+    return opcion ? [`${f.label}: ${opcion.label}`] : []
+  })
+}
+
+function Contenido({
   presets = ["ultimos_7", "este_mes", "personalizado"],
+  etiquetaTodo = "Todos",
   filtros = [],
   onDescargar,
-}: ReporteModalProps) {
-  const [preset, setPreset] = useState<Preset>("ultimos_7")
-  const [{ inicio, fin }, setRango] = useState(() => rangoDePreset("ultimos_7"))
+  onCerrar,
+}: Omit<ReporteModalProps, "open" | "onOpenChange" | "titulo" | "descripcion"> & { onCerrar: () => void }) {
+  const { data: colegio } = useColegioPublico()
+  const [preset, setPreset] = useState<Preset>(presets[0] ?? "todo")
+  const [{ inicio, fin }, setRango] = useState(() => rangoDePreset(presets[0] ?? "todo"))
   const [generando, setGenerando] = useState<Formato | null>(null)
 
   function cambiaPreset(nuevo: string | null) {
@@ -114,7 +144,7 @@ export function ReporteModal({
   }
 
   async function descargar(formato: Formato) {
-    if (!inicio || !fin || inicio > fin) {
+    if (preset !== "todo" && (!inicio || !fin || inicio > fin)) {
       toast.error("La fecha inicial no puede ser mayor que la final")
       return
     }
@@ -125,8 +155,11 @@ export function ReporteModal({
       for (const f of filtros) {
         if (f.valor) filtroValues[f.id] = f.valor
       }
-      await onDescargar(formato, inicio, fin, filtroValues)
-      onOpenChange(false)
+      await onDescargar(formato, inicio, fin, filtroValues, {
+        colegio: colegio?.nombre ?? "Sistema Escolar",
+        filtros: textoFiltros(filtros),
+      })
+      onCerrar()
     } catch (error) {
       toast.error(
         error instanceof Error
@@ -141,21 +174,19 @@ export function ReporteModal({
   const ocupado = generando !== null
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{titulo}</DialogTitle>
-          {descripcion && <DialogDescription>{descripcion}</DialogDescription>}
-        </DialogHeader>
-
+    <>
         <div className="space-y-4">
+          {presets.length > 0 && (
           <div className="space-y-2">
             <p className="text-sm font-medium">Rango de fechas</p>
             <Select value={preset} onValueChange={cambiaPreset}>
               <SelectTrigger className="w-full">
-                <SelectValue>{ETIQUETA_PRESET[preset]}</SelectValue>
+                <SelectValue>{preset === "todo" ? etiquetaTodo : ETIQUETA_PRESET[preset]}</SelectValue>
               </SelectTrigger>
               <SelectContent>
+                {presets.includes("todo") && (
+                  <SelectItem value="todo">{etiquetaTodo}</SelectItem>
+                )}
                 {presets.includes("hoy") && (
                   <SelectItem value="hoy">Hoy</SelectItem>
                 )}
@@ -175,6 +206,9 @@ export function ReporteModal({
             </Select>
           </div>
 
+          )}
+
+          {presets.length > 0 && preset !== "todo" && (
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <p className="text-sm font-medium">Desde</p>
@@ -201,11 +235,12 @@ export function ReporteModal({
               />
             </div>
           </div>
+          )}
 
           {filtros.length > 0 && (
-            <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
               {filtros.map((f) => (
-                <div key={f.id} className="space-y-2">
+                <div key={f.id} className={f.render ? "col-span-2 space-y-2" : "space-y-2"}>
                   {f.render ? (
                     <>
                       <p className="text-sm font-medium">{f.label}</p>
@@ -222,7 +257,7 @@ export function ReporteModal({
                           </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">Todos</SelectItem>
+                          {!f.sinTodos && <SelectItem value="">Todos</SelectItem>}
                           {f.opciones?.map((op) => (
                             <SelectItem key={op.value} value={op.value}>
                               {op.label}
@@ -241,7 +276,7 @@ export function ReporteModal({
         <DialogFooter className="flex-col gap-2 sm:flex-row">
           <Button
             variant="outline"
-            onClick={() => onOpenChange(false)}
+            onClick={onCerrar}
             disabled={ocupado}
           >
             Cancelar
@@ -279,7 +314,6 @@ export function ReporteModal({
             PDF
           </Button>
         </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    </>
   )
 }

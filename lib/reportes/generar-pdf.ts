@@ -5,10 +5,6 @@ import type { AutorizacionRegistroResponse } from "@/lib/api/evaluacion"
 import type {
   ReporteGeneralItem,
   NotaReporteItem,
-  MatriculaReporteItem,
-  AlumnoReporteItem,
-  DocenteReporteItem,
-  UsuarioReporteItem,
 } from "@/lib/api/reportes"
 import type {
   DistribucionGrado,
@@ -16,7 +12,7 @@ import type {
 } from "@/lib/api/dashboard"
 import type { EstadisticasResponse } from "@/lib/api/asistencia"
 import { formatearFecha, formatearHora } from "@/lib/fechas"
-import { contarEstados, fechaCorta, fechaHora } from "./formato"
+import { celdaTexto, contarEstados, fechaCorta, fechaHora, type TablaReporte } from "./formato"
 
 // Paleta institucional (§6.1 de AGENTS.md): azul #004497 para encabezados.
 const AZUL: [number, number, number] = [0, 68, 151]
@@ -299,188 +295,35 @@ export function generarPdfNotas({
   doc.save(`reporte-notas-${inicio}_${fin}.pdf`)
 }
 
-// ── Matrícula ────────────────────────────────────────────────────────────
+// ── Usuarios, docentes, alumnos y matrícula ──────
 
-export function generarPdfMatriculas({
-  datos,
-  inicio,
-  fin,
-  nombreColegio = "Sistema Escolar",
-}: OpcionesReporte & { datos: MatriculaReporteItem[] }): void {
+export function generarPdfTabla(tabla: TablaReporte): void {
   const doc = nuevoDoc("landscape")
-
-  const startY = escribirEncabezado(doc, "Reporte de Matrícula", [
-    nombreColegio,
-    `Rango: ${fechaCorta(inicio)} — ${fechaCorta(fin)}`,
-    `Total de registros: ${datos.length}`,
-    `Generado: ${generarAhora()}`,
-  ])
+  const startY = escribirEncabezado(doc, tabla.titulo, tabla.encabezado)
+  const anchoUtil = doc.internal.pageSize.getWidth() - 28
+  const total = tabla.columnas.reduce((suma, c) => suma + c.ancho, 0)
 
   autoTable(doc, {
     startY,
-    head: [
-      [
-        "Alumno",
-        "Código",
-        "Grado y sección",
-        "Fecha pago",
-        "Monto",
-        "Registro",
-        "Registrado por",
-      ],
-    ],
-    body: datos.map((d) => [
-      d.alumno,
-      d.codigo,
-      d.gradoSeccion,
-      d.fechaPago ? fechaCorta(d.fechaPago) : "—",
-      d.montoPago != null ? `S/ ${d.montoPago.toFixed(2)}` : "—",
-      fechaCorta(d.fechaRegistro),
-      d.registradoPor,
-    ]),
-    styles: { fontSize: 8, cellPadding: 1.5 },
+    margin: { left: 14, right: 14 },
+    head: [tabla.columnas.map((c) => c.titulo)],
+    body: tabla.filas.map((fila) => fila.map((valor, i) => celdaTexto(valor, tabla.columnas[i]))),
+    columnStyles: Object.fromEntries(
+      tabla.columnas.map((c, i) => [
+        i,
+        {
+          cellWidth: (c.ancho / total) * anchoUtil,
+          halign: c.tipo === "monto" ? ("right" as const) : ("left" as const),
+        },
+      ])
+    ),
+    // Con muchas columnas la letra baja para que los nombres no se partan tanto.
+    styles: { fontSize: tabla.columnas.length > 10 ? 6.5 : 7.5, cellPadding: 1.2, overflow: "linebreak" },
     headStyles: { fillColor: AZUL, textColor: 255, fontStyle: "bold" },
     alternateRowStyles: { fillColor: FILA_ALTERNA },
   })
 
-  doc.save(`reporte-matricula-${inicio}_${fin}.pdf`)
-}
-
-// ── Alumnos ──────────────────────────────────────────────────────────────
-
-export function generarPdfAlumnos({
-  datos,
-  inicio,
-  fin,
-  nombreColegio = "Sistema Escolar",
-}: OpcionesReporte & { datos: AlumnoReporteItem[] }): void {
-  const doc = nuevoDoc("landscape")
-
-  const startY = escribirEncabezado(doc, "Reporte de Alumnos", [
-    nombreColegio,
-    `Rango: ${fechaCorta(inicio)} — ${fechaCorta(fin)}`,
-    `Total de registros: ${datos.length}`,
-    `Generado: ${generarAhora()}`,
-  ])
-
-  autoTable(doc, {
-    startY,
-    head: [
-      [
-        "Código",
-        "Nombre",
-        "DNI",
-        "Grado y sección",
-        "Apoderado",
-        "Fecha ingreso",
-      ],
-    ],
-    body: datos.map((d) => [
-      d.codigo,
-      d.nombre,
-      d.documentoIdentidad ?? "—",
-      d.gradoSeccion,
-      d.apoderado,
-      fechaCorta(d.fechaIngreso),
-    ]),
-    styles: { fontSize: 8, cellPadding: 1.5 },
-    headStyles: { fillColor: AZUL, textColor: 255, fontStyle: "bold" },
-    alternateRowStyles: { fillColor: FILA_ALTERNA },
-  })
-
-  doc.save(`reporte-alumnos-${inicio}_${fin}.pdf`)
-}
-
-// ── Docentes ─────────────────────────────────────────────────────────────
-
-export function generarPdfDocentes({
-  datos,
-  inicio,
-  fin,
-  nombreColegio = "Sistema Escolar",
-}: OpcionesReporte & { datos: DocenteReporteItem[] }): void {
-  const doc = nuevoDoc("landscape")
-
-  const startY = escribirEncabezado(doc, "Reporte de Docentes", [
-    nombreColegio,
-    `Rango: ${fechaCorta(inicio)} — ${fechaCorta(fin)}`,
-    `Total de registros: ${datos.length}`,
-    `Generado: ${generarAhora()}`,
-  ])
-
-  autoTable(doc, {
-    startY,
-    head: [
-      [
-        "Código",
-        "Nombre",
-        "DNI",
-        "Grado académico",
-        "Tipo contrato",
-        "Niveles",
-        "Fecha contratación",
-      ],
-    ],
-    body: datos.map((d) => [
-      d.codigo,
-      d.nombre,
-      d.documentoIdentidad ?? "—",
-      d.gradoAcademico ?? "—",
-      d.tipoContrato ?? "—",
-      d.niveles.length ? d.niveles.join(", ") : "—",
-      d.fechaContratacion ? fechaCorta(d.fechaContratacion) : "—",
-    ]),
-    styles: { fontSize: 8, cellPadding: 1.5 },
-    headStyles: { fillColor: AZUL, textColor: 255, fontStyle: "bold" },
-    alternateRowStyles: { fillColor: FILA_ALTERNA },
-  })
-
-  doc.save(`reporte-docentes-${inicio}_${fin}.pdf`)
-}
-
-// ── Usuarios ─────────────────────────────────────────────────────────────
-
-export function generarPdfUsuarios({
-  datos,
-  inicio,
-  fin,
-  nombreColegio = "Sistema Escolar",
-}: OpcionesReporte & { datos: UsuarioReporteItem[] }): void {
-  const doc = nuevoDoc("landscape")
-
-  const startY = escribirEncabezado(doc, "Reporte de Usuarios", [
-    nombreColegio,
-    `Rango: ${fechaCorta(inicio)} — ${fechaCorta(fin)}`,
-    `Total de registros: ${datos.length}`,
-    `Generado: ${generarAhora()}`,
-  ])
-
-  autoTable(doc, {
-    startY,
-    head: [
-      [
-        "Código",
-        "Nombre",
-        "DNI",
-        "Correo",
-        "Fecha creación",
-        "Roles",
-      ],
-    ],
-    body: datos.map((d) => [
-      d.codigo,
-      d.nombre,
-      d.documentoIdentidad ?? "—",
-      d.gmail ?? "—",
-      fechaCorta(d.fechaCreacion),
-      d.roles.join(", "),
-    ]),
-    styles: { fontSize: 8, cellPadding: 1.5 },
-    headStyles: { fillColor: AZUL, textColor: 255, fontStyle: "bold" },
-    alternateRowStyles: { fillColor: FILA_ALTERNA },
-  })
-
-  doc.save(`reporte-usuarios-${inicio}_${fin}.pdf`)
+  doc.save(`${tabla.archivo}.pdf`)
 }
 
 // ── Horario Académico (grilla visual) ──────────────────────────────────

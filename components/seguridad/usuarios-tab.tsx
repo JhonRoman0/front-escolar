@@ -25,9 +25,7 @@ import { useDebouncedValue } from "@/hooks/use-debounce"
 import { usePuede } from "@/hooks/use-permisos"
 import type { UsuarioResponse } from "@/lib/api/seguridad"
 import { reportesApi } from "@/lib/api/reportes"
-import { generarPdfUsuarios } from "@/lib/reportes/generar-pdf"
-import { generarExcelUsuarios } from "@/lib/reportes/generar-excel"
-import { generarCsvUsuarios } from "@/lib/reportes/generar-csv"
+import { descargarTabla, tablaUsuarios, type FormatoReporte } from "@/lib/reportes/tablas"
 import { ReporteModal } from "@/components/reportes/reporte-modal"
 import { ConfirmarEliminar } from "./confirmar-eliminar"
 import { EstadoBadge } from "./estado-badge"
@@ -57,6 +55,8 @@ export default function UsuariosTab() {
   const [busqueda, setBusqueda] = useState("")
   const [filtroRolTabla, setFiltroRolTabla] = useState("")
   const [filtroEstado, setFiltroEstado] = useState("")
+  const [reporteRol, setReporteRol] = useState("")
+  const [reporteEstado, setReporteEstado] = useState("")
   const busquedaDebounced = useDebouncedValue(busqueda, 400)
 
   const filtros = useMemo(
@@ -119,22 +119,18 @@ export default function UsuariosTab() {
   }
 
   async function handleDescargarReporte(
-    formato: "pdf" | "excel" | "csv",
+    formato: FormatoReporte,
     inicio: string,
-    fin: string
+    fin: string,
+    filtros: Record<string, string>,
+    contexto: { colegio: string; filtros: string[] }
   ) {
-    const datos = await reportesApi.usuarios(inicio, fin, {
-      q: busqueda.trim() || undefined,
-      idRol: filtroRolTabla ? Number(filtroRolTabla) : undefined,
-      idAcceso: filtroEstado ? Number(filtroEstado) : undefined,
-    })
+    const datos = await reportesApi.usuarios(inicio, fin, filtros)
     if (datos.length === 0) {
       toast.warning("No hay usuarios en el rango y filtros seleccionados")
       return
     }
-    if (formato === "pdf") generarPdfUsuarios({ datos, inicio, fin })
-    else if (formato === "excel") generarExcelUsuarios({ datos, inicio, fin })
-    else generarCsvUsuarios({ datos, inicio, fin })
+    descargarTabla(formato, tablaUsuarios(datos, { inicio, fin, ...contexto }))
     toast.success(`Reporte ${formato.toUpperCase()} generado (${datos.length} registros)`)
   }
 
@@ -169,7 +165,11 @@ export default function UsuariosTab() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {puedeExportar && (
-              <Button variant="outline" size="sm" onClick={() => setReporteOpen(true)}>
+              <Button variant="outline" size="sm" onClick={() => {
+                setReporteRol(filtroRolTabla)
+                setReporteEstado(filtroEstado)
+                setReporteOpen(true)
+              }}>
                 <FileDown data-icon="inline-start" />
                 Generar reporte
               </Button>
@@ -378,7 +378,12 @@ export default function UsuariosTab() {
           onOpenChange={setReporteOpen}
           titulo="Reporte de usuarios"
           descripcion="Descarga el listado de usuarios del rango en PDF, Excel o CSV."
-          presets={["ultimos_7", "este_mes", "personalizado"]}
+          presets={["todo", "ultimos_7", "este_mes", "personalizado"]}
+          etiquetaTodo="Todos los usuarios"
+          filtros={[
+            { id: "idRol", label: "Rol", opciones: opcionesRol, valor: reporteRol, onChange: setReporteRol },
+            { id: "idAcceso", label: "Estado", opciones: ESTADO_OPCIONES, valor: reporteEstado, onChange: setReporteEstado },
+          ]}
           onDescargar={handleDescargarReporte}
         />
         </CardContent>

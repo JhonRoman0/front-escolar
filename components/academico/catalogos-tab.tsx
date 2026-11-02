@@ -80,7 +80,8 @@ import type {
   AulaResponse,
   TurnoResponse,
 } from "@/lib/api/academico"
-import { ACCESO, ESTADO_ANIO, horaCorta, TIPOS_AULA, type TipoAula } from "@/lib/api/academico"
+import { ACCESO, anioParaFiltro, ESTADO_ANIO, estadoAnioTexto, horaCorta, TIPOS_AULA, type SeccionDelAula, type TipoAula } from "@/lib/api/academico"
+import { cn } from "@/lib/utils"
 import { type TurnoFranja } from "@/lib/turnos"
 import { ConfiguracionAcademicaTab } from "./configuracion-academica-tab"
 import { fechaHoyISO, rangoLectivo } from "@/lib/fechas"
@@ -98,6 +99,7 @@ import {
 } from "@/lib/schemas/academico"
 import { usePuede } from "@/hooks/use-permisos"
 import { SeccionesEstructura } from "./secciones-estructura"
+import { tonoDe } from "./secciones-por-nivel"
 import { OrdenGradosTab } from "./orden-grados-tab"
 
 interface CatalogosTabProps {
@@ -211,29 +213,35 @@ function BadgeTipoAula({ tipo }: { tipo: TipoAula }) {
 }
 
 /** "3 años B – Mañana 2026" → sección resaltada y turno y año en gris. */
-function SeccionesDelSalon({ secciones }: { secciones: string[] }) {
+/** Etiqueta con el color del nivel, como en Secciones y Orden de grados. */
+function SeccionesDelSalon({ secciones, conAnio = false, className }: { secciones: SeccionDelAula[]; conAnio?: boolean; className?: string }) {
   return (
-    <div className="flex flex-wrap gap-1.5">
-      {secciones.map((s) => {
-        const [seccion, turnoAnio] = s.split(" – ")
-        return (
-          <Badge key={s} variant="outline" className="h-auto gap-1.5 py-0.5 font-normal">
-            <span className="font-medium">{seccion}</span>
-            {turnoAnio && <span className="text-muted-foreground">{turnoAnio}</span>}
+    <div className={cn("flex flex-wrap items-center gap-x-3 gap-y-1.5", className)}>
+      {secciones.map((s) => (
+        <span key={`${s.idAnio}-${s.nivel}-${s.grado}-${s.seccion}-${s.turno}`} className="inline-flex items-center gap-1.5">
+          <Badge
+            variant="outline"
+            className={cn("h-6 rounded-full px-2.5 text-[12px] font-semibold ring-1 ring-inset", tonoDe(s.nivel).badge)}
+          >
+            {s.nivel} {s.grado} {s.seccion}
           </Badge>
-        )
-      })}
+          <span className="text-xs text-muted-foreground">
+            {s.turno}{conAnio ? ` ${s.anio}` : ""}
+          </span>
+        </span>
+      ))}
     </div>
   )
 }
 
-/** Quién usa el aula: las secciones de un salón, o para qué sirve un ambiente. */
-function UsoAula({ aula }: { aula: AulaResponse }) {
+/** Quién usa el aula en el año elegido: las secciones de un salón, o para qué sirve un ambiente. */
+function UsoAula({ aula, anio }: { aula: AulaResponse; anio?: AnioEscolarResponse }) {
   if (aula.tipo === "SALON") {
-    return aula.secciones.length ? (
-      <SeccionesDelSalon secciones={aula.secciones} />
+    const delAnio = aula.secciones.filter((s) => s.idAnio === anio?.idAnio)
+    return delAnio.length ? (
+      <SeccionesDelSalon secciones={delAnio} className="justify-center" />
     ) : (
-      <span className="text-xs text-muted-foreground">Libre: sin sección asignada</span>
+      <span className="text-xs text-muted-foreground">{anio ? `Libre en ${anio.anio}` : "Libre"}</span>
     )
   }
   return (
@@ -257,11 +265,16 @@ function AulasTab() {
   const puedeEliminar = usePuede("AULAS", "ELIMINAR")
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editando, setEditando] = useState<AulaResponse | null>(null)
+  const { data: anios = [] } = useAniosEscolares()
+  const [idAnioElegido, setIdAnioElegido] = useState<number | null>(null)
+  const anioFiltro = anios.find((a) => a.idAnio === idAnioElegido) ?? anioParaFiltro(anios)
 
   // "" = "Todos los estados". El filtro es local sobre los datos ya cargados.
   const [estadoFiltro, setEstadoFiltro] = useState("")
+  const [tipoFiltro, setTipoFiltro] = useState("")
   const aulasFiltradas = (data ?? [])
     .filter((aula) => estadoFiltro === "" || String(aula.accesoId) === estadoFiltro)
+    .filter((aula) => tipoFiltro === "" || aula.tipo === tipoFiltro)
     .sort((a, b) => b.idAula - a.idAula)
 
   // Los nombres ya registrados, sin incluir el que se está editando: el schema
@@ -303,6 +316,21 @@ function AulasTab() {
         />
         <div className="flex flex-wrap items-center gap-3">
           <FilterSelect
+            value={anioFiltro ? String(anioFiltro.idAnio) : ""}
+            onValueChange={(valor) => setIdAnioElegido(Number(valor))}
+            options={[...anios]
+              .sort((a, b) => b.anio.localeCompare(a.anio))
+              .map((a) => ({ value: String(a.idAnio), label: `${a.anio} · ${estadoAnioTexto(a.estado)}` }))}
+            includeAll={false}
+          />
+          <FilterSelect
+            value={tipoFiltro}
+            onValueChange={setTipoFiltro}
+            options={TIPOS_AULA.map((t) => ({ value: t.value, label: t.label }))}
+            allLabel="Todos los tipos"
+            className="w-[180px] max-w-full shrink-0"
+          />
+          <FilterSelect
             value={estadoFiltro}
             onValueChange={setEstadoFiltro}
             options={[
@@ -320,7 +348,7 @@ function AulasTab() {
                 <TableHead>Aula</TableHead>
                 <TableHead className="text-center">Tipo</TableHead>
                 <TableHead className="text-center">Capacidad</TableHead>
-                <TableHead>Uso</TableHead>
+                <TableHead className="text-center">Uso</TableHead>
                 <TableHead className="text-center">Estado</TableHead>
                 <TableHead className="text-center">Acciones</TableHead>
               </TableRow>
@@ -345,8 +373,8 @@ function AulasTab() {
                       <BadgeTipoAula tipo={aula.tipo} />
                     </TableCell>
                     <TableCell className="text-center">{aula.capacidad ?? "—"}</TableCell>
-                    <TableCell>
-                      <UsoAula aula={aula} />
+                    <TableCell className="text-center">
+                      <UsoAula aula={aula} anio={anioFiltro} />
                     </TableCell>
                     <TableCell className="text-center">
                       <EstadoBadge accesoId={aula.accesoId} />
@@ -1308,7 +1336,7 @@ function AulaDialog({
                           <p className="text-xs text-muted-foreground">
                             {aula.nombre} es el salón de {aula.secciones.length === 1 ? "esta sección" : "estas secciones"}. Para cambiar su tipo, primero asígnales otro salón en Secciones.
                           </p>
-                          <SeccionesDelSalon secciones={aula.secciones} />
+                          <SeccionesDelSalon secciones={aula.secciones} conAnio />
                         </div>
                       </div>
                     )}

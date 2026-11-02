@@ -47,46 +47,63 @@ export interface NotaReporteItem {
   docente: string
 }
 
-// ≡ GET /matriculas/reporte?inicio=&fin=&idAnio?=&idGradoSeccion? → List.
+// ≡ GET /matriculas/reporte?inicio?=&fin?=&idAnio?=&idNivel?=&idGrado?=&idGradoSeccion?=&idAcceso? → List.
 export interface MatriculaReporteItem {
   idMatricula: number
   alumno: string
   codigo: string
+  documentoIdentidad: string | null
+  anio: string
+  nivel: string
   gradoSeccion: string
+  turno: string
   fechaRegistro: string
   fechaPago: string | null
+  metodoPago: string
+  monto: number | null
   montoPago: number | null
+  saldo: number | null
   registradoPor: string
+  estado: string
 }
 
-// ≡ GET /alumnos/reporte?inicio=&fin=&idGradoSeccion? → List.
+// ≡ GET /alumnos/reporte?idAnio=&idNivel?=&idGrado?=&idGradoSeccion? → List.
 export interface AlumnoReporteItem {
   codigo: string
   nombre: string
   documentoIdentidad: string | null
   fechaNacimiento: string | null
-  fechaIngreso: string
+  fechaIngreso: string | null
+  anio: string
+  nivel: string
   gradoSeccion: string
-  apoderado: string
+  turno: string
+  // null: quien descarga no tiene el permiso de apoderados.
+  apoderados: string[] | null
 }
 
-// ≡ GET /docentes/reporte?inicio=&fin=&tipoContratoId? → List.
+// ≡ GET /docentes/reporte?inicio?=&fin?=&tipoContratoId?=&idNivel?=&idAcceso? → List.
 export interface DocenteReporteItem {
   codigo: string
   nombre: string
   documentoIdentidad: string | null
+  gmail: string | null
+  celular: string | null
+  estado: string
   gradoAcademico: string | null
   tipoContrato: string | null
   niveles: string[]
   fechaContratacion: string | null
 }
 
-// ≡ GET /usuarios/reporte?inicio=&fin=&idRol? → List.
+// ≡ GET /usuarios/reporte?inicio?=&fin?=&idRol?=&idAcceso? → List.
 export interface UsuarioReporteItem {
   codigo: string
   nombre: string
   documentoIdentidad: string | null
   gmail: string | null
+  celular: string | null
+  estado: string
   fechaCreacion: string
   roles: string[]
 }
@@ -113,6 +130,11 @@ async function fetchPaginas<T>(
 function rango(inicio: string, fin: string): URLSearchParams {
   // Recomendación del back: NUNCA depender de los defaults (traen desde 2000).
   return new URLSearchParams({ inicio, fin })
+}
+
+/** Rango opcional ("" = sin límite) más los filtros elegidos en el modal. */
+function consulta(inicio: string, fin: string, filtros: Record<string, string>): string {
+  return new URLSearchParams({ ...(inicio && fin ? { inicio, fin } : {}), ...filtros }).toString()
 }
 
 export const reportesApi = {
@@ -172,55 +194,28 @@ export const reportesApi = {
   async matriculas(
     inicio: string,
     fin: string,
-    filtros?: { idAnio?: number; idGradoSeccion?: number }
+    filtros: Record<string, string> = {}
   ): Promise<MatriculaReporteItem[]> {
-    const params = rango(inicio, fin)
-    if (filtros?.idAnio != null) params.set("idAnio", String(filtros.idAnio))
-    if (filtros?.idGradoSeccion != null)
-      params.set("idGradoSeccion", String(filtros.idGradoSeccion))
-    return apiFetch<MatriculaReporteItem[]>(
-      `/matriculas/reporte?${params.toString()}`
-    )
+    return apiFetch<MatriculaReporteItem[]>(`/matriculas/reporte?${consulta(inicio, fin, filtros)}`)
   },
 
-  async alumnos(
-    inicio: string,
-    fin: string,
-    filtros?: { idGradoSeccion?: number }
-  ): Promise<AlumnoReporteItem[]> {
-    const params = rango(inicio, fin)
-    if (filtros?.idGradoSeccion != null)
-      params.set("idGradoSeccion", String(filtros.idGradoSeccion))
-    return apiFetch<AlumnoReporteItem[]>(
-      `/alumnos/reporte?${params.toString()}`
-    )
+  async alumnos(filtros: Record<string, string> = {}): Promise<AlumnoReporteItem[]> {
+    return apiFetch<AlumnoReporteItem[]>(`/alumnos/reporte?${consulta("", "", filtros)}`)
   },
 
   async docentes(
     inicio: string,
     fin: string,
-    filtros?: { tipoContratoId?: number }
+    filtros: Record<string, string> = {}
   ): Promise<DocenteReporteItem[]> {
-    const params = rango(inicio, fin)
-    if (filtros?.tipoContratoId != null)
-      params.set("tipoContratoId", String(filtros.tipoContratoId))
-    return apiFetch<DocenteReporteItem[]>(
-      `/docentes/reporte?${params.toString()}`
-    )
+    return apiFetch<DocenteReporteItem[]>(`/docentes/reporte?${consulta(inicio, fin, filtros)}`)
   },
 
   async usuarios(
     inicio: string,
     fin: string,
-    filtros?: { q?: string; idRol?: number; idAcceso?: number }
+    filtros: Record<string, string> = {}
   ): Promise<UsuarioReporteItem[]> {
-    const params = rango(inicio, fin)
-    if (filtros?.q) params.set("q", filtros.q)
-    if (filtros?.idRol != null) params.set("idRol", String(filtros.idRol))
-    if (filtros?.idAcceso != null)
-      params.set("idAcceso", String(filtros.idAcceso))
-    return apiFetch<UsuarioReporteItem[]>(
-      `/usuarios/reporte?${params.toString()}`
-    )
+    return apiFetch<UsuarioReporteItem[]>(`/usuarios/reporte?${consulta(inicio, fin, filtros)}`)
   },
 }
