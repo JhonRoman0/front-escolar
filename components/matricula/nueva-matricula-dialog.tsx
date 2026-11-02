@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 
 import { Stepper } from "@/components/shared/stepper"
 import { useCrudMatriculas } from "@/hooks/use-matricula"
-import type { ApoderadoBusqueda, InscripcionApoderado, InscripcionRequest } from "@/lib/api/matricula"
+import type { ApoderadoBusqueda, InscripcionApoderado, InscripcionRequest, MatriculaResponse } from "@/lib/api/matricula"
 import type { ApoderadoPasoValues } from "@/lib/schemas/matricula"
 
 import { PasoAlumno, type AlumnoPaso } from "./paso-alumno"
@@ -62,9 +62,11 @@ function aRequest(alumno: AlumnoPaso, apoderados: ApoderadoPasoValues[]): Inscri
 export function NuevaMatriculaDialog({
   open,
   onOpenChange,
+  onCreada,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
+  onCreada?: (matricula: MatriculaResponse) => void
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -73,13 +75,13 @@ export function NuevaMatriculaDialog({
           <DialogTitle className="text-lg font-semibold tracking-tight">Nueva matrícula</DialogTitle>
         </DialogHeader>
         {/* Se monta al abrir: cada apertura empieza desde el paso 1 limpio. */}
-        {open && <Asistente onCerrar={() => onOpenChange(false)} />}
+        {open && <Asistente onCerrar={() => onOpenChange(false)} onCreada={onCreada} />}
       </DialogContent>
     </Dialog>
   )
 }
 
-function Asistente({ onCerrar }: { onCerrar: () => void }) {
+function Asistente({ onCerrar, onCreada }: { onCerrar: () => void; onCreada?: (matricula: MatriculaResponse) => void }) {
   const crud = useCrudMatriculas()
   const [paso, setPaso] = useState(1)
   const [alumno, setAlumno] = useState<AlumnoPaso | null>(null)
@@ -139,6 +141,7 @@ function Asistente({ onCerrar }: { onCerrar: () => void }) {
           { id: guardando }
         )
       }
+      onCreada?.(creada)
       onCerrar()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo crear la matrícula", { id: guardando })

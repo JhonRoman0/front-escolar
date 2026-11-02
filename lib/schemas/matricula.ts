@@ -51,9 +51,10 @@ export const alumnoPasoDefault: AlumnoPasoValues = {
 // ── Paso 2: apoderados ──────────────────────────────────────────────────
 
 // "" hasta comprobar el DNI en el colegio; el autocompletado externo es opcional.
+// EDICION: la misma persona que ya es apoderado, con todos sus datos editables.
 const apoderadoPasoSchema = z
   .object({
-    estado: z.enum(["", "APODERADO", "USUARIO", "NUEVO"]),
+    estado: z.enum(["", "APODERADO", "USUARIO", "NUEVO", "EDICION"]),
     documentoIdentidad: z.string().regex(REGEX_DNI, MENSAJE_DNI),
     nombre: z.string(),
     apellidoPat: z.string(),

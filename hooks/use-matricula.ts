@@ -17,12 +17,15 @@ const KEYS = {
   apoderados: ["apoderados"] as const,
 }
 
-export function useMatriculas(page: number, size = 10, idAcceso?: number) {
+export function useMatriculas(page: number, size = 10, idAcceso?: number, idAnio?: number, habilitado = true) {
   return useQuery({
-    queryKey: [...KEYS.matriculas, page, size, idAcceso ?? null],
-    queryFn: () => matriculasApi.listar(page, size, idAcceso),
+    queryKey: [...KEYS.matriculas, page, size, idAcceso ?? null, idAnio ?? null],
+    queryFn: () => matriculasApi.listar(page, size, idAcceso, idAnio),
+    enabled: habilitado,
     placeholderData: (previousData, previousQuery) =>
-      previousQuery?.queryKey[3] === (idAcceso ?? null) ? previousData : undefined,
+      previousQuery?.queryKey[3] === (idAcceso ?? null) && previousQuery?.queryKey[4] === (idAnio ?? null)
+        ? previousData
+        : undefined,
   })
 }
 

@@ -19,7 +19,7 @@ import { ConfirmarEliminar } from "@/components/seguridad/confirmar-eliminar"
 import { EstadoBadge } from "@/components/seguridad/estado-badge"
 import { TablaPaginacion } from "@/components/shared/paginacion-tabla"
 import { FilterSelect } from "@/components/shared/filter-select"
-import { ACCESO, OPCIONES_ESTADO_ACCESO } from "@/lib/api/academico"
+import { ACCESO, anioParaFiltro, estadoAnioTexto, OPCIONES_ESTADO_ACCESO } from "@/lib/api/academico"
 import {
   FilasCargando,
   MensajeSinDatos,
@@ -45,17 +45,22 @@ const TAMANIO_PAGINA = 10
 export function MatriculasTab() {
   const [page, setPage] = useState(0)
   const [filtroEstado, setFiltroEstado] = useState("")
-  const { data, isLoading, isError, refetch } = useMatriculas(
+  const [idAnioElegido, setIdAnioElegido] = useState<number | null>(null)
+  const { data: aniosEscolares = [], isLoading: cargandoAnios } = useAniosEscolares()
+  const idAnio = idAnioElegido ?? anioParaFiltro(aniosEscolares)?.idAnio
+  const { data, isLoading: cargandoMatriculas, isError, refetch } = useMatriculas(
     page,
     TAMANIO_PAGINA,
-    filtroEstado ? Number(filtroEstado) : undefined
+    filtroEstado ? Number(filtroEstado) : undefined,
+    idAnio,
+    idAnio != null
   )
+  const isLoading = cargandoAnios || cargandoMatriculas
   const crud = useCrudMatriculas()
   const puedeCrear = usePuede("MATRICULAS", "CREAR")
   const puedeActualizar = usePuede("MATRICULAS", "ACTUALIZAR")
   const puedeEliminar = usePuede("MATRICULAS", "ELIMINAR")
   const puedeExportar = usePuede("MATRICULAS", "IMPRIMIR_EXPORTAR")
-  const { data: aniosEscolares = [] } = useAniosEscolares()
 
   const [nuevaOpen, setNuevaOpen] = useState(false)
   const [editando, setEditando] = useState<MatriculaResponse | null>(null)
@@ -124,6 +129,18 @@ export function MatriculasTab() {
               <p className="text-[14px] leading-5 text-muted-foreground">Alumnos matriculados por año escolar y sección.</p>
             </div>
             <div className="flex max-w-full flex-wrap items-center gap-3">
+              <FilterSelect
+                value={idAnio ? String(idAnio) : ""}
+                onValueChange={(valor) => {
+                  setIdAnioElegido(Number(valor))
+                  setPage(0)
+                }}
+                options={[...aniosEscolares]
+                  .sort((a, b) => b.anio.localeCompare(a.anio))
+                  .map((a) => ({ value: String(a.idAnio), label: `${a.anio} · ${estadoAnioTexto(a.estado)}` }))}
+                includeAll={false}
+                className="w-[180px] max-w-full shrink-0"
+              />
               <FilterSelect
                 value={filtroEstado}
                 onValueChange={cambiarEstadoFiltro}
@@ -263,7 +280,16 @@ export function MatriculasTab() {
 
           {!!data?.totalPages && data.totalPages > 1 && <TablaPaginacion data={data} onPage={setPage} />}
 
-          <NuevaMatriculaDialog open={nuevaOpen} onOpenChange={setNuevaOpen} />
+          <NuevaMatriculaDialog
+            open={nuevaOpen}
+            onOpenChange={setNuevaOpen}
+            onCreada={(matricula) => {
+              // Muestra la matrícula recién creada aunque sea de otro año o estado.
+              setIdAnioElegido(matricula.idAnio)
+              setFiltroEstado("")
+              setPage(0)
+            }}
+          />
           <EditarMatriculaDialog
             matricula={editando}
             open={!!editando}

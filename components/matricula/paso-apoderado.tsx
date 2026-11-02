@@ -115,10 +115,15 @@ export function FormularioApoderado({
   form,
   indice,
   idAlumno,
+  original,
+  onCambiarCorreo,
 }: {
   form: UseFormReturn<ApoderadosPasoValues>
   indice: number
   idAlumno: number | null
+  /** Al editar: la persona actual, a la que se vuelve si se escribe de nuevo su DNI. */
+  original?: ApoderadoPasoValues
+  onCambiarCorreo?: (anterior: string, nuevo: string) => void
 }) {
   const buscar = useBuscarApoderadoInscripcion()
   const consultarDni = useConsultarDni()
@@ -249,7 +254,7 @@ export function FormularioApoderado({
     setConsultando(false)
     setAvisoConsulta("")
     // Otro DNI es otra persona: hay que volver a buscarlo.
-    form.setValue(base, { ...apoderadoPasoDefault, documentoIdentidad: dni })
+    form.setValue(base, dni === original?.documentoIdentidad ? original : { ...apoderadoPasoDefault, documentoIdentidad: dni })
     form.clearErrors(base)
   }
 
@@ -280,7 +285,7 @@ export function FormularioApoderado({
         )}
       />
 
-      <p role="status" className="text-xs text-muted-foreground">
+      {estado !== "EDICION" && <p role="status" className="text-xs text-muted-foreground">
         {comprobando
           ? "Comprobando el DNI en la base del colegio. Puedes seguir llenando los campos."
           : estado === "NUEVO"
@@ -288,7 +293,7 @@ export function FormularioApoderado({
             : estado === ""
               ? "Al salir del DNI se comprobará si ya existe en el colegio. Esta comprobación es necesaria para continuar; la consulta de datos es opcional."
               : "Se reutilizarán los datos registrados en el colegio; no se creará una persona duplicada."}
-      </p>
+      </p>}
       {avisoConsulta && <p role="status" className="text-xs text-muted-foreground">{avisoConsulta}</p>}
 
       {yaEsApoderado && (
@@ -447,8 +452,18 @@ export function FormularioApoderado({
                   <Field>
                     <FieldLabel>Correo electrónico *</FieldLabel>
                     <FieldContent>
-                      <Input type="email" placeholder="apoderado@correo.com" {...field} />
-                      <FieldDescription className="text-xs">Aquí le llegarán sus accesos. La contraseña se genera sola y se pedirá cambiarla al ingresar.</FieldDescription>
+                      <Input
+                        type="email"
+                        placeholder="apoderado@correo.com"
+                        {...field}
+                        onChange={(e) => {
+                          onCambiarCorreo?.(field.value, e.target.value)
+                          field.onChange(e)
+                        }}
+                      />
+                      {estado !== "EDICION" && (
+                        <FieldDescription className="text-xs">Aquí le llegarán sus accesos. La contraseña se genera sola y se pedirá cambiarla al ingresar.</FieldDescription>
+                      )}
                       <FieldError errors={[errores?.gmail]} />
                     </FieldContent>
                   </Field>
@@ -461,7 +476,7 @@ export function FormularioApoderado({
   )
 }
 
-function Aviso({
+export function Aviso({
   icono: Icono,
   titulo,
   children,

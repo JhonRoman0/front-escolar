@@ -151,6 +151,15 @@ export const apoderadosApi = {
       body: JSON.stringify(data),
     })
   },
+  async quitar(id: number, idAlumno: number): Promise<void> {
+    return apiFetch<void>(`/apoderados/${id}?idAlumno=${idAlumno}`, { method: "DELETE" })
+  },
+  async reemplazar(id: number, idAlumno: number, data: InscripcionApoderado): Promise<ApoderadoResponse> {
+    return apiFetch<ApoderadoResponse>(`/apoderados/${id}/reemplazar?idAlumno=${idAlumno}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    })
+  },
   async actualizar(id: number, data: ApoderadoEdicionRequest): Promise<ApoderadoResponse> {
     return apiFetch<ApoderadoResponse>(`/apoderados/${id}`, {
       method: "PUT",

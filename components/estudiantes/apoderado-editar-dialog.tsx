@@ -1,49 +1,27 @@
 "use client"
 
+import { useState } from "react"
 import { toast } from "sonner"
+import { Loader2, UserMinus } from "lucide-react"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { Controller, useForm } from "react-hook-form"
-import { z } from "zod"
+import { useForm, useWatch } from "react-hook-form"
 
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Field, FieldContent, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
-import { BotonGuardar } from "@/components/shared/boton-guardar"
+import { aApoderadoRequest } from "@/components/matricula/nueva-matricula-dialog"
+import { Aviso, FormularioApoderado } from "@/components/matricula/paso-apoderado"
 import { casillaTrasCambiarCorreo, CampoRestablecerContrasena } from "@/components/shared/campo-restablecer-contrasena"
-import { CamposNombres } from "@/components/shared/campos-nombres"
-import { useActualizarApoderado } from "@/hooks/use-estudiantes"
-import { useParentescos, useSexos } from "@/hooks/use-pagos"
+import { useActualizarApoderado, useHijosDeApoderado, useReemplazarApoderado } from "@/hooks/use-estudiantes"
 import type { AlumnoResponse, ApoderadoResponse } from "@/lib/api/estudiantes"
-import {
-  MENSAJE_DNI,
-  MENSAJE_SOLO_LETRAS_Y_ESPACIOS,
-  REGEX_DNI,
-  REGEX_SOLO_LETRAS_Y_ESPACIOS,
-  emailRequerido,
-} from "@/lib/schemas/comun"
+import { apoderadoPasoDefault, apoderadosPasoSchema, type ApoderadoPasoValues, type ApoderadosPasoValues } from "@/lib/schemas/matricula"
 
-const nombre = (campo: string) =>
-  z.string().trim().min(1, `${campo} es obligatorio`).max(30).regex(REGEX_SOLO_LETRAS_Y_ESPACIOS, MENSAJE_SOLO_LETRAS_Y_ESPACIOS)
+const SIN_ACCESOS = "Datos guardados, pero no se pudo enviar el correo"
 
-const apoderadoSchema = z.object({
-  documentoIdentidad: z.string().regex(REGEX_DNI, MENSAJE_DNI),
-  nombre: nombre("El nombre"),
-  apellidoPat: nombre("El apellido paterno"),
-  apellidoMat: nombre("El apellido materno"),
-  fechaNaci: z.string().min(1, "La fecha de nacimiento es obligatoria"),
-  sexo: z.string().min(1, "Selecciona el sexo"),
-  direccion: z.string().trim().min(1, "La dirección es obligatoria").max(120),
-  celular: z.string().regex(/^\d{9}$/, "El celular debe tener 9 dígitos"),
-  gmail: emailRequerido,
-  idParentesco: z.number().int().min(1, "Selecciona el parentesco"),
-  restablecerContrasena: z.boolean(),
-})
-type ApoderadoValues = z.infer<typeof apoderadoSchema>
-
-/** Todo obligatorio. El parentesco es el que tiene con el alumno desde el que se edita. */
+/**
+ * Mismo formulario que al agregar. Con su DNI se corrigen sus datos; con otro DNI
+ * esa persona lo reemplaza como apoderado de este alumno.
+ */
 export function ApoderadoEditarDialog({
   alumno,
   apoderado,
@@ -67,6 +45,23 @@ export function ApoderadoEditarDialog({
   )
 }
 
+function valoresOriginales(apoderado: ApoderadoResponse): ApoderadoPasoValues {
+  return {
+    ...apoderadoPasoDefault,
+    estado: "EDICION",
+    documentoIdentidad: apoderado.documentoIdentidad ?? "",
+    nombre: apoderado.nombre,
+    apellidoPat: apoderado.apellidoPat,
+    apellidoMat: apoderado.apellidoMat,
+    fechaNaci: apoderado.fechaNaci ?? "",
+    sexo: apoderado.sexo ?? "",
+    direccion: apoderado.direccion ?? "",
+    idParentesco: apoderado.idParentesco ?? 0,
+    celular: apoderado.celular ?? "",
+    gmail: apoderado.gmail ?? "",
+  }
+}
+
 function Formulario({
   alumno,
   apoderado,
@@ -77,188 +72,113 @@ function Formulario({
   onCerrar: () => void
 }) {
   const actualizar = useActualizarApoderado()
-  const { data: parentescos = [] } = useParentescos()
-  const { data: sexos = [] } = useSexos()
-  const form = useForm<ApoderadoValues>({
-    resolver: zodResolver(apoderadoSchema),
-    defaultValues: {
-      documentoIdentidad: apoderado.documentoIdentidad ?? "",
-      nombre: apoderado.nombre,
-      apellidoPat: apoderado.apellidoPat,
-      apellidoMat: apoderado.apellidoMat,
-      fechaNaci: apoderado.fechaNaci ?? "",
-      sexo: apoderado.sexo ?? "",
-      direccion: apoderado.direccion ?? "",
-      celular: apoderado.celular ?? "",
-      gmail: apoderado.gmail ?? "",
-      idParentesco: apoderado.idParentesco ?? 0,
-      restablecerContrasena: false,
-    },
+  const reemplazar = useReemplazarApoderado()
+  const [original] = useState(() => valoresOriginales(apoderado))
+  const [restablecer, setRestablecer] = useState(false)
+  const form = useForm<ApoderadosPasoValues>({
+    resolver: zodResolver(apoderadosPasoSchema),
+    defaultValues: { apoderados: [original] },
   })
-  const errores = form.formState.errors
+  const estado = useWatch({ control: form.control, name: "apoderados.0.estado" })
+  const esReemplazo = estado !== "EDICION"
+  const enviando = actualizar.isPending || reemplazar.isPending
 
-  async function onSubmit(values: ApoderadoValues) {
-    try {
-      const actualizado = await actualizar.mutateAsync({
-        id: apoderado.idApoderado,
-        data: { ...values, gmail: values.gmail.trim(), direccion: values.direccion.trim(), idAlumno: alumno.idAlumno },
+  // Sus hijos deciden qué pasa con su cuenta si sale; se avisa antes de guardar.
+  const hijos = useHijosDeApoderado(apoderado.documentoIdentidad, alumno.idAlumno)
+  const sinOtrosHijos = !!hijos && hijos.length <= 1
+
+  function handleCambiarCorreo(anterior: string, nuevo: string) {
+    const marcar = casillaTrasCambiarCorreo(anterior, nuevo, apoderado.gmail)
+    if (marcar !== null) setRestablecer(marcar)
+  }
+
+  const handleGuardar = form.handleSubmit(async ({ apoderados: [valores] }) => {
+    const dni = valores.documentoIdentidad
+    const otroApoderado = alumno.apoderados.some(
+      (a) => a.idApoderado !== apoderado.idApoderado && a.documentoIdentidad === dni
+    )
+    if (dni === alumno.documentoIdentidad || otroApoderado) {
+      form.setError("apoderados.0.documentoIdentidad", {
+        message: otroApoderado ? "Ese DNI ya es apoderado de este alumno" : "No puede ser el DNI del alumno",
       })
-      if (actualizado.credencialesEnviadas === false) {
-        toast.warning("Datos guardados, pero no se pudo enviar el correo: la contraseña no se cambió.")
+      return
+    }
+    try {
+      if (valores.estado === "EDICION") {
+        const actualizado = await actualizar.mutateAsync({
+          id: apoderado.idApoderado,
+          data: {
+            documentoIdentidad: dni,
+            nombre: valores.nombre.trim(),
+            apellidoPat: valores.apellidoPat.trim(),
+            apellidoMat: valores.apellidoMat.trim(),
+            fechaNaci: valores.fechaNaci,
+            sexo: valores.sexo,
+            direccion: valores.direccion.trim(),
+            celular: valores.celular,
+            gmail: valores.gmail.trim(),
+            restablecerContrasena: restablecer,
+            idAlumno: alumno.idAlumno,
+            idParentesco: valores.idParentesco,
+          },
+        })
+        if (actualizado.credencialesEnviadas === false) {
+          toast.warning(`${SIN_ACCESOS}: la contraseña no se cambió.`)
+        } else {
+          toast.success(
+            actualizado.credencialesEnviadas
+              ? `Apoderado actualizado. Se envió una contraseña nueva a ${valores.gmail.trim()}`
+              : "Apoderado actualizado"
+          )
+        }
       } else {
-        toast.success(
-          actualizado.credencialesEnviadas
-            ? `Apoderado actualizado. Se envió una contraseña nueva a ${values.gmail.trim()}`
-            : "Apoderado actualizado"
-        )
+        const reemplazado = await reemplazar.mutateAsync({
+          id: apoderado.idApoderado,
+          idAlumno: alumno.idAlumno,
+          data: aApoderadoRequest(valores),
+        })
+        if (reemplazado.credencialesEnviadas === false) {
+          toast.warning(`${SIN_ACCESOS} con sus accesos. Revisa su correo y marca Restablecer al editarlo.`)
+        } else {
+          toast.success(
+            reemplazado.credencialesEnviadas
+              ? `Apoderado reemplazado. Sus accesos se enviaron a ${valores.gmail.trim()}`
+              : "Apoderado reemplazado"
+          )
+        }
       }
       onCerrar()
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "No se pudo actualizar el apoderado")
+      toast.error(error instanceof Error ? error.message : "No se pudo guardar el apoderado")
     }
-  }
+  })
 
   return (
-    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5" noValidate>
-      <FieldGroup>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Controller
-            control={form.control}
-            name="documentoIdentidad"
-            render={({ field }) => (
-              <Field>
-                <FieldLabel>DNI *</FieldLabel>
-                <FieldContent>
-                  <Input maxLength={8} inputMode="numeric" {...field} onChange={(e) => field.onChange(e.target.value.replace(/\D/g, ""))} />
-                  <FieldError errors={[errores.documentoIdentidad]} />
-                </FieldContent>
-              </Field>
-            )}
-          />
-          <Controller
-            control={form.control}
-            name="fechaNaci"
-            render={({ field }) => (
-              <Field>
-                <FieldLabel>Fecha de nacimiento *</FieldLabel>
-                <FieldContent>
-                  <Input type="date" {...field} />
-                  <FieldError errors={[errores.fechaNaci]} />
-                </FieldContent>
-              </Field>
-            )}
-          />
-        </div>
-        <CamposNombres control={form.control} errors={errores} />
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Controller
-            control={form.control}
-            name="sexo"
-            render={({ field }) => (
-              <Field>
-                <FieldLabel>Sexo *</FieldLabel>
-                <FieldContent>
-                  <Select value={field.value} onValueChange={(v) => field.onChange(v ?? "")}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Selecciona">{sexos.find((s) => s.valor === field.value)?.nombre}</SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        {sexos.map((s) => (
-                          <SelectItem key={s.valor} value={s.valor}>{s.nombre}</SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                  <FieldError errors={[errores.sexo]} />
-                </FieldContent>
-              </Field>
-            )}
-          />
-          <Controller
-            control={form.control}
-            name="idParentesco"
-            render={({ field }) => (
-              <Field>
-                <FieldLabel>Parentesco con {alumno.nombre} *</FieldLabel>
-                <FieldContent>
-                  <Select value={field.value ? String(field.value) : ""} onValueChange={(v) => field.onChange(Number(v))}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Selecciona">{parentescos.find((p) => p.idParentesco === field.value)?.nombre}</SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        {parentescos.map((p) => (
-                          <SelectItem key={p.idParentesco} value={String(p.idParentesco)}>{p.nombre}</SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                  <FieldError errors={[errores.idParentesco]} />
-                </FieldContent>
-              </Field>
-            )}
-          />
-          <Controller
-            control={form.control}
-            name="celular"
-            render={({ field }) => (
-              <Field>
-                <FieldLabel>Celular *</FieldLabel>
-                <FieldContent>
-                  <Input maxLength={9} inputMode="numeric" {...field} onChange={(e) => field.onChange(e.target.value.replace(/\D/g, ""))} />
-                  <FieldError errors={[errores.celular]} />
-                </FieldContent>
-              </Field>
-            )}
-          />
-          <Controller
-            control={form.control}
-            name="gmail"
-            render={({ field }) => (
-              <Field>
-                <FieldLabel>Correo electrónico *</FieldLabel>
-                <FieldContent>
-                  <Input
-                    type="email"
-                    {...field}
-                    onChange={(e) => {
-                      const marcar = casillaTrasCambiarCorreo(field.value, e.target.value, apoderado.gmail)
-                      if (marcar !== null) form.setValue("restablecerContrasena", marcar)
-                      field.onChange(e)
-                    }}
-                  />
-                  <FieldError errors={[errores.gmail]} />
-                </FieldContent>
-              </Field>
-            )}
-          />
-        </div>
-        <Controller
-          control={form.control}
-          name="direccion"
-          render={({ field }) => (
-            <Field>
-              <FieldLabel>Dirección *</FieldLabel>
-              <FieldContent>
-                <Input maxLength={120} {...field} />
-                <FieldError errors={[errores.direccion]} />
-              </FieldContent>
-            </Field>
-          )}
-        />
-        <Controller
-          control={form.control}
-          name="restablecerContrasena"
-          render={({ field }) => (
-            <CampoRestablecerContrasena checked={field.value} onCheckedChange={field.onChange} />
-          )}
-        />
-      </FieldGroup>
+    <div className="flex flex-col gap-4">
+      <FormularioApoderado
+        form={form}
+        indice={0}
+        idAlumno={alumno.idAlumno}
+        original={original}
+        onCambiarCorreo={handleCambiarCorreo}
+      />
+
+      {!esReemplazo && <CampoRestablecerContrasena checked={restablecer} onCheckedChange={setRestablecer} />}
+
+      {esReemplazo && (
+        <Aviso icono={UserMinus} titulo={`${apoderado.nombre} ${apoderado.apellidoPat} dejará de ser apoderado de este alumno`}>
+          Perderá el acceso a sus datos al guardar.
+          {sinOtrosHijos ? " Como no tiene otros hijos en el colegio, se eliminará su cuenta de apoderado." : ""}
+        </Aviso>
+      )}
+
       <DialogFooter>
         <DialogTrigger render={<Button variant="outline" />}>Cancelar</DialogTrigger>
-        <BotonGuardar etiqueta="Guardar cambios" enviando={actualizar.isPending} />
+        <Button variant="brand" onClick={handleGuardar} disabled={enviando}>
+          {enviando && <Loader2 className="animate-spin" data-icon="inline-start" />}
+          {esReemplazo ? "Reemplazar apoderado" : "Guardar cambios"}
+        </Button>
       </DialogFooter>
-    </form>
+    </div>
   )
 }

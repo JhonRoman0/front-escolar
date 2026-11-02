@@ -32,7 +32,7 @@ import { TablaPaginacion } from "@/components/shared/paginacion-tabla"
 import { FilasCargando, MensajeSinDatos } from "@/components/shared/table-helpers"
 import { useAlumnos } from "@/hooks/use-estudiantes"
 import { useAniosEscolares, useGradosPorNivel, useNiveles, useSeccionesPorGrado, useTurnos } from "@/hooks/use-academico"
-import { ESTADO_ANIO, estadoAnioTexto } from "@/lib/api/academico"
+import { anioParaFiltro, estadoAnioTexto } from "@/lib/api/academico"
 import { usePuede, usePuedeLeer } from "@/hooks/use-permisos"
 import type { AlumnoResponse, ApoderadoResponse } from "@/lib/api/estudiantes"
 import { reportesApi } from "@/lib/api/reportes"
@@ -44,6 +44,7 @@ import { GradoSeccionCascada } from "@/components/shared/grado-seccion-cascada"
 import { AlumnoEditarDialog } from "./alumno-editar-dialog"
 import { ApoderadoAgregarDialog } from "./apoderado-agregar-dialog"
 import { ApoderadoEditarDialog } from "./apoderado-editar-dialog"
+import { BotonQuitarApoderado } from "./boton-quitar-apoderado"
 import { AlumnoQrModal } from "./alumno-qr-modal"
 
 const TAMANIO_PAGINA = 10
@@ -70,8 +71,8 @@ export function AlumnosTab() {
   const [expandedId, setExpandedId] = useState<number | null>(null)
   const [idAnioElegido, setIdAnioElegido] = useState<number | null>(null)
   const { data: anios = [], isLoading: cargandoAnios, isError: errorAnios, refetch: reintentarAnios } = useAniosEscolares()
-  const anioVigente = anios.find((a) => a.estado === ESTADO_ANIO.VIGENTE)
-  const idAnio = idAnioElegido ?? anioVigente?.idAnio ?? null
+  const anioDefecto = anioParaFiltro(anios)
+  const idAnio = idAnioElegido ?? anioDefecto?.idAnio ?? null
   const anioSeleccionado = anios.find((a) => a.idAnio === idAnio)
   const puedeConsultar = !!anioSeleccionado && !errorAnios && !cargandoAnios
 
@@ -138,6 +139,7 @@ export function AlumnosTab() {
   const columnas = puedeVerApoderados ? 10 : 9
   const puedeEditarApoderado = usePuede("APODERADOS", "ACTUALIZAR")
   const puedeAgregarApoderado = usePuede("APODERADOS", "CREAR")
+  const puedeQuitarApoderado = usePuede("APODERADOS", "ELIMINAR")
   const puedeExportar = usePuede("ALUMNOS", "IMPRIMIR_EXPORTAR")
 
   const [editando, setEditando] = useState<AlumnoResponse | null>(null)
@@ -159,7 +161,7 @@ export function AlumnosTab() {
   // Si no hay nivel seleccionado, no mostrar grados (elige nivel primero)
 
   const hayFiltros =
-    idAnio !== (anioVigente?.idAnio ?? null) || busqueda !== "" || idNivel !== null || idGrado !== null || idSeccion !== null || idTurno !== null
+    idAnio !== (anioDefecto?.idAnio ?? null) || busqueda !== "" || idNivel !== null || idGrado !== null || idSeccion !== null || idTurno !== null
 
   function limpiarFiltros() {
     setIdAnioElegido(null)
@@ -485,6 +487,10 @@ export function AlumnosTab() {
                                         >
                                           <Pencil className="size-3.5" />
                                         </Button>
+                                      )}
+                                      {/* Un alumno siempre conserva al menos un apoderado. */}
+                                      {puedeQuitarApoderado && alumno.apoderados.length === 2 && (
+                                        <BotonQuitarApoderado alumno={alumno} apoderado={ap} />
                                       )}
                                     </div>
                                   ))}
