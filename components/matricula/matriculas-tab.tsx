@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useState } from "react"
 import { toast } from "sonner"
 import { FileDown, History, Pencil, Plus, Receipt } from "lucide-react"
 
@@ -29,11 +29,9 @@ import { usePuede } from "@/hooks/use-permisos"
 import { useAniosEscolares } from "@/hooks/use-academico"
 import { ANIO_POR_COMENZAR, type MatriculaResponse } from "@/lib/api/matricula"
 import { reportesApi } from "@/lib/api/reportes"
-import { generarPdfMatriculas } from "@/lib/reportes/generar-pdf"
-import { generarExcelMatriculas } from "@/lib/reportes/generar-excel"
-import { generarCsvMatriculas } from "@/lib/reportes/generar-csv"
+import { descargarTabla, tablaMatriculas, type FormatoReporte } from "@/lib/reportes/tablas"
 import { ReporteModal } from "@/components/reportes/reporte-modal"
-import { GradoSeccionCascada } from "@/components/shared/grado-seccion-cascada"
+import { useFiltrosAcademicos } from "@/components/reportes/use-filtros-academicos"
 import { formatoSoles } from "./campos-pago"
 import { EditarMatriculaDialog } from "./editar-matricula-dialog"
 import { HistorialDialog } from "./historial-dialog"
@@ -67,34 +65,22 @@ export function MatriculasTab() {
   const [pagos, setPagos] = useState<MatriculaResponse | null>(null)
   const [historial, setHistorial] = useState<MatriculaResponse | null>(null)
   const [reporteOpen, setReporteOpen] = useState(false)
-  const [filtroAnio, setFiltroAnio] = useState("")
-  const [filtroGradoSeccion, setFiltroGradoSeccion] = useState<number | null>(null)
-
-  const opcionesAnio = useMemo(
-    () =>
-      aniosEscolares
-        .filter((a) => a.accesoId === 1)
-        .map((a) => ({ value: String(a.idAnio), label: a.anio })),
-    [aniosEscolares]
-  )
+  const filtrosReporte = useFiltrosAcademicos()
+  const [reporteEstado, setReporteEstado] = useState("")
 
   async function handleDescargarReporte(
-    formato: "pdf" | "excel" | "csv",
+    formato: FormatoReporte,
     inicio: string,
     fin: string,
-    filtros: Record<string, string>
+    filtros: Record<string, string>,
+    contexto: { colegio: string; filtros: string[] }
   ) {
-    const datos = await reportesApi.matriculas(inicio, fin, {
-      idAnio: filtros.idAnio ? Number(filtros.idAnio) : undefined,
-      idGradoSeccion: filtroGradoSeccion ?? undefined,
-    })
+    const datos = await reportesApi.matriculas(inicio, fin, filtros)
     if (datos.length === 0) {
       toast.warning("No hay matrículas en el rango y filtros seleccionados")
       return
     }
-    if (formato === "pdf") generarPdfMatriculas({ datos, inicio, fin })
-    else if (formato === "excel") generarExcelMatriculas({ datos, inicio, fin })
-    else generarCsvMatriculas({ datos, inicio, fin })
+    descargarTabla(formato, tablaMatriculas(datos, { inicio, fin, ...contexto }))
     toast.success(`Reporte ${formato.toUpperCase()} generado (${datos.length} registros)`)
   }
 
@@ -149,7 +135,11 @@ export function MatriculasTab() {
                 className="w-[180px] max-w-full shrink-0"
               />
               {puedeExportar && (
-                <Button variant="outline" size="sm" className="h-8 rounded-[8px] border-[#A9A9AA] text-[12px]" onClick={() => setReporteOpen(true)}>
+                <Button variant="outline" size="sm" className="h-8 rounded-[8px] border-[#A9A9AA] text-[12px]" onClick={() => {
+                    filtrosReporte.iniciar({ idAnio: idAnio ?? null })
+                    setReporteEstado(filtroEstado)
+                    setReporteOpen(true)
+                  }}>
                   <FileDown data-icon="inline-start" />
                   Generar reporte
                 </Button>
@@ -318,28 +308,20 @@ export function MatriculasTab() {
             open={reporteOpen}
             onOpenChange={setReporteOpen}
             titulo="Reporte de matrícula"
-            descripcion="Descarga todas las matrículas del rango en PDF, Excel o CSV."
-            presets={["ultimos_7", "este_mes", "personalizado"]}
+            descripcion="Descarga las matrículas del año en PDF, Excel o CSV."
+            presets={["todo", "ultimos_7", "este_mes", "personalizado"]}
+          etiquetaTodo="Todo el año escolar"
             filtros={[
+              ...filtrosReporte.filtros,
               {
-                id: "idAnio",
-                label: "Año escolar",
-                opciones: opcionesAnio,
-                valor: filtroAnio,
-                onChange: setFiltroAnio,
-              },
-              {
-                id: "idGradoSeccion",
-                label: "Grado y sección",
-                opciones: [],
-                valor: "",
-                onChange: () => {},
-                render: () => (
-                  <GradoSeccionCascada
-                    value={filtroGradoSeccion}
-                    onChange={setFiltroGradoSeccion}
-                  />
-                ),
+                id: "idAcceso",
+                label: "Estado",
+                opciones: [
+                  { value: "1", label: "Activa" },
+                  { value: "3", label: "Inactiva" },
+                ],
+                valor: reporteEstado,
+                onChange: setReporteEstado,
               },
             ]}
             onDescargar={handleDescargarReporte}

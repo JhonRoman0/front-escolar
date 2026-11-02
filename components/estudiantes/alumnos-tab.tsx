@@ -36,11 +36,9 @@ import { anioParaFiltro, estadoAnioTexto } from "@/lib/api/academico"
 import { usePuede, usePuedeLeer } from "@/hooks/use-permisos"
 import type { AlumnoResponse, ApoderadoResponse } from "@/lib/api/estudiantes"
 import { reportesApi } from "@/lib/api/reportes"
-import { generarPdfAlumnos } from "@/lib/reportes/generar-pdf"
-import { generarExcelAlumnos } from "@/lib/reportes/generar-excel"
-import { generarCsvAlumnos } from "@/lib/reportes/generar-csv"
+import { descargarTabla, tablaAlumnos, type FormatoReporte } from "@/lib/reportes/tablas"
 import { ReporteModal } from "@/components/reportes/reporte-modal"
-import { GradoSeccionCascada } from "@/components/shared/grado-seccion-cascada"
+import { useFiltrosAcademicos } from "@/components/reportes/use-filtros-academicos"
 import { AlumnoEditarDialog } from "./alumno-editar-dialog"
 import { ApoderadoAgregarDialog } from "./apoderado-agregar-dialog"
 import { ApoderadoEditarDialog } from "./apoderado-editar-dialog"
@@ -147,7 +145,7 @@ export function AlumnosTab() {
   const [apoderadoEditando, setApoderadoEditando] = useState<{ alumno: AlumnoResponse; apoderado: ApoderadoResponse } | null>(null)
   const [qrAlumno, setQrAlumno] = useState<AlumnoResponse | null>(null)
   const [reporteOpen, setReporteOpen] = useState(false)
-  const [filtroGradoSeccion, setFiltroGradoSeccion] = useState<number | null>(null)
+  const filtrosReporte = useFiltrosAcademicos()
 
   const gradosOpciones = idNivel && idAnio
     ? (gradosPorNivel ?? []).filter((g) => g.secciones.some((s) => s.idAnio === idAnio))
@@ -185,20 +183,18 @@ export function AlumnosTab() {
   }, [contenido, busqueda])
 
   async function handleDescargarReporte(
-    formato: "pdf" | "excel" | "csv",
+    formato: FormatoReporte,
     inicio: string,
-    fin: string
+    fin: string,
+    filtros: Record<string, string>,
+    contexto: { colegio: string; filtros: string[] }
   ) {
-    const datos = await reportesApi.alumnos(inicio, fin, {
-      idGradoSeccion: filtroGradoSeccion ?? undefined,
-    })
+    const datos = await reportesApi.alumnos(filtros)
     if (datos.length === 0) {
-      toast.warning("No hay alumnos en el rango y filtros seleccionados")
+      toast.warning("No hay alumnos matriculados con esos filtros")
       return
     }
-    if (formato === "pdf") generarPdfAlumnos({ datos, inicio, fin })
-    else if (formato === "excel") generarExcelAlumnos({ datos, inicio, fin })
-    else generarCsvAlumnos({ datos, inicio, fin })
+    descargarTabla(formato, tablaAlumnos(datos, { inicio, fin, ...contexto }))
     toast.success(`Reporte ${formato.toUpperCase()} generado (${datos.length} registros)`)
   }
 
@@ -217,7 +213,15 @@ export function AlumnosTab() {
             />
           </div>
           {puedeExportar && (
-            <Button variant="outline" size="sm" className="ml-auto h-8 rounded-[8px] border-[#A9A9AA] text-[12px] font-semibold text-[#495057]" onClick={() => setReporteOpen(true)}>
+            <Button variant="outline" size="sm" className="ml-auto h-8 rounded-[8px] border-[#A9A9AA] text-[12px] font-semibold text-[#495057]" onClick={() => {
+              filtrosReporte.iniciar({
+                idAnio,
+                idNivel,
+                idGrado,
+                idGradoSeccion: seccionSeleccionada?.idGradoSeccion ?? null,
+              })
+              setReporteOpen(true)
+            }}>
               <FileDown data-icon="inline-start" />
               Generar reporte
             </Button>
@@ -562,18 +566,9 @@ export function AlumnosTab() {
           open={reporteOpen}
           onOpenChange={setReporteOpen}
           titulo="Reporte de alumnos"
-          descripcion="Descarga el padrón de alumnos del rango en PDF, Excel o CSV."
-          presets={["ultimos_7", "este_mes", "personalizado"]}
-          filtros={[
-            {
-              id: "idGradoSeccion",
-              label: "Grado y sección",
-              opciones: [],
-              valor: "",
-              onChange: () => { },
-              render: () => <GradoSeccionCascada value={filtroGradoSeccion} onChange={setFiltroGradoSeccion} />,
-            },
-          ]}
+          descripcion="Descarga el padrón de alumnos matriculados en el año en PDF, Excel o CSV."
+          presets={[]}
+          filtros={filtrosReporte.filtros}
           onDescargar={handleDescargarReporte}
         />
       </CardContent>

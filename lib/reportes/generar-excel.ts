@@ -4,13 +4,9 @@ import type { AutorizacionRegistroResponse } from "@/lib/api/evaluacion"
 import type {
   ReporteGeneralItem,
   NotaReporteItem,
-  MatriculaReporteItem,
-  AlumnoReporteItem,
-  DocenteReporteItem,
-  UsuarioReporteItem,
 } from "@/lib/api/reportes"
 import { formatearHora } from "@/lib/fechas"
-import { fechaCorta, fechaHora } from "./formato"
+import { fechaCorta, fechaHora, type TablaReporte } from "./formato"
 
 // ── Asistencia general ───────────────────────────────────────────────────
 
@@ -105,128 +101,31 @@ export function generarExcelNotas({
   XLSX.writeFile(wb, `reporte-notas-${inicio}_${fin}.xlsx`)
 }
 
-// ── Matrícula ────────────────────────────────────────────────────────────
+// ── Usuarios, docentes, alumnos y matrícula ──────
 
-export function generarExcelMatriculas({
-  datos,
-  inicio,
-  fin,
-}: {
-  datos: MatriculaReporteItem[]
-  inicio: string
-  fin: string
-}): void {
-  const filas = datos.map((d) => ({
-    Alumno: d.alumno,
-    Código: d.codigo,
-    "Grado y sección": d.gradoSeccion,
-    "Fecha pago": d.fechaPago ? fechaCorta(d.fechaPago) : "",
-    Monto: d.montoPago ?? "",
-    Registro: fechaCorta(d.fechaRegistro),
-    "Registrado por": d.registradoPor,
-  }))
+export function generarExcelTabla(tabla: TablaReporte): void {
+  const cabecera = [[tabla.titulo], ...tabla.encabezado.map((linea) => [linea]), []]
+  const ws = XLSX.utils.aoa_to_sheet([
+    ...cabecera,
+    tabla.columnas.map((c) => c.titulo),
+    ...tabla.filas.map((fila) => fila.map((valor) => valor ?? "")),
+  ])
+  ws["!cols"] = tabla.columnas.map((c) => ({ wch: c.ancho }))
 
-  const ws = XLSX.utils.json_to_sheet(filas)
-  ws["!cols"] = [
-    { wch: 28 }, { wch: 12 }, { wch: 22 }, { wch: 12 },
-    { wch: 10 }, { wch: 12 }, { wch: 22 },
-  ]
+  // Los montos quedan como número para poder sumarlos en Excel.
+  tabla.filas.forEach((fila, f) => {
+    tabla.columnas.forEach((columna, c) => {
+      if (columna.tipo !== "monto" || fila[c] == null) return
+      const celda = ws[XLSX.utils.encode_cell({ r: cabecera.length + 1 + f, c })]
+      if (celda) {
+        celda.t = "n"
+        celda.v = Number(fila[c])
+        celda.z = "#,##0.00"
+      }
+    })
+  })
 
   const wb = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(wb, ws, "Matrícula")
-  XLSX.writeFile(wb, `reporte-matricula-${inicio}_${fin}.xlsx`)
-}
-
-// ── Alumnos ──────────────────────────────────────────────────────────────
-
-export function generarExcelAlumnos({
-  datos,
-  inicio,
-  fin,
-}: {
-  datos: AlumnoReporteItem[]
-  inicio: string
-  fin: string
-}): void {
-  const filas = datos.map((d) => ({
-    Código: d.codigo,
-    Nombre: d.nombre,
-    DNI: d.documentoIdentidad ?? "",
-    "Grado y sección": d.gradoSeccion,
-    Apoderado: d.apoderado,
-    "Fecha ingreso": fechaCorta(d.fechaIngreso),
-  }))
-
-  const ws = XLSX.utils.json_to_sheet(filas)
-  ws["!cols"] = [
-    { wch: 12 }, { wch: 28 }, { wch: 12 }, { wch: 22 },
-    { wch: 24 }, { wch: 12 },
-  ]
-
-  const wb = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(wb, ws, "Alumnos")
-  XLSX.writeFile(wb, `reporte-alumnos-${inicio}_${fin}.xlsx`)
-}
-
-// ── Docentes ─────────────────────────────────────────────────────────────
-
-export function generarExcelDocentes({
-  datos,
-  inicio,
-  fin,
-}: {
-  datos: DocenteReporteItem[]
-  inicio: string
-  fin: string
-}): void {
-  const filas = datos.map((d) => ({
-    Código: d.codigo,
-    Nombre: d.nombre,
-    DNI: d.documentoIdentidad ?? "",
-    "Grado académico": d.gradoAcademico ?? "",
-    "Tipo contrato": d.tipoContrato ?? "",
-    Niveles: d.niveles.join(", "),
-    "Fecha contratación": d.fechaContratacion ? fechaCorta(d.fechaContratacion) : "",
-  }))
-
-  const ws = XLSX.utils.json_to_sheet(filas)
-  ws["!cols"] = [
-    { wch: 12 }, { wch: 28 }, { wch: 12 }, { wch: 18 },
-    { wch: 16 }, { wch: 20 }, { wch: 16 },
-  ]
-
-  const wb = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(wb, ws, "Docentes")
-  XLSX.writeFile(wb, `reporte-docentes-${inicio}_${fin}.xlsx`)
-}
-
-// ── Usuarios ─────────────────────────────────────────────────────────────
-
-export function generarExcelUsuarios({
-  datos,
-  inicio,
-  fin,
-}: {
-  datos: UsuarioReporteItem[]
-  inicio: string
-  fin: string
-}): void {
-  const filas = datos.map((d) => ({
-    Código: d.codigo,
-    Nombre: d.nombre,
-    DNI: d.documentoIdentidad ?? "",
-    Correo: d.gmail ?? "",
-    "Fecha creación": fechaCorta(d.fechaCreacion),
-    Roles: d.roles.join(", "),
-  }))
-
-  const ws = XLSX.utils.json_to_sheet(filas)
-  ws["!cols"] = [
-    { wch: 12 }, { wch: 28 }, { wch: 12 }, { wch: 24 },
-    { wch: 14 }, { wch: 28 },
-  ]
-
-  const wb = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(wb, ws, "Usuarios")
-  XLSX.writeFile(wb, `reporte-usuarios-${inicio}_${fin}.xlsx`)
+  XLSX.utils.book_append_sheet(wb, ws, tabla.hoja)
+  XLSX.writeFile(wb, `${tabla.archivo}.xlsx`)
 }

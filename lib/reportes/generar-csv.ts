@@ -2,13 +2,9 @@ import type { AutorizacionRegistroResponse } from "@/lib/api/evaluacion"
 import type {
   ReporteGeneralItem,
   NotaReporteItem,
-  MatriculaReporteItem,
-  AlumnoReporteItem,
-  DocenteReporteItem,
-  UsuarioReporteItem,
 } from "@/lib/api/reportes"
 import { formatearHora } from "@/lib/fechas"
-import { fechaCorta, fechaHora } from "./formato"
+import { fechaCorta, fechaHora, type ColumnaReporte, type TablaReporte } from "./formato"
 
 // CSV con separador ";" (Excel es-PE lo abre en columnas sin pasos extra)
 // y BOM UTF-8 para que los acentos no se rompan.
@@ -27,8 +23,8 @@ function celda(valor: string | null | undefined): string {
   return texto
 }
 
-function descargarCsv(encabezados: string[], filas: string[][], nombre: string) {
-  const lineas = [encabezados, ...filas]
+function descargarCsv(encabezados: string[], filas: string[][], nombre: string, previas: string[][] = []) {
+  const lineas = [...previas, encabezados, ...filas]
     .map((fila) => fila.map(celda).join(SEPARADOR))
     .join("\r\n")
 
@@ -149,134 +145,22 @@ export function generarCsvNotas({
   )
 }
 
-// ── Matrícula ────────────────────────────────────────────────────────────
+// ── Usuarios, docentes, alumnos y matrícula ──────
 
-export function generarCsvMatriculas({
-  datos,
-  inicio,
-  fin,
-}: {
-  datos: MatriculaReporteItem[]
-  inicio: string
-  fin: string
-}): void {
-  descargarCsv(
-    [
-      "Alumno",
-      "Código",
-      "Grado y sección",
-      "Fecha pago",
-      "Monto",
-      "Registro",
-      "Registrado por",
-    ],
-    datos.map((d) => [
-      d.alumno,
-      d.codigo,
-      d.gradoSeccion,
-      d.fechaPago ? fechaCorta(d.fechaPago) : "",
-      d.montoPago != null ? `S/ ${d.montoPago.toFixed(2)}` : "",
-      fechaCorta(d.fechaRegistro),
-      d.registradoPor,
-    ]),
-    `reporte-matricula-${inicio}_${fin}.csv`
-  )
+/** Excel convierte "0000123" en 123 al abrir un CSV; ="..." lo mantiene como texto. */
+function valorCsv(valor: string | number | null, columna: ColumnaReporte): string {
+  if (valor == null || valor === "") return ""
+  if (columna.tipo === "monto") return Number(valor).toFixed(2)
+  if (columna.tipo === "codigo") return `="${valor}"`
+  return String(valor)
 }
 
-// ── Alumnos ──────────────────────────────────────────────────────────────
-
-export function generarCsvAlumnos({
-  datos,
-  inicio,
-  fin,
-}: {
-  datos: AlumnoReporteItem[]
-  inicio: string
-  fin: string
-}): void {
+export function generarCsvTabla(tabla: TablaReporte): void {
+  const lineas = [[tabla.titulo], ...tabla.encabezado.map((linea) => [linea]), [""]]
   descargarCsv(
-    [
-      "Código",
-      "Nombre",
-      "DNI",
-      "Grado y sección",
-      "Apoderado",
-      "Fecha ingreso",
-    ],
-    datos.map((d) => [
-      d.codigo,
-      d.nombre,
-      d.documentoIdentidad ?? "",
-      d.gradoSeccion,
-      d.apoderado,
-      fechaCorta(d.fechaIngreso),
-    ]),
-    `reporte-alumnos-${inicio}_${fin}.csv`
-  )
-}
-
-// ── Docentes ─────────────────────────────────────────────────────────────
-
-export function generarCsvDocentes({
-  datos,
-  inicio,
-  fin,
-}: {
-  datos: DocenteReporteItem[]
-  inicio: string
-  fin: string
-}): void {
-  descargarCsv(
-    [
-      "Código",
-      "Nombre",
-      "DNI",
-      "Grado académico",
-      "Tipo contrato",
-      "Niveles",
-      "Fecha contratación",
-    ],
-    datos.map((d) => [
-      d.codigo,
-      d.nombre,
-      d.documentoIdentidad ?? "",
-      d.gradoAcademico ?? "",
-      d.tipoContrato ?? "",
-      d.niveles.join(", "),
-      d.fechaContratacion ? fechaCorta(d.fechaContratacion) : "",
-    ]),
-    `reporte-docentes-${inicio}_${fin}.csv`
-  )
-}
-
-// ── Usuarios ─────────────────────────────────────────────────────────────
-
-export function generarCsvUsuarios({
-  datos,
-  inicio,
-  fin,
-}: {
-  datos: UsuarioReporteItem[]
-  inicio: string
-  fin: string
-}): void {
-  descargarCsv(
-    [
-      "Código",
-      "Nombre",
-      "DNI",
-      "Correo",
-      "Fecha creación",
-      "Roles",
-    ],
-    datos.map((d) => [
-      d.codigo,
-      d.nombre,
-      d.documentoIdentidad ?? "",
-      d.gmail ?? "",
-      fechaCorta(d.fechaCreacion),
-      d.roles.join(", "),
-    ]),
-    `reporte-usuarios-${inicio}_${fin}.csv`
+    tabla.columnas.map((c) => c.titulo),
+    tabla.filas.map((fila) => fila.map((valor, i) => valorCsv(valor, tabla.columnas[i]))),
+    `${tabla.archivo}.csv`,
+    lineas
   )
 }
