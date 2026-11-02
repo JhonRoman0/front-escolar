@@ -7,7 +7,7 @@ import type {
 import { generarCsvTabla } from "./generar-csv"
 import { generarExcelTabla } from "./generar-excel"
 import { generarPdfTabla } from "./generar-pdf"
-import { fechaCorta, type ColumnaReporte, type TablaReporte } from "./formato"
+import { edad, fechaCorta, type ColumnaReporte, type TablaReporte } from "./formato"
 
 export type FormatoReporte = "pdf" | "excel" | "csv"
 
@@ -24,15 +24,6 @@ type Definicion<T> = (ColumnaReporte & { valor: (fila: T) => string | number | n
 
 function fecha(iso: string | null | undefined): string | null {
   return iso ? fechaCorta(iso) : null
-}
-
-/** Años cumplidos a hoy. */
-function edad(nacimiento: string | null): number | null {
-  if (!nacimiento) return null
-  const hoy = new Date()
-  const [anio, mes, dia] = nacimiento.split("-").map(Number)
-  const yaCumplio = hoy.getMonth() + 1 > mes || (hoy.getMonth() + 1 === mes && hoy.getDate() >= dia)
-  return hoy.getFullYear() - anio - (yaCumplio ? 0 : 1)
 }
 
 function armar<T>(

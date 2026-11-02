@@ -1,4 +1,4 @@
-import { apiFetch } from "@/lib/api"
+import { apiFetch, formulario } from "@/lib/api"
 
 // ── Tipos ────────────────────────────────────────────────────────────────
 
@@ -16,12 +16,10 @@ export interface ColegioResponse {
 
 export interface ColegioRequest {
   nombre: string
-  celular?: string
-  telefono?: string
-  direccion?: string
-  codigoColegio?: string
-  urlFoto?: string
-  urlPortal?: string
+  celular: string
+  telefono: string
+  direccion: string
+  codigoColegio: string
 }
 
 // ── API (requiere auth) ──────────────────────────────────────────────────
@@ -42,11 +40,11 @@ export const colegioApi = {
     return apiFetch<ColegioResponse>(`/colegios/${id}`)
   },
 
-  /** POST /colegios — crear (solo si no existe ninguno). */
-  crear(data: ColegioRequest): Promise<ColegioResponse> {
+  /** POST /colegios — crear con su foto, en un solo paso (solo si no existe ninguno). */
+  crear(data: ColegioRequest, foto: File, portada: File | null): Promise<ColegioResponse> {
     return apiFetch<ColegioResponse>("/colegios", {
       method: "POST",
-      body: JSON.stringify(data),
+      body: formulario(data, { foto, portada }),
     })
   },
 
@@ -76,11 +74,6 @@ export const colegioApi = {
       method: "POST",
       body: formData,
     })
-  },
-
-  /** DELETE /colegios/{id}/foto — borra la foto (204, urlFoto queda null). */
-  async eliminarFoto(id: number): Promise<void> {
-    return apiFetch<void>(`/colegios/${id}/foto`, { method: "DELETE" })
   },
 
   /** POST /colegios/{id}/portada — campo del form: imagen (1 archivo). */

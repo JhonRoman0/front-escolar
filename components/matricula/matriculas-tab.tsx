@@ -34,6 +34,7 @@ import { ReporteModal } from "@/components/reportes/reporte-modal"
 import { useFiltrosAcademicos } from "@/components/reportes/use-filtros-academicos"
 import { formatoSoles } from "./campos-pago"
 import { EditarMatriculaDialog } from "./editar-matricula-dialog"
+import { BotonFicha } from "./boton-ficha"
 import { HistorialDialog } from "./historial-dialog"
 import { NuevaMatriculaDialog } from "./nueva-matricula-dialog"
 import { PagosDialog } from "./pagos-dialog"
@@ -59,6 +60,7 @@ export function MatriculasTab() {
   const puedeActualizar = usePuede("MATRICULAS", "ACTUALIZAR")
   const puedeEliminar = usePuede("MATRICULAS", "ELIMINAR")
   const puedeExportar = usePuede("MATRICULAS", "IMPRIMIR_EXPORTAR")
+  const puedeImprimirFicha = usePuede("MATRICULAS", "IMPRIMIR_FICHA")
 
   const [nuevaOpen, setNuevaOpen] = useState(false)
   const [editando, setEditando] = useState<MatriculaResponse | null>(null)
@@ -236,6 +238,9 @@ export function MatriculasTab() {
                         >
                           <Receipt />
                         </Button>
+                        {puedeImprimirFicha && (
+                          <BotonFicha idMatricula={matricula.idMatricula} alumno={matricula.alumno} />
+                        )}
                         {puedeActualizar && (
                           <Button
                             variant="outline"

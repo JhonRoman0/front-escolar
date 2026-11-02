@@ -1,12 +1,13 @@
 "use client"
 
 import { useRef, useState } from "react"
-import { useForm } from "react-hook-form"
+import { Controller, useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { Save, Camera, Image as ImageIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { FieldError } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
 import { usePuedeLeer } from "@/hooks/use-permisos"
@@ -15,17 +16,16 @@ import {
   useActualizarColegio,
   useCrearColegio,
   useSubirFotoColegio,
-  useEliminarFotoColegio,
   useSubirPortadaColegio,
   useEliminarPortadaColegio,
 } from "@/hooks/use-colegio"
 
 const schema = z.object({
-  nombre: z.string().min(2, "Nombre requerido"),
-  celular: z.string().optional(),
-  telefono: z.string().optional(),
-  direccion: z.string().optional(),
-  codigoColegio: z.string().optional(),
+  nombre: z.string().trim().min(2, "El nombre es obligatorio").max(120, "Máximo 120 caracteres"),
+  codigoColegio: z.string().trim().max(20, "Máximo 20 caracteres"),
+  telefono: z.string().regex(/^\d{6,15}$/, "El teléfono debe tener entre 6 y 15 dígitos"),
+  celular: z.string().regex(/^\d{9}$/, "El celular debe tener 9 dígitos"),
+  direccion: z.string().trim().min(1, "La dirección es obligatoria").max(150, "Máximo 150 caracteres"),
 })
 
 type FormData = z.infer<typeof schema>
@@ -36,14 +36,13 @@ export default function ColegioPage() {
   const actualizar = useActualizarColegio()
   const crear = useCrearColegio()
   const subirFoto = useSubirFotoColegio()
-  const eliminarFoto = useEliminarFotoColegio()
   const subirPortada = useSubirPortadaColegio()
   const eliminarPortada = useEliminarPortadaColegio()
 
   // Foto del colegio (urlFoto)
   const [fotoNueva, setFotoNueva] = useState<File | null>(null)
   const [previewFoto, setPreviewFoto] = useState<string | null>(null)
-  const [quitarFoto, setQuitarFoto] = useState(false)
+  const [faltaFoto, setFaltaFoto] = useState(false)
   const [inputKeyFoto, setInputKeyFoto] = useState(0)
   const inputFotoRef = useRef<HTMLInputElement>(null)
 
@@ -66,7 +65,6 @@ export default function ColegioPage() {
   })
 
   function fotoActual(): string | null {
-    if (quitarFoto) return null
     if (previewFoto) return previewFoto
     return colegio?.urlFoto ?? null
   }
@@ -81,7 +79,6 @@ export default function ColegioPage() {
     if (previewFoto) URL.revokeObjectURL(previewFoto)
     setFotoNueva(null)
     setPreviewFoto(null)
-    setQuitarFoto(false)
     setInputKeyFoto((k) => k + 1)
   }
 
@@ -99,7 +96,7 @@ export default function ColegioPage() {
     if (previewFoto) URL.revokeObjectURL(previewFoto)
     setFotoNueva(file)
     setPreviewFoto(URL.createObjectURL(file))
-    setQuitarFoto(false)
+    setFaltaFoto(false)
   }
 
   function handleArchivoPortada(event: React.ChangeEvent<HTMLInputElement>) {
@@ -112,26 +109,19 @@ export default function ColegioPage() {
   }
 
   async function onSubmit(data: FormData) {
-    // ⚠️ NO enviar urlFoto/urlPortal en el PUT: el back pisa los campos con
-    // null si vienen explícitos. Se gestionan solo por upload/delete.
-    const payload = {
-      nombre: data.nombre,
-      celular: data.celular || undefined,
-      telefono: data.telefono || undefined,
-      direccion: data.direccion || undefined,
-      codigoColegio: data.codigoColegio || undefined,
+    if (!fotoActual()) {
+      setFaltaFoto(true)
+      return
     }
 
     try {
       if (colegio?.idColegio) {
         const id = colegio.idColegio
 
-        await actualizar.mutateAsync({ id, data: payload })
+        await actualizar.mutateAsync({ id, data })
 
         if (fotoNueva) {
           await subirFoto.mutateAsync({ id, file: fotoNueva })
-        } else if (quitarFoto && colegio.urlFoto) {
-          await eliminarFoto.mutateAsync(id)
         }
 
         if (portadaNueva) {
@@ -142,15 +132,8 @@ export default function ColegioPage() {
 
         toast.success("Colegio actualizado")
       } else {
-        const creado = await crear.mutateAsync(payload)
-
-        if (fotoNueva) {
-          await subirFoto.mutateAsync({ id: creado.idColegio, file: fotoNueva })
-        }
-        if (portadaNueva) {
-          await subirPortada.mutateAsync({ id: creado.idColegio, file: portadaNueva })
-        }
-
+        // La validación de arriba garantiza la foto en un colegio nuevo.
+        await crear.mutateAsync({ data, foto: fotoNueva as File, portada: portadaNueva })
         toast.success("Colegio creado")
       }
       limpiarFoto()
@@ -176,9 +159,15 @@ export default function ColegioPage() {
     actualizar.isPending ||
     crear.isPending ||
     subirFoto.isPending ||
-    eliminarFoto.isPending ||
     subirPortada.isPending ||
     eliminarPortada.isPending
+
+  // form.formState.isDirty compara con lo guardado; las imágenes van fuera del formulario.
+  const hayCambios =
+    form.formState.isDirty ||
+    !!fotoNueva ||
+    !!portadaNueva ||
+    (quitarPortada && !!colegio?.urlPortal)
 
   const fotoVisible = fotoActual()
   const portadaVisible = portadaActual()
@@ -207,7 +196,7 @@ export default function ColegioPage() {
               </div>
             )}
             <div className="flex flex-col gap-2">
-              <p className="text-sm font-medium">Foto del colegio</p>
+              <p className="text-sm font-medium">Foto del colegio *</p>
               <p className="text-xs text-muted-foreground">
                 Logo que aparece en el header y footer del portal.
               </p>
@@ -229,20 +218,8 @@ export default function ColegioPage() {
                 <Camera />
                 {fotoNueva || fotoVisible ? "Cambiar foto" : "Subir foto"}
               </Button>
-              {(fotoNueva || (colegio?.urlFoto && !quitarFoto)) && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    limpiarFoto()
-                    setQuitarFoto(true)
-                  }}
-                  disabled={ocupado || !colegio?.idColegio}
-                  className="text-destructive hover:text-destructive self-start"
-                >
-                  Quitar
-                </Button>
+              {faltaFoto && !fotoVisible && (
+                <p className="text-xs text-destructive">La foto del colegio es obligatoria</p>
               )}
             </div>
           </div>
@@ -261,7 +238,7 @@ export default function ColegioPage() {
               </div>
             )}
             <div className="flex flex-col gap-2">
-              <p className="text-sm font-medium">Portada del portal</p>
+              <p className="text-sm font-medium">Portada del portal (opcional)</p>
               <p className="text-xs text-muted-foreground">
                 Imagen destacada para el hero de la landing.
               </p>
@@ -292,7 +269,7 @@ export default function ColegioPage() {
                     limpiarPortada()
                     setQuitarPortada(true)
                   }}
-                  disabled={ocupado || !colegio?.idColegio}
+                  disabled={ocupado}
                   className="text-destructive hover:text-destructive self-start"
                 >
                   Quitar
@@ -302,35 +279,64 @@ export default function ColegioPage() {
           </div>
         </div>
 
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={form.handleSubmit(onSubmit, () => setFaltaFoto(!fotoActual()))} className="space-y-4">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm font-medium">Nombre del colegio *</label>
-              <Input {...form.register("nombre")} />
+              <Input maxLength={120} aria-invalid={!!form.formState.errors.nombre} {...form.register("nombre")} />
+              <FieldError errors={[form.formState.errors.nombre]} />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium">Código</label>
-              <Input {...form.register("codigoColegio")} />
+              <label className="mb-1 block text-sm font-medium">Código (opcional)</label>
+              <Input maxLength={20} aria-invalid={!!form.formState.errors.codigoColegio} {...form.register("codigoColegio")} />
+              <FieldError errors={[form.formState.errors.codigoColegio]} />
             </div>
           </div>
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
-              <label className="mb-1 block text-sm font-medium">Teléfono</label>
-              <Input {...form.register("telefono")} />
+              <label className="mb-1 block text-sm font-medium">Teléfono *</label>
+              <Controller
+                name="telefono"
+                control={form.control}
+                render={({ field, fieldState }) => (
+                  <Input
+                    maxLength={15}
+                    inputMode="numeric"
+                    aria-invalid={fieldState.invalid}
+                    {...field}
+                    onChange={(e) => field.onChange(e.target.value.replace(/\D/g, ""))}
+                  />
+                )}
+              />
+              <FieldError errors={[form.formState.errors.telefono]} />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium">Celular</label>
-              <Input {...form.register("celular")} />
+              <label className="mb-1 block text-sm font-medium">Celular *</label>
+              <Controller
+                name="celular"
+                control={form.control}
+                render={({ field, fieldState }) => (
+                  <Input
+                    maxLength={9}
+                    inputMode="numeric"
+                    aria-invalid={fieldState.invalid}
+                    {...field}
+                    onChange={(e) => field.onChange(e.target.value.replace(/\D/g, ""))}
+                  />
+                )}
+              />
+              <FieldError errors={[form.formState.errors.celular]} />
             </div>
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium">Dirección</label>
-            <Input {...form.register("direccion")} />
+            <label className="mb-1 block text-sm font-medium">Dirección *</label>
+            <Input maxLength={150} aria-invalid={!!form.formState.errors.direccion} {...form.register("direccion")} />
+            <FieldError errors={[form.formState.errors.direccion]} />
           </div>
 
-          <Button type="submit" disabled={ocupado}>
+          <Button type="submit" disabled={ocupado || !hayCambios}>
             <Save className="mr-2 h-4 w-4" />
             {ocupado ? "Guardando..." : "Guardar cambios"}
           </Button>

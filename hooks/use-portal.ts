@@ -1,6 +1,7 @@
 "use client"
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { reintentarSalvo404 } from "@/lib/api"
 import {
   portalApi,
   portalAdminApi,
@@ -23,6 +24,7 @@ export function useColegioPublico() {
   return useQuery({
     queryKey: ["portal", "colegio"],
     queryFn: () => portalApi.colegio(),
+    retry: reintentarSalvo404,
     staleTime: 10 * 60 * 1000,
   })
 }

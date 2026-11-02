@@ -1,4 +1,4 @@
-import { apiFetch } from "@/lib/api"
+import { apiFetch, formulario } from "@/lib/api"
 import type { Paginated } from "@/lib/api/seguridad"
 
 // ── Historial de cambios de sección ─────────────────────────────────────
@@ -23,6 +23,43 @@ export interface HistorialResponse {
 export const ANIO_VIGENTE = 1
 export const ANIO_CERRADO = 2
 export const ANIO_POR_COMENZAR = 3
+
+export interface FichaTrayectoria {
+  idMatricula: number
+  anio: string
+  nivel: string
+  gradoSeccion: string
+  turno: string
+  estado: string
+}
+
+// ≡ GET /matriculas/{id}/ficha
+export interface FichaMatricula {
+  alumno: {
+    codigo: string
+    documentoIdentidad: string | null
+    nombre: string
+    sexo: string | null
+    fechaNacimiento: string | null
+    direccion: string | null
+    // null: no tiene.
+    discapacidad: string | null
+    urlFoto: string | null
+  }
+  matricula: FichaTrayectoria
+  fechaRegistro: string | null
+  registradoPor: string
+  apoderados: {
+    nombre: string
+    documentoIdentidad: string | null
+    parentesco: string | null
+    celular: string | null
+    gmail: string | null
+    direccion: string | null
+    principal: boolean
+  }[]
+  trayectoria: FichaTrayectoria[]
+}
 
 export interface MatriculaResponse {
   idMatricula: number
@@ -173,15 +210,6 @@ export interface MatriculaEdicionRequest {
 }
 
 // El back recibe los datos como parte JSON y los archivos aparte.
-function formulario(datos: unknown, archivos: Record<string, File | null | undefined>): FormData {
-  const formData = new FormData()
-  formData.append("datos", new Blob([JSON.stringify(datos)], { type: "application/json" }))
-  Object.entries(archivos).forEach(([nombre, archivo]) => {
-    if (archivo) formData.append(nombre, archivo)
-  })
-  return formData
-}
-
 // ── API ──────────────────────────────────────────────────────────────────
 
 export const matriculasApi = {
@@ -219,6 +247,9 @@ export const matriculasApi = {
       method: "POST",
       body: JSON.stringify(data),
     })
+  },
+  ficha(idMatricula: number): Promise<FichaMatricula> {
+    return apiFetch<FichaMatricula>(`/matriculas/${idMatricula}/ficha`)
   },
   async inscribir(data: InscripcionRequest, foto: File | null, comprobante: File | null): Promise<MatriculaResponse> {
     return apiFetch<MatriculaResponse>("/matriculas/inscripcion", {
