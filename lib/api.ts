@@ -216,3 +216,18 @@ export async function apiFetch<T>(
   }
   return response.text() as unknown as T
 }
+
+/** Datos en JSON más archivos, para los endpoints multipart. */
+export function formulario(datos: unknown, archivos: Record<string, File | null | undefined>): FormData {
+  const formData = new FormData()
+  formData.append("datos", new Blob([JSON.stringify(datos)], { type: "application/json" }))
+  Object.entries(archivos).forEach(([nombre, archivo]) => {
+    if (archivo) formData.append(nombre, archivo)
+  })
+  return formData
+}
+
+/** Un 404 no cambia al repetir la consulta: reintentarlo solo hace esperar. */
+export function reintentarSalvo404(intentos: number, error: unknown): boolean {
+  return !(error instanceof ApiError && error.status === 404) && intentos < 1
+}

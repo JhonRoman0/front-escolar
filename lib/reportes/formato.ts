@@ -17,6 +17,15 @@ export function fechaHora(iso: string | null | undefined): string {
   })}`
 }
 
+/** Años cumplidos a hoy. */
+export function edad(nacimiento: string | null): number | null {
+  if (!nacimiento) return null
+  const hoy = new Date()
+  const [anio, mes, dia] = nacimiento.split("-").map(Number)
+  const yaCumplio = hoy.getMonth() + 1 > mes || (hoy.getMonth() + 1 === mes && hoy.getDate() >= dia)
+  return hoy.getFullYear() - anio - (yaCumplio ? 0 : 1)
+}
+
 export interface ColumnaReporte {
   titulo: string
   /** Ancho en caracteres para Excel y proporción de columna en PDF. */

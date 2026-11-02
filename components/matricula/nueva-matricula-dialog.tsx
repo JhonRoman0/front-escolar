@@ -7,6 +7,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 
 import { Stepper } from "@/components/shared/stepper"
 import { useCrudMatriculas } from "@/hooks/use-matricula"
+import { CircleCheck } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { usePuede } from "@/hooks/use-permisos"
+import { BotonFicha } from "./boton-ficha"
 import type { ApoderadoBusqueda, InscripcionApoderado, InscripcionRequest, MatriculaResponse } from "@/lib/api/matricula"
 import type { ApoderadoPasoValues } from "@/lib/schemas/matricula"
 
@@ -83,6 +87,8 @@ export function NuevaMatriculaDialog({
 
 function Asistente({ onCerrar, onCreada }: { onCerrar: () => void; onCreada?: (matricula: MatriculaResponse) => void }) {
   const crud = useCrudMatriculas()
+  const puedeImprimirFicha = usePuede("MATRICULAS", "IMPRIMIR_FICHA")
+  const [matriculaCreada, setMatriculaCreada] = useState<MatriculaResponse | null>(null)
   const [paso, setPaso] = useState(1)
   const [alumno, setAlumno] = useState<AlumnoPaso | null>(null)
   const [apoderados, setApoderados] = useState<ApoderadoPasoValues[]>([])
@@ -142,10 +148,27 @@ function Asistente({ onCerrar, onCreada }: { onCerrar: () => void; onCreada?: (m
         )
       }
       onCreada?.(creada)
-      onCerrar()
+      if (puedeImprimirFicha) setMatriculaCreada(creada)
+      else onCerrar()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo crear la matrícula", { id: guardando })
     }
+  }
+
+  if (matriculaCreada) {
+    return (
+      <div className="flex flex-col items-center gap-4 py-8 text-center">
+        <CircleCheck className="size-12 text-emerald-600" aria-hidden />
+        <div className="space-y-1">
+          <p className="text-base font-semibold">Matrícula creada</p>
+          <p className="text-sm text-muted-foreground">{matriculaCreada.alumno}</p>
+        </div>
+        <div className="flex flex-wrap justify-center gap-2">
+          <Button variant="outline" onClick={onCerrar}>Cerrar</Button>
+          <BotonFicha idMatricula={matriculaCreada.idMatricula} alumno={matriculaCreada.alumno} conTexto />
+        </div>
+      </div>
+    )
   }
 
   return (

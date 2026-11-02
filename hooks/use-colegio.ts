@@ -1,12 +1,14 @@
 "use client"
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { reintentarSalvo404 } from "@/lib/api"
 import { colegioApi, type ColegioRequest } from "@/lib/api/colegio"
 
 export function useColegio() {
   return useQuery({
     queryKey: ["colegio", "actual"],
     queryFn: () => colegioApi.actual(),
+    retry: reintentarSalvo404,
     staleTime: 5 * 60 * 1000,
   })
 }
@@ -21,9 +23,11 @@ export function useColegios() {
 export function useCrearColegio() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data: ColegioRequest) => colegioApi.crear(data),
+    mutationFn: ({ data, foto, portada }: { data: ColegioRequest; foto: File; portada: File | null }) =>
+      colegioApi.crear(data, foto, portada),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["colegio"] })
+      qc.invalidateQueries({ queryKey: ["portal", "colegio"] })
     },
   })
 }
@@ -35,6 +39,7 @@ export function useActualizarColegio() {
       colegioApi.actualizar(id, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["colegio"] })
+      qc.invalidateQueries({ queryKey: ["portal", "colegio"] })
     },
   })
 }
@@ -48,16 +53,7 @@ export function useSubirFotoColegio() {
       colegioApi.subirFoto(id, file),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["colegio"] })
-    },
-  })
-}
-
-export function useEliminarFotoColegio() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (id: number) => colegioApi.eliminarFoto(id),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["colegio"] })
+      qc.invalidateQueries({ queryKey: ["portal", "colegio"] })
     },
   })
 }
