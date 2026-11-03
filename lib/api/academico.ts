@@ -511,6 +511,9 @@ interface HorasDocenteResponse {
 // ── API ──────────────────────────────────────────────────────────────────
 
 export const docentesApi = {
+  async validarDni(dni: string): Promise<void> {
+    return apiFetch<void>(`/docentes/validar-dni/${encodeURIComponent(dni)}`)
+  },
   async listar(): Promise<DocenteResponse[]> {
     return apiFetch<DocenteResponse[]>("/docentes")
   },

@@ -1,5 +1,8 @@
 "use client"
 
+import { ACCESO, docentesApi } from "@/lib/api/academico"
+import { useValidarDniPersona } from "@/hooks/use-validar-dni-persona"
+
 import { useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 import { FileDown, Loader2, Lock, Pencil, RotateCcw } from "lucide-react"
@@ -19,6 +22,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field"
+import { nacimientoMaximoAdulto } from "@/lib/edades"
 import { Input } from "@/components/ui/input"
 import {
   Select,
@@ -67,7 +71,7 @@ import type {
   DocenteRequest,
   DocenteResponse,
 } from "@/lib/api/academico"
-import { docenteSchema, type DocenteValues } from "@/lib/schemas/academico"
+import { crearDocenteSchema, type DocenteValues } from "@/lib/schemas/academico"
 import { CampoDni } from "@/components/shared/campo-dni"
 import { usePuede } from "@/hooks/use-permisos"
 import { reportesApi } from "@/lib/api/reportes"
@@ -419,7 +423,7 @@ function DocenteFormDialog({
   )
 
   const form = useForm<DocenteValues>({
-    resolver: zodResolver(docenteSchema),
+    resolver: zodResolver(crearDocenteSchema(docente?.fechaNaci)),
     defaultValues: {
       nombre: docente?.nombre ?? "",
       apellidoPat: docente?.apellidoPat ?? "",
@@ -478,26 +482,42 @@ function DocenteFormDialog({
     }
   }
 
+  const comprobacionDni = useValidarDniPersona({
+    validar: (dni) => docentesApi.validarDni(dni),
+    original: docente?.documentoIdentidad,
+    abierta: open,
+    onError: (message) => form.setError("documentoIdentidad", { message }),
+    onValido: () => form.clearErrors("documentoIdentidad"),
+  })
+
   async function handleBuscarDni() {
     const dni = form.getValues("documentoIdentidad")?.trim()
     if (!dni || !/^\d{8}$/.test(dni)) {
       toast.error("Ingresa un DNI de 8 dígitos")
       return
     }
+    const sigueVigente = comprobacionDni.capturarVigencia()
+    if (!await comprobacionDni.comprobar(dni) || !sigueVigente()) return
     try {
+      const previos = form.getValues()
       const r = await consultarDni.mutateAsync(dni)
+      if (!sigueVigente() || form.getValues("documentoIdentidad") !== dni) return
+      const actuales = form.getValues()
+      if (actuales.nombre !== previos.nombre || actuales.apellidoPat !== previos.apellidoPat || actuales.apellidoMat !== previos.apellidoMat) return
       form.setValue("nombre", r.nombres ?? "", { shouldValidate: true })
       form.setValue("apellidoPat", r.apellidoPaterno ?? "", { shouldValidate: true })
       form.setValue("apellidoMat", r.apellidoMaterno ?? "", { shouldValidate: true })
       const mensaje = r.origen === "RENIEC" || r.origen === "CACHE" ? "Datos completados desde RENIEC" : "Datos completados automáticamente"
       toast.success(mensaje)
     } catch (error) {
+      if (!sigueVigente()) return
       toast.error(error instanceof Error ? error.message : "No se pudo consultar el DNI")
     }
   }
 
   async function onSubmit(values: DocenteValues) {
     if (!docente) return
+    if (!await comprobacionDni.comprobar(values.documentoIdentidad, !!docente && docente.accesoId !== ACCESO.ACTIVO && values.accesoId === ACCESO.ACTIVO)) return
     const guardando = toast.loading("Guardando docente...")
     try {
       const actualizado = await actualizar.mutateAsync({
@@ -532,7 +552,7 @@ function DocenteFormDialog({
   const iniciales = `${form.getValues("nombre")[0] ?? ""}${form.getValues("apellidoPat")[0] ?? ""}`.toUpperCase()
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(next) => { comprobacionDni.invalidar(); onOpenChange(next) }}>
       <DialogContent className="flex max-h-[85vh] flex-col sm:max-w-4xl">
         <DialogHeader className="shrink-0">
           <DialogTitle className="text-lg font-semibold tracking-tight">
@@ -565,11 +585,11 @@ function DocenteFormDialog({
                         render={({ field }) => (
                           <CampoDni
                             value={field.value}
-                            onChange={field.onChange}
-                            onBlur={field.onBlur}
+                            onChange={(dni) => { comprobacionDni.invalidar(); form.clearErrors("documentoIdentidad"); field.onChange(dni) }}
+                            onBlur={() => { field.onBlur(); void comprobacionDni.comprobar(field.value) }}
                             name={field.name}
                             inputRef={field.ref}
-                            cargando={consultarDni.isPending}
+                            cargando={consultarDni.isPending || comprobacionDni.comprobando}
                             onBuscar={handleBuscarDni}
                             error={form.formState.errors.documentoIdentidad}
                             autoFocus
@@ -585,7 +605,12 @@ function DocenteFormDialog({
                           <Field>
                             <FieldLabel>Fecha de nacimiento *</FieldLabel>
                             <FieldContent>
-                              <Input type="date" {...field} />
+                              <Input
+                                type="date"
+                                onFocus={(event) => { event.currentTarget.max = nacimientoMaximoAdulto() }}
+                                max={nacimientoMaximoAdulto()}
+                                {...field}
+                              />
                               <FieldError errors={[form.formState.errors.fechaNaci]} />
                             </FieldContent>
                           </Field>
@@ -802,7 +827,7 @@ function DocenteFormDialog({
 
           <DialogFooter className="shrink-0">
             <DialogTrigger render={<Button variant="outline" />}>Cancelar</DialogTrigger>
-            <Button type="submit" disabled={enviando}>
+            <Button type="submit" disabled={enviando || form.formState.isSubmitting}>
               {enviando && <Loader2 className="animate-spin" data-icon="inline-start" />}
               {esEdicion ? "Guardar cambios" : "Crear docente"}
             </Button>

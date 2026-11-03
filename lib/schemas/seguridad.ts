@@ -1,3 +1,4 @@
+import { errorNacimiento } from "@/lib/edades"
 import * as z from "zod"
 
 import {
@@ -114,9 +115,11 @@ export type UsuarioValues = z.infer<typeof usuarioSchemaBase>
  * obligatorios. Al editar un usuario que ya es docente, se gestionan desde la
  * pestaña Docentes y aquí se ignoran.
  */
-export function crearUsuarioSchema(exigeDocente: boolean) {
-  if (!exigeDocente) return usuarioSchemaBase
+export function crearUsuarioSchema(exigeDocente: boolean, fechaOriginal?: string | null) {
   return usuarioSchemaBase.superRefine((valores, ctx) => {
+    const error = errorNacimiento(valores.fechaNaci, "adulto", fechaOriginal)
+    if (error) ctx.addIssue({ code: "custom", path: ["fechaNaci"], message: error })
+    if (!exigeDocente) return
     if (valores.gradoAcademicoId == null) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,

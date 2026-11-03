@@ -60,7 +60,7 @@ function formulario({ valores = {}, buscar, consultar, indice = 0 } = {}) {
   const llamadas = { internas: 0, externas: 0 }
   const context = {
     exports: {},
-    Error, REGEX_DNI, apoderadoPasoDefault, idAlumno: 42, base,
+    Error, REGEX_DNI, apoderadoPasoDefault, idAlumno: 42, base, original: undefined,
     version: { current: 0 }, consultaExterna: { current: 0 }, comprobacion: { current: null },
     edicionesNombres: { current: { nombre: 0, apellidoPat: 0, apellidoMat: 0 } },
     consultando: false,
@@ -207,7 +207,7 @@ test("RENIEC fallido, no encontrado o deshabilitado no invalida la comprobación
 test("la consulta externa pendiente permite validar datos manuales", async () => {
   const externa = pendiente()
   const valores = { nombre: "Ana", apellidoPat: "Lopez", apellidoMat: "Perez", fechaNaci: "1980-01-01",
-    sexo: "F", celular: "987654321", direccion: "Av. Uno", gmail: "ana@example.com", contraseña: "Segura123!", idParentesco: 1 }
+    sexo: "F", celular: "987654321", direccion: "Av. Uno", gmail: "ana@example.com", idParentesco: 1 }
   const f = formulario({ valores, consultar: () => externa.promise })
   const consulta = f.context.handleBuscar()
   await new Promise((resolve) => setImmediate(resolve))
@@ -302,11 +302,11 @@ test("los errores antiguos no reemplazan un resultado interno nuevo", async () =
 test("el schema exige la comprobación interna y conserva las reglas de persona nueva", () => {
   const nuevo = { ...structuredClone(apoderadoPasoDefault), documentoIdentidad: "12345678", nombre: "Ana",
     apellidoPat: "Lopez", apellidoMat: "Perez", fechaNaci: "1980-01-01", sexo: "F", celular: "987654321",
-    direccion: "Av. Uno", gmail: "ana@example.com", contraseña: "Segura123!", idParentesco: 1 }
+    direccion: "Av. Uno", gmail: "ana@example.com", idParentesco: 1 }
   assert.equal(apoderadosPasoSchema.safeParse({ apoderados: [nuevo] }).success, false)
   nuevo.estado = "NUEVO"
   assert.equal(apoderadosPasoSchema.safeParse({ apoderados: [nuevo] }).success, true)
-  for (const [campo, valor] of [["documentoIdentidad", "123"], ["gmail", "incorrecto"], ["contraseña", "123"],
+  for (const [campo, valor] of [["documentoIdentidad", "123"], ["gmail", "incorrecto"],
     ["idParentesco", 0], ["celular", "12"], ["fechaNaci", ""], ["nombre", "Ana1"], ["direccion", ""], ["sexo", ""]]) {
     assert.equal(apoderadosPasoSchema.safeParse({ apoderados: [{ ...nuevo, [campo]: valor }] }).success, false, campo)
   }
@@ -314,8 +314,8 @@ test("el schema exige la comprobación interna y conserva las reglas de persona 
   assert.equal(apoderadosPasoSchema.safeParse({ apoderados: [nuevo, { ...nuevo, documentoIdentidad: "87654321" }] }).success, true)
 })
 
-test("APODERADO requiere parentesco y USUARIO requiere contacto, sin credenciales nuevas", () => {
-  const base = { ...structuredClone(apoderadoPasoDefault), documentoIdentidad: "12345678", idParentesco: 1 }
+test("APODERADO requiere parentesco y contacto; USUARIO agrega sexo, sin credenciales nuevas", () => {
+  const base = { ...structuredClone(apoderadoPasoDefault), documentoIdentidad: "12345678", idParentesco: 1, direccion: "Av. Uno", celular: "987654321" }
   assert.equal(apoderadosPasoSchema.safeParse({ apoderados: [{ ...base, estado: "APODERADO" }] }).success, true)
   assert.equal(apoderadosPasoSchema.safeParse({ apoderados: [{ ...base, estado: "APODERADO", idParentesco: 0 }] }).success, false)
   assert.equal(apoderadosPasoSchema.safeParse({ apoderados: [{ ...base, estado: "USUARIO" }] }).success, false)

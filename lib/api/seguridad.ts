@@ -186,6 +186,9 @@ export interface UsuariosFiltros {
 }
 
 export const usuariosApi = {
+  async validarDni(dni: string): Promise<void> {
+    return apiFetch<void>(`/usuarios/validar-dni/${encodeURIComponent(dni)}`)
+  },
   async listar(
     page = 0,
     size = 10,

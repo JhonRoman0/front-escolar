@@ -1,3 +1,4 @@
+import { errorNacimiento } from "@/lib/edades"
 import * as z from "zod"
 
 import { emailRequerido, MENSAJE_DNI, MENSAJE_SOLO_LETRAS_Y_ESPACIOS, REGEX_DNI, REGEX_SOLO_LETRAS_Y_ESPACIOS } from "@/lib/schemas/comun"
@@ -14,7 +15,7 @@ const hora = z
 
 // ── Docente ──────────────────────────────────────────────────────────────
 
-export const docenteSchema = z
+export const crearDocenteSchema = (fechaOriginal?: string | null) => z
   .object({
     nombre: z
       .string()
@@ -55,6 +56,8 @@ export const docenteSchema = z
     accesoId: accesoId.optional(),
   })
   .superRefine((valores, ctx) => {
+    const error = errorNacimiento(valores.fechaNaci, "adulto", fechaOriginal)
+    if (error) ctx.addIssue({ code: "custom", path: ["fechaNaci"], message: error })
     if (valores.niveles.length === 0) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -63,6 +66,7 @@ export const docenteSchema = z
       })
     }
   })
+export const docenteSchema = crearDocenteSchema()
 export type DocenteValues = z.infer<typeof docenteSchema>
 
 // ── Curso ────────────────────────────────────────────────────────────────
