@@ -496,23 +496,24 @@ function DocenteFormDialog({
       toast.error("Ingresa un DNI de 8 dígitos")
       return
     }
-    const sigueVigente = comprobacionDni.capturarVigencia()
-    if (!await comprobacionDni.comprobar(dni) || !sigueVigente()) return
-    try {
-      const previos = form.getValues()
-      const r = await consultarDni.mutateAsync(dni)
-      if (!sigueVigente() || form.getValues("documentoIdentidad") !== dni) return
-      const actuales = form.getValues()
-      if (actuales.nombre !== previos.nombre || actuales.apellidoPat !== previos.apellidoPat || actuales.apellidoMat !== previos.apellidoMat) return
-      form.setValue("nombre", r.nombres ?? "", { shouldValidate: true })
-      form.setValue("apellidoPat", r.apellidoPaterno ?? "", { shouldValidate: true })
-      form.setValue("apellidoMat", r.apellidoMaterno ?? "", { shouldValidate: true })
-      const mensaje = r.origen === "RENIEC" || r.origen === "CACHE" ? "Datos completados desde RENIEC" : "Datos completados automáticamente"
-      toast.success(mensaje)
-    } catch (error) {
-      if (!sigueVigente()) return
-      toast.error(error instanceof Error ? error.message : "No se pudo consultar el DNI")
-    }
+    await comprobacionDni.ejecutarBusqueda(async (sigueVigente) => {
+      if (!await comprobacionDni.comprobar(dni) || !sigueVigente()) return
+      try {
+        const previos = form.getValues()
+        const r = await consultarDni.mutateAsync(dni)
+        if (!sigueVigente() || form.getValues("documentoIdentidad") !== dni) return
+        const actuales = form.getValues()
+        if (actuales.nombre !== previos.nombre || actuales.apellidoPat !== previos.apellidoPat || actuales.apellidoMat !== previos.apellidoMat) return
+        form.setValue("nombre", r.nombres ?? "", { shouldValidate: true })
+        form.setValue("apellidoPat", r.apellidoPaterno ?? "", { shouldValidate: true })
+        form.setValue("apellidoMat", r.apellidoMaterno ?? "", { shouldValidate: true })
+        const mensaje = r.origen === "RENIEC" || r.origen === "CACHE" ? "Datos completados desde RENIEC" : "Datos completados automáticamente"
+        toast.success(mensaje)
+      } catch (error) {
+        if (!sigueVigente()) return
+        toast.error(error instanceof Error ? error.message : "No se pudo consultar el DNI")
+      }
+    })
   }
 
   async function onSubmit(values: DocenteValues) {
@@ -589,7 +590,7 @@ function DocenteFormDialog({
                             onBlur={() => { field.onBlur(); void comprobacionDni.comprobar(field.value) }}
                             name={field.name}
                             inputRef={field.ref}
-                            cargando={consultarDni.isPending || comprobacionDni.comprobando}
+                            cargando={comprobacionDni.buscando}
                             onBuscar={handleBuscarDni}
                             error={form.formState.errors.documentoIdentidad}
                             autoFocus

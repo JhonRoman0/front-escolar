@@ -227,6 +227,9 @@ export const matriculasApi = {
   async pagos(id: number): Promise<PagoMatriculaResponse[]> {
     return apiFetch<PagoMatriculaResponse[]>(`/matriculas/${id}/pagos`)
   },
+  async validarDniAlumno(dni: string): Promise<void> {
+    return apiFetch<void>(`/matriculas/inscripcion/alumno/validar-dni/${encodeURIComponent(dni)}`)
+  },
   async buscarAlumno(dni: string): Promise<AlumnoBusqueda> {
     return apiFetch<AlumnoBusqueda>(`/matriculas/inscripcion/alumno/${encodeURIComponent(dni)}`)
   },

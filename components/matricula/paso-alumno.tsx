@@ -21,7 +21,7 @@ import { CamposNombres } from "@/components/shared/campos-nombres"
 import { useBuscarAlumnoInscripcion } from "@/hooks/use-matricula"
 import { useSexos } from "@/hooks/use-pagos"
 import { useConsultarDni } from "@/hooks/use-reniec"
-import type { ApoderadoBusqueda } from "@/lib/api/matricula"
+import { matriculasApi, type ApoderadoBusqueda } from "@/lib/api/matricula"
 import { alumnoPasoDefault, crearAlumnoPasoSchema, type AlumnoPasoValues } from "@/lib/schemas/matricula"
 
 import { hoyNacimiento, NACIMIENTO_MINIMO_ALUMNO } from "@/lib/edades"
@@ -66,7 +66,7 @@ export function PasoAlumno({ value, onCancelar, onSiguiente }: PasoAlumnoProps) 
   const bloqueado = !!existente
 
   const comprobacionDni = useValidarDniPersona({
-    validar: (dni) => buscarAlumno.mutateAsync(dni),
+    validar: (dni) => matriculasApi.validarDniAlumno(dni),
     original: bloqueado ? form.getValues("documentoIdentidad") : undefined,
     onError: (message) => form.setError("documentoIdentidad", { message }),
     onValido: () => form.clearErrors("documentoIdentidad"),
@@ -75,49 +75,51 @@ export function PasoAlumno({ value, onCancelar, onSiguiente }: PasoAlumnoProps) 
   async function handleBuscar() {
     const dni = form.getValues("documentoIdentidad").trim()
     if (!REGEX_DNI.test(dni)) return
-    const sigueVigente = comprobacionDni.capturarVigencia()
-    let internoCorrecto = false
-    try {
-      const alumno = await buscarAlumno.mutateAsync(dni)
-      if (!sigueVigente()) return
-      internoCorrecto = true
-      form.clearErrors("documentoIdentidad")
-      if (alumno.existe) {
-        setFechaOriginal(alumno.fechaNacimiento ?? null)
-        form.reset({
-          documentoIdentidad: dni,
-          nombre: alumno.nombre ?? "",
-          apellidoPat: alumno.apellidoPat ?? "",
-          apellidoMat: alumno.apellidoMat ?? "",
-          fechaNacimiento: alumno.fechaNacimiento ?? "",
-          sexo: alumno.sexo ?? "",
-          direccion: alumno.direccion ?? "",
-          tieneDiscapacidad: alumno.tieneDiscapacidad,
-          discapacidad: alumno.discapacidad ?? "",
-        })
-        setExistente({ existe: true, idAlumno: alumno.idAlumno, urlFoto: alumno.urlFoto, ultimaMatricula: alumno.ultimaMatricula })
-        setApoderadosPrevios(alumno.apoderados)
-        setFoto(null)
-        setPreview(alumno.urlFoto)
-        toast.success(`${alumno.nombre} ${alumno.apellidoPat} ya es alumno del colegio`)
-        return
+    await comprobacionDni.ejecutarBusqueda(async (sigueVigente) => {
+      if (!await comprobacionDni.comprobar(dni) || !sigueVigente()) return
+      let internoCorrecto = false
+      try {
+        const alumno = await buscarAlumno.mutateAsync(dni)
+        if (!sigueVigente()) return
+        internoCorrecto = true
+        form.clearErrors("documentoIdentidad")
+        if (alumno.existe) {
+          setFechaOriginal(alumno.fechaNacimiento ?? null)
+          form.reset({
+            documentoIdentidad: dni,
+            nombre: alumno.nombre ?? "",
+            apellidoPat: alumno.apellidoPat ?? "",
+            apellidoMat: alumno.apellidoMat ?? "",
+            fechaNacimiento: alumno.fechaNacimiento ?? "",
+            sexo: alumno.sexo ?? "",
+            direccion: alumno.direccion ?? "",
+            tieneDiscapacidad: alumno.tieneDiscapacidad,
+            discapacidad: alumno.discapacidad ?? "",
+          })
+          setExistente({ existe: true, idAlumno: alumno.idAlumno, urlFoto: alumno.urlFoto, ultimaMatricula: alumno.ultimaMatricula })
+          setApoderadosPrevios(alumno.apoderados)
+          setFoto(null)
+          setPreview(alumno.urlFoto)
+          toast.success(`${alumno.nombre} ${alumno.apellidoPat} ya es alumno del colegio`)
+          return
+        }
+        setExistente(null)
+        setApoderadosPrevios(null)
+        const previos = form.getValues()
+        const r = await consultarDni.mutateAsync(dni)
+        if (!sigueVigente()) return
+        const actuales = form.getValues()
+        if (actuales.nombre !== previos.nombre || actuales.apellidoPat !== previos.apellidoPat || actuales.apellidoMat !== previos.apellidoMat) return
+        form.setValue("nombre", r.nombres ?? "", { shouldValidate: true })
+        form.setValue("apellidoPat", r.apellidoPaterno ?? "", { shouldValidate: true })
+        form.setValue("apellidoMat", r.apellidoMaterno ?? "", { shouldValidate: true })
+        toast.success("Datos completados desde RENIEC")
+      } catch (error) {
+        if (!sigueVigente()) return
+        if (!internoCorrecto) form.setError("documentoIdentidad", { message: error instanceof Error ? error.message : "No se pudo comprobar el DNI en el colegio. Reintenta." })
+        else toast.error(error instanceof Error ? error.message : "No se pudo consultar el DNI")
       }
-      setExistente(null)
-      setApoderadosPrevios(null)
-      const previos = form.getValues()
-      const r = await consultarDni.mutateAsync(dni)
-      if (!sigueVigente()) return
-      const actuales = form.getValues()
-      if (actuales.nombre !== previos.nombre || actuales.apellidoPat !== previos.apellidoPat || actuales.apellidoMat !== previos.apellidoMat) return
-      form.setValue("nombre", r.nombres ?? "", { shouldValidate: true })
-      form.setValue("apellidoPat", r.apellidoPaterno ?? "", { shouldValidate: true })
-      form.setValue("apellidoMat", r.apellidoMaterno ?? "", { shouldValidate: true })
-      toast.success("Datos completados desde RENIEC")
-    } catch (error) {
-      if (!sigueVigente()) return
-      if (!internoCorrecto) form.setError("documentoIdentidad", { message: error instanceof Error ? error.message : "No se pudo comprobar el DNI en el colegio. Reintenta." })
-      else toast.error(error instanceof Error ? error.message : "No se pudo consultar el DNI")
-    }
+    })
   }
 
   function handleCambiarDni(dni: string) {
@@ -213,7 +215,7 @@ export function PasoAlumno({ value, onCancelar, onSiguiente }: PasoAlumnoProps) 
             onBlur={() => { field.onBlur(); void comprobacionDni.comprobar(field.value) }}
             name={field.name}
             inputRef={field.ref}
-            cargando={buscarAlumno.isPending || consultarDni.isPending || comprobacionDni.comprobando}
+            cargando={comprobacionDni.buscando}
             onBuscar={handleBuscar}
             error={form.formState.errors.documentoIdentidad}
             autoFocus
