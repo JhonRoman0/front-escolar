@@ -1,5 +1,8 @@
 "use client"
 
+import { ACCESO } from "@/lib/api/academico"
+import { useValidarDniPersona } from "@/hooks/use-validar-dni-persona"
+
 import { useState } from "react"
 import { toast } from "sonner"
 import { Loader2, RefreshCcw } from "lucide-react"
@@ -17,6 +20,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field"
+import { nacimientoMaximoAdulto } from "@/lib/edades"
 import { Input } from "@/components/ui/input"
 import {
   Select,
@@ -42,7 +46,7 @@ import {
   useTiposContrato,
 } from "@/hooks/use-academico"
 import { useConsultarDni } from "@/hooks/use-reniec"
-import type { UsuarioResponse, UsuarioRequest } from "@/lib/api/seguridad"
+import { usuariosApi, type UsuarioResponse, type UsuarioRequest } from "@/lib/api/seguridad"
 import {
   crearUsuarioSchema,
   type UsuarioValues,
@@ -134,7 +138,7 @@ export default function UsuarioFormDialog({
         !!rolDocente && values.rolIds.includes(rolDocente.idRol)
       const exige =
         seleccionaDocente && (esEdicion ? !docenteActivo : true)
-      return zodResolver(crearUsuarioSchema(exige))(
+      return zodResolver(crearUsuarioSchema(exige, usuario?.fechaNaci))(
         values,
         context,
         options
@@ -226,25 +230,42 @@ export default function UsuarioFormDialog({
     }
   }
 
+  const comprobacionDni = useValidarDniPersona({
+    validar: (dni) => usuariosApi.validarDni(dni),
+    original: usuario?.documentoIdentidad,
+    abierta: open,
+    onError: (message) => form.setError("documentoIdentidad", { message }),
+    onValido: () => form.clearErrors("documentoIdentidad"),
+  })
+
   async function handleBuscarDni() {
     const dni = form.getValues("documentoIdentidad")?.trim()
     if (!dni || !REGEX_DNI.test(dni)) {
       toast.error("Ingresa un DNI de 8 dígitos")
       return
     }
-    try {
-      const r = await consultarDni.mutateAsync(dni)
-      form.setValue("nombre", r.nombres ?? "", { shouldValidate: true })
-      form.setValue("apellidoPat", r.apellidoPaterno ?? "", { shouldValidate: true })
-      form.setValue("apellidoMat", r.apellidoMaterno ?? "", { shouldValidate: true })
-      const mensaje = r.origen === "RENIEC" || r.origen === "CACHE" ? "Datos completados desde RENIEC" : "Datos completados automáticamente"
-      toast.success(mensaje)
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "No se pudo consultar el DNI")
-    }
+    await comprobacionDni.ejecutarBusqueda(async (sigueVigente) => {
+      if (!await comprobacionDni.comprobar(dni) || !sigueVigente()) return
+      try {
+        const previos = form.getValues()
+        const r = await consultarDni.mutateAsync(dni)
+        if (!sigueVigente() || form.getValues("documentoIdentidad") !== dni) return
+        const actuales = form.getValues()
+        if (actuales.nombre !== previos.nombre || actuales.apellidoPat !== previos.apellidoPat || actuales.apellidoMat !== previos.apellidoMat) return
+        form.setValue("nombre", r.nombres ?? "", { shouldValidate: true })
+        form.setValue("apellidoPat", r.apellidoPaterno ?? "", { shouldValidate: true })
+        form.setValue("apellidoMat", r.apellidoMaterno ?? "", { shouldValidate: true })
+        const mensaje = r.origen === "RENIEC" || r.origen === "CACHE" ? "Datos completados desde RENIEC" : "Datos completados automáticamente"
+        toast.success(mensaje)
+      } catch (error) {
+        if (!sigueVigente()) return
+        toast.error(error instanceof Error ? error.message : "No se pudo consultar el DNI")
+      }
+    })
   }
 
   async function onSubmit(values: UsuarioValues) {
+    if (!await comprobacionDni.comprobar(values.documentoIdentidad, !!usuario && usuario.accesoId !== ACCESO.ACTIVO && values.accesoId === ACCESO.ACTIVO)) return
     const guardando = toast.loading(
       esEdicion ? "Guardando usuario..." : "Creando usuario..."
     )
@@ -310,6 +331,14 @@ export default function UsuarioFormDialog({
 
   async function handleConfirmarReactivacion() {
     if (!reactivacion) return
+    const sigueVigente = comprobacionDni.capturarVigencia()
+    const compatible = await comprobacionDni.comprobar(reactivacion.request.documentoIdentidad ?? "", true)
+    if (!sigueVigente()) throw new Error("Comprobación cancelada")
+    if (!compatible) {
+      const mensaje = form.getFieldState("documentoIdentidad").error?.message ?? "No se pudo comprobar el DNI en el colegio. Reintenta."
+      toast.error(mensaje)
+      throw new Error(mensaje)
+    }
     const guardando = toast.loading("Reactivando usuario...")
     try {
       const reactivado = await reactivar.mutateAsync({
@@ -332,6 +361,7 @@ export default function UsuarioFormDialog({
         error instanceof Error ? error.message : "Error al reactivar",
         { id: guardando }
       )
+      throw error
     }
   }
 
@@ -342,7 +372,7 @@ export default function UsuarioFormDialog({
 
   return (
     <>
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(next) => { comprobacionDni.invalidar(); onOpenChange(next) }}>
       <DialogContent className="flex max-h-[85vh] flex-col sm:max-w-4xl">
         <DialogHeader className="shrink-0">
           <DialogTitle className="text-lg font-semibold tracking-tight">{esEdicion ? "Editar usuario" : "Nuevo usuario"}</DialogTitle>
@@ -375,11 +405,11 @@ export default function UsuarioFormDialog({
                       render={({ field }) => (
                         <CampoDni
                           value={field.value}
-                          onChange={field.onChange}
-                          onBlur={field.onBlur}
+                          onChange={(dni) => { comprobacionDni.invalidar(); form.clearErrors("documentoIdentidad"); field.onChange(dni) }}
+                          onBlur={() => { field.onBlur(); void comprobacionDni.comprobar(field.value) }}
                           name={field.name}
                           inputRef={field.ref}
-                          cargando={consultarDni.isPending}
+                          cargando={comprobacionDni.buscando}
                           onBuscar={handleBuscarDni}
                           error={form.formState.errors.documentoIdentidad}
                           autoFocus
@@ -395,7 +425,12 @@ export default function UsuarioFormDialog({
                         <Field>
                           <FieldLabel>Fecha de nacimiento *</FieldLabel>
                           <FieldContent>
-                            <Input type="date" {...field} />
+                            <Input
+                              type="date"
+                              onFocus={(event) => { event.currentTarget.max = nacimientoMaximoAdulto() }}
+                              max={nacimientoMaximoAdulto()}
+                              {...field}
+                            />
                             <FieldError errors={[form.formState.errors.fechaNaci]} />
                           </FieldContent>
                         </Field>
@@ -684,7 +719,7 @@ export default function UsuarioFormDialog({
 
           <DialogFooter className="shrink-0">
             <DialogTrigger render={<Button variant="outline" />}>Cancelar</DialogTrigger>
-            <Button type="submit" disabled={enviando}>
+            <Button type="submit" disabled={enviando || form.formState.isSubmitting}>
               {enviando && <Loader2 className="animate-spin" data-icon="inline-start" />}
               {esEdicion ? "Guardar cambios" : "Crear usuario"}
             </Button>
@@ -708,7 +743,7 @@ export default function UsuarioFormDialog({
           textoBoton="Reactivar"
           icono={<RefreshCcw />}
           variantConfirmar="default"
-          disabled={reactivar.isPending}
+          disabled={reactivar.isPending || comprobacionDni.comprobando}
           onConfirm={handleConfirmarReactivacion}
         />
       )}

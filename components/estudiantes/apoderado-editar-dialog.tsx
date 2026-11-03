@@ -14,7 +14,7 @@ import { Aviso, FormularioApoderado } from "@/components/matricula/paso-apoderad
 import { casillaTrasCambiarCorreo, CampoRestablecerContrasena } from "@/components/shared/campo-restablecer-contrasena"
 import { useActualizarApoderado, useHijosDeApoderado, useReemplazarApoderado } from "@/hooks/use-estudiantes"
 import type { AlumnoResponse, ApoderadoResponse } from "@/lib/api/estudiantes"
-import { apoderadoPasoDefault, apoderadosPasoSchema, type ApoderadoPasoValues, type ApoderadosPasoValues } from "@/lib/schemas/matricula"
+import { apoderadoPasoDefault, crearApoderadosPasoSchema, type ApoderadoPasoValues, type ApoderadosPasoValues } from "@/lib/schemas/matricula"
 
 const SIN_ACCESOS = "Datos guardados, pero no se pudo enviar el correo"
 
@@ -76,7 +76,7 @@ function Formulario({
   const [original] = useState(() => valoresOriginales(apoderado))
   const [restablecer, setRestablecer] = useState(false)
   const form = useForm<ApoderadosPasoValues>({
-    resolver: zodResolver(apoderadosPasoSchema),
+    resolver: zodResolver(crearApoderadosPasoSchema(original)),
     defaultValues: { apoderados: [original] },
   })
   const estado = useWatch({ control: form.control, name: "apoderados.0.estado" })

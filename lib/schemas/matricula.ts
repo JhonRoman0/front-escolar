@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { errorNacimiento } from "@/lib/edades"
 
 import {
   MENSAJE_DNI,
@@ -17,23 +18,26 @@ const nombre = (campo: string) =>
 
 // ── Paso 1: alumno ──────────────────────────────────────────────────────
 
-export const alumnoPasoSchema = z
+export const crearAlumnoPasoSchema = (original?: string | null) => z
   .object({
     documentoIdentidad: z.string().regex(REGEX_DNI, MENSAJE_DNI),
     nombre: nombre("El nombre"),
     apellidoPat: nombre("El apellido paterno"),
     apellidoMat: nombre("El apellido materno"),
-    fechaNacimiento: z.string().min(1, "La fecha de nacimiento es obligatoria"),
+    fechaNacimiento: z.string(),
     sexo: z.string().min(1, "Selecciona el sexo"),
     direccion: z.string().trim().min(1, "La dirección es obligatoria").max(120, "Máximo 120 caracteres"),
     tieneDiscapacidad: z.boolean(),
     discapacidad: z.string().max(255, "Máximo 255 caracteres"),
   })
   .superRefine((val, ctx) => {
+    const error = errorNacimiento(val.fechaNacimiento, "alumno", original)
+    if (error) ctx.addIssue({ code: "custom", path: ["fechaNacimiento"], message: error })
     if (val.tieneDiscapacidad && !val.discapacidad.trim()) {
       ctx.addIssue({ code: "custom", path: ["discapacidad"], message: "Describe la discapacidad" })
     }
   })
+export const alumnoPasoSchema = crearAlumnoPasoSchema()
 export type AlumnoPasoValues = z.infer<typeof alumnoPasoSchema>
 
 export const alumnoPasoDefault: AlumnoPasoValues = {
@@ -91,14 +95,19 @@ const apoderadoPasoSchema = z
       const resultado = nombre(etiqueta).safeParse(val[campo])
       exigir(resultado.success, campo, resultado.error?.issues[0]?.message ?? "")
     }
-    exigir(!!val.fechaNaci, "fechaNaci", "La fecha de nacimiento es obligatoria")
     exigir(z.string().email().safeParse(val.gmail.trim()).success, "gmail", "Escribe un correo válido")
   })
 export type ApoderadoPasoValues = z.infer<typeof apoderadoPasoSchema>
 
-export const apoderadosPasoSchema = z
+export const crearApoderadosPasoSchema = (original?: { documentoIdentidad: string; fechaNaci: string }) => z
   .object({ apoderados: z.array(apoderadoPasoSchema).min(1).max(2) })
   .superRefine((val, ctx) => {
+    val.apoderados.forEach((apoderado, indice) => {
+      if (apoderado.estado !== "NUEVO" && apoderado.estado !== "EDICION") return
+      const fechaOriginal = apoderado.estado === "EDICION" && apoderado.documentoIdentidad === original?.documentoIdentidad ? original.fechaNaci : undefined
+      const error = errorNacimiento(apoderado.fechaNaci, "adulto", fechaOriginal)
+      if (error) ctx.addIssue({ code: "custom", path: ["apoderados", indice, "fechaNaci"], message: error })
+    })
     const [principal, secundario] = val.apoderados
     if (secundario && principal.documentoIdentidad === secundario.documentoIdentidad) {
       ctx.addIssue({
@@ -108,6 +117,7 @@ export const apoderadosPasoSchema = z
       })
     }
   })
+export const apoderadosPasoSchema = crearApoderadosPasoSchema()
 export type ApoderadosPasoValues = z.infer<typeof apoderadosPasoSchema>
 
 export const apoderadoPasoDefault: ApoderadoPasoValues = {

@@ -7,6 +7,7 @@ import { Controller, useFieldArray, useForm, useWatch, type UseFormReturn } from
 
 import { Button } from "@/components/ui/button"
 import { Field, FieldContent, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field"
+import { nacimientoMaximoAdulto } from "@/lib/edades"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
@@ -344,7 +345,13 @@ export function FormularioApoderado({
                 <Field>
                   <FieldLabel>Fecha de nacimiento *</FieldLabel>
                   <FieldContent>
-                    <Input type="date" disabled={tieneCuenta} {...field} />
+                    <Input
+                      type="date"
+                      onFocus={(event) => { event.currentTarget.max = nacimientoMaximoAdulto() }}
+                      max={tieneCuenta ? undefined : nacimientoMaximoAdulto()}
+                      disabled={tieneCuenta}
+                      {...field}
+                    />
                     <FieldError errors={[errores?.fechaNaci]} />
                   </FieldContent>
                 </Field>

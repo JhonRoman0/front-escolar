@@ -1,5 +1,7 @@
 "use client"
 
+import { useValidarDniPersona } from "@/hooks/use-validar-dni-persona"
+import { REGEX_DNI } from "@/lib/schemas/comun"
 import { useState } from "react"
 import { toast } from "sonner"
 import { GraduationCap } from "lucide-react"
@@ -19,8 +21,10 @@ import { CamposNombres } from "@/components/shared/campos-nombres"
 import { useBuscarAlumnoInscripcion } from "@/hooks/use-matricula"
 import { useSexos } from "@/hooks/use-pagos"
 import { useConsultarDni } from "@/hooks/use-reniec"
-import type { ApoderadoBusqueda } from "@/lib/api/matricula"
-import { alumnoPasoDefault, alumnoPasoSchema, type AlumnoPasoValues } from "@/lib/schemas/matricula"
+import { matriculasApi, type ApoderadoBusqueda } from "@/lib/api/matricula"
+import { alumnoPasoDefault, crearAlumnoPasoSchema, type AlumnoPasoValues } from "@/lib/schemas/matricula"
+
+import { hoyNacimiento, NACIMIENTO_MINIMO_ALUMNO } from "@/lib/edades"
 
 export interface AlumnoPaso {
   valores: AlumnoPasoValues
@@ -52,50 +56,75 @@ export function PasoAlumno({ value, onCancelar, onSiguiente }: PasoAlumnoProps) 
   )
   const [errorFoto, setErrorFoto] = useState(false)
 
+  const [fechaOriginal, setFechaOriginal] = useState(value?.existe ? value.valores.fechaNacimiento : null)
   const form = useForm<AlumnoPasoValues>({
-    resolver: zodResolver(alumnoPasoSchema),
+    resolver: zodResolver(crearAlumnoPasoSchema(existente ? fechaOriginal : undefined)),
     defaultValues: value?.valores ?? alumnoPasoDefault,
   })
   const tieneDiscapacidad = useWatch({ control: form.control, name: "tieneDiscapacidad" })
   const [nombre, apellidoPat] = useWatch({ control: form.control, name: ["nombre", "apellidoPat"] })
   const bloqueado = !!existente
 
+  const comprobacionDni = useValidarDniPersona({
+    validar: (dni) => matriculasApi.validarDniAlumno(dni),
+    original: bloqueado ? form.getValues("documentoIdentidad") : undefined,
+    onError: (message) => form.setError("documentoIdentidad", { message }),
+    onValido: () => form.clearErrors("documentoIdentidad"),
+  })
+
   async function handleBuscar() {
     const dni = form.getValues("documentoIdentidad").trim()
-    try {
-      const alumno = await buscarAlumno.mutateAsync(dni)
-      if (alumno.existe) {
-        form.reset({
-          documentoIdentidad: dni,
-          nombre: alumno.nombre ?? "",
-          apellidoPat: alumno.apellidoPat ?? "",
-          apellidoMat: alumno.apellidoMat ?? "",
-          fechaNacimiento: alumno.fechaNacimiento ?? "",
-          sexo: alumno.sexo ?? "",
-          direccion: alumno.direccion ?? "",
-          tieneDiscapacidad: alumno.tieneDiscapacidad,
-          discapacidad: alumno.discapacidad ?? "",
-        })
-        setExistente({ existe: true, idAlumno: alumno.idAlumno, urlFoto: alumno.urlFoto, ultimaMatricula: alumno.ultimaMatricula })
-        setApoderadosPrevios(alumno.apoderados)
-        setFoto(null)
-        setPreview(alumno.urlFoto)
-        toast.success(`${alumno.nombre} ${alumno.apellidoPat} ya es alumno del colegio`)
-        return
+    if (!REGEX_DNI.test(dni)) return
+    await comprobacionDni.ejecutarBusqueda(async (sigueVigente) => {
+      if (!await comprobacionDni.comprobar(dni) || !sigueVigente()) return
+      let internoCorrecto = false
+      try {
+        const alumno = await buscarAlumno.mutateAsync(dni)
+        if (!sigueVigente()) return
+        internoCorrecto = true
+        form.clearErrors("documentoIdentidad")
+        if (alumno.existe) {
+          setFechaOriginal(alumno.fechaNacimiento ?? null)
+          form.reset({
+            documentoIdentidad: dni,
+            nombre: alumno.nombre ?? "",
+            apellidoPat: alumno.apellidoPat ?? "",
+            apellidoMat: alumno.apellidoMat ?? "",
+            fechaNacimiento: alumno.fechaNacimiento ?? "",
+            sexo: alumno.sexo ?? "",
+            direccion: alumno.direccion ?? "",
+            tieneDiscapacidad: alumno.tieneDiscapacidad,
+            discapacidad: alumno.discapacidad ?? "",
+          })
+          setExistente({ existe: true, idAlumno: alumno.idAlumno, urlFoto: alumno.urlFoto, ultimaMatricula: alumno.ultimaMatricula })
+          setApoderadosPrevios(alumno.apoderados)
+          setFoto(null)
+          setPreview(alumno.urlFoto)
+          toast.success(`${alumno.nombre} ${alumno.apellidoPat} ya es alumno del colegio`)
+          return
+        }
+        setExistente(null)
+        setApoderadosPrevios(null)
+        const previos = form.getValues()
+        const r = await consultarDni.mutateAsync(dni)
+        if (!sigueVigente()) return
+        const actuales = form.getValues()
+        if (actuales.nombre !== previos.nombre || actuales.apellidoPat !== previos.apellidoPat || actuales.apellidoMat !== previos.apellidoMat) return
+        form.setValue("nombre", r.nombres ?? "", { shouldValidate: true })
+        form.setValue("apellidoPat", r.apellidoPaterno ?? "", { shouldValidate: true })
+        form.setValue("apellidoMat", r.apellidoMaterno ?? "", { shouldValidate: true })
+        toast.success("Datos completados desde RENIEC")
+      } catch (error) {
+        if (!sigueVigente()) return
+        if (!internoCorrecto) form.setError("documentoIdentidad", { message: error instanceof Error ? error.message : "No se pudo comprobar el DNI en el colegio. Reintenta." })
+        else toast.error(error instanceof Error ? error.message : "No se pudo consultar el DNI")
       }
-      setExistente(null)
-      setApoderadosPrevios(null)
-      const r = await consultarDni.mutateAsync(dni)
-      form.setValue("nombre", r.nombres ?? "", { shouldValidate: true })
-      form.setValue("apellidoPat", r.apellidoPaterno ?? "", { shouldValidate: true })
-      form.setValue("apellidoMat", r.apellidoMaterno ?? "", { shouldValidate: true })
-      toast.success("Datos completados desde RENIEC")
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "No se pudo consultar el DNI")
-    }
+    })
   }
 
   function handleCambiarDni(dni: string) {
+    comprobacionDni.invalidar()
+    form.clearErrors("documentoIdentidad")
     form.setValue("documentoIdentidad", dni)
     // Otro DNI es otro alumno: se olvida el que se había encontrado.
     if (existente) {
@@ -118,7 +147,8 @@ export function PasoAlumno({ value, onCancelar, onSiguiente }: PasoAlumnoProps) 
     setPreview(existente?.urlFoto ?? null)
   }
 
-  const handleSiguiente = form.handleSubmit((valores) => {
+  const handleSiguiente = form.handleSubmit(async (valores) => {
+    if (!await comprobacionDni.comprobar(valores.documentoIdentidad)) return
     if (!foto && !existente?.urlFoto) {
       setErrorFoto(true)
       toast.error("La foto del alumno es obligatoria")
@@ -182,10 +212,10 @@ export function PasoAlumno({ value, onCancelar, onSiguiente }: PasoAlumnoProps) 
           <CampoDni
             value={field.value}
             onChange={handleCambiarDni}
-            onBlur={field.onBlur}
+            onBlur={() => { field.onBlur(); void comprobacionDni.comprobar(field.value) }}
             name={field.name}
             inputRef={field.ref}
-            cargando={buscarAlumno.isPending || consultarDni.isPending}
+            cargando={comprobacionDni.buscando}
             onBuscar={handleBuscar}
             error={form.formState.errors.documentoIdentidad}
             autoFocus
@@ -207,7 +237,13 @@ export function PasoAlumno({ value, onCancelar, onSiguiente }: PasoAlumnoProps) 
                 <Field>
                   <FieldLabel>Fecha de nacimiento *</FieldLabel>
                   <FieldContent>
-                    <Input type="date" {...field} />
+                    <Input
+                      type="date"
+                      onFocus={(event) => { if (!bloqueado) event.currentTarget.max = hoyNacimiento() }}
+                      min={bloqueado ? undefined : NACIMIENTO_MINIMO_ALUMNO}
+                      max={bloqueado ? undefined : hoyNacimiento()}
+                      {...field}
+                    />
                     <FieldError errors={[form.formState.errors.fechaNacimiento]} />
                   </FieldContent>
                 </Field>
@@ -287,7 +323,7 @@ export function PasoAlumno({ value, onCancelar, onSiguiente }: PasoAlumnoProps) 
 
       <div className="flex justify-end gap-2">
         <Button type="button" variant="outline" onClick={onCancelar}>Cancelar</Button>
-        <Button type="button" variant="brand" onClick={handleSiguiente}>Siguiente</Button>
+        <Button type="button" variant="brand" onClick={handleSiguiente} disabled={form.formState.isSubmitting}>Siguiente</Button>
       </div>
     </div>
   )
