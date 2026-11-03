@@ -173,8 +173,10 @@ function Asistente({ onCerrar, onCreada }: { onCerrar: () => void; onCreada?: (m
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-5">
-      <Stepper steps={PASOS} paso={paso} />
-      <div className="min-h-0 flex-1 overflow-y-auto px-0.5 pb-1">
+      <div className="shrink-0">
+        <Stepper steps={PASOS} paso={paso} />
+      </div>
+      <div className="flex min-h-0 flex-1 flex-col">
         {paso === 1 && <PasoAlumno value={alumno} onCancelar={onCerrar} onSiguiente={handleAlumno} />}
         {paso === 2 && alumno && (
           <PasoApoderado

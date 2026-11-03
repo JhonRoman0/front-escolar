@@ -652,7 +652,7 @@ function ConfiguracionCursoDialog({
       return
     }
     setConfirmando(false)
-    await ejecutar([
+    const exito = await ejecutar([
       ...(cambioSubcursos ? [{
         nombre: "la configuración de subcursos",
         guardar: () => onSubcursos(curso, habilitados),
@@ -661,6 +661,7 @@ function ConfiguracionCursoDialog({
           : `Se ${habilitados ? "habilitaron" : "deshabilitaron"} los subcursos.`,
       }] : []),
     ], ocupado)
+    if (exito) onCerrar()
   }
 
   return (
@@ -965,8 +966,8 @@ function ImportarCursosModal({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-2xl">
-        <DialogHeader>
+      <DialogContent className="flex max-h-[90dvh] flex-col overflow-hidden sm:max-w-2xl">
+        <DialogHeader className="shrink-0">
           <DialogTitle className="flex items-center gap-2 text-lg font-semibold tracking-tight">
             <FileSpreadsheet className="size-5 text-primary" />
             Importar cursos del SIAGIE al año {anio.anio}
@@ -977,60 +978,65 @@ function ImportarCursosModal({
           </DialogDescription>
         </DialogHeader>
 
-        {resultado ? (
-          <div className="space-y-4 py-2">
-            <div className="flex items-center gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-emerald-950 dark:text-emerald-200">
-              <CheckCircle2 className="size-6 shrink-0 text-emerald-600 dark:text-emerald-400" />
-              <p className="font-semibold leading-tight">Importación completada</p>
-            </div>
-            <div className="grid grid-cols-2 gap-2.5">
-              <Contador valor={resultado.creados} texto="Nuevos" />
-              <Contador valor={resultado.actualizados} texto="Actualizados" />
-            </div>
-            <DialogFooter>
-              <Button variant="brand" className="w-full" onClick={() => handleOpenChange(false)}>
-                Entendido
-              </Button>
-            </DialogFooter>
-          </div>
-        ) : (
-          <div className="space-y-4 py-2">
-            <label
-              htmlFor="excel-cursos"
-              className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-muted-foreground/25 p-5 text-center transition-colors hover:bg-muted/40"
-            >
-              <Upload className="mb-2 size-7 text-muted-foreground" />
-              <span className="text-sm font-semibold text-primary">
-                {archivo ? "Elegir otro archivo" : "Seleccionar archivo .xlsx"}
-              </span>
-              {archivo && (
-                <span className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <FileCheck className="size-3.5 text-emerald-600" />
-                  {archivo.name}
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto py-2">
+          {resultado ? (
+            <>
+              <div className="flex items-center gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-emerald-950 dark:text-emerald-200">
+                <CheckCircle2 className="size-6 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                <p className="font-semibold leading-tight">Importación completada</p>
+              </div>
+              <div className="grid grid-cols-2 gap-2.5">
+                <Contador valor={resultado.creados} texto="Nuevos" />
+                <Contador valor={resultado.actualizados} texto="Actualizados" />
+              </div>
+            </>
+          ) : (
+            <>
+              <label
+                htmlFor="excel-cursos"
+                className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-muted-foreground/25 p-5 text-center transition-colors hover:bg-muted/40"
+              >
+                <Upload className="mb-2 size-7 text-muted-foreground" />
+                <span className="text-sm font-semibold text-primary">
+                  {archivo ? "Elegir otro archivo" : "Seleccionar archivo .xlsx"}
                 </span>
-              )}
-              <input
-                id="excel-cursos"
-                type="file"
-                accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                className="hidden"
-                onChange={handleArchivo}
-              />
-            </label>
+                {archivo && (
+                  <span className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <FileCheck className="size-3.5 text-emerald-600" />
+                    {archivo.name}
+                  </span>
+                )}
+                <input
+                  id="excel-cursos"
+                  type="file"
+                  accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                  className="hidden"
+                  onChange={handleArchivo}
+                />
+              </label>
 
-            {vistaPrevia.isPending && <p className="text-center text-sm text-muted-foreground">Leyendo el archivo...</p>}
+              {vistaPrevia.isPending && <p className="text-center text-sm text-muted-foreground">Leyendo el archivo...</p>}
 
-            {vista && <VistaPrevia vista={vista} />}
+              {vista && <VistaPrevia vista={vista} />}
+            </>
+          )}
+        </div>
 
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => handleOpenChange(false)} disabled={importar.isPending}>
-                Cancelar
-              </Button>
-              <Button variant="brand" onClick={handleImportar} disabled={!vista || importar.isPending}>
-                {importar.isPending ? "Importando..." : `Importar ${vista?.areas.length ?? ""} cursos`}
-              </Button>
-            </DialogFooter>
-          </div>
+        {resultado ? (
+          <DialogFooter className="shrink-0">
+            <Button variant="brand" className="w-full" onClick={() => handleOpenChange(false)}>
+              Entendido
+            </Button>
+          </DialogFooter>
+        ) : (
+          <DialogFooter className="shrink-0">
+            <Button type="button" variant="outline" onClick={() => handleOpenChange(false)} disabled={importar.isPending}>
+              Cancelar
+            </Button>
+            <Button variant="brand" onClick={handleImportar} disabled={!vista || importar.isPending}>
+              {importar.isPending ? "Importando..." : `Importar ${vista?.areas.length ?? ""} cursos`}
+            </Button>
+          </DialogFooter>
         )}
       </DialogContent>
     </Dialog>
@@ -1072,7 +1078,7 @@ function VistaPrevia({ vista }: { vista: CursoVistaPreviaResponse }) {
         </div>
       )}
 
-      <div className="max-h-[320px] overflow-y-auto rounded-lg border">
+      <div className="rounded-lg border">
         {vista.areas.map((area) => (
           <div key={area.codigo} className="border-b px-3 py-2.5 last:border-b-0">
             <div className="flex flex-wrap items-center gap-2">

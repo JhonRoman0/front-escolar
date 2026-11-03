@@ -322,6 +322,7 @@ function AulasTab() {
               .sort((a, b) => b.anio.localeCompare(a.anio))
               .map((a) => ({ value: String(a.idAnio), label: `${a.anio} · ${estadoAnioTexto(a.estado)}` }))}
             includeAll={false}
+            className="w-[180px] max-w-full shrink-0"
           />
           <FilterSelect
             value={tipoFiltro}

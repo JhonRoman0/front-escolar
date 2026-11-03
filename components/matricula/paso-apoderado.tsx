@@ -68,38 +68,40 @@ export function PasoApoderado({ value, idAlumno, vinculados, validando, onAtras,
   )
 
   return (
-    <div className="flex flex-col gap-4">
-      {fields.map((field, indice) => (
-        <TarjetaSeccion key={field.id}>
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <p className="text-sm font-semibold">
-              {indice === 0 ? "Apoderado principal" : "Apoderado secundario"}
-            </p>
-            {indice > 0 && (
-              <Button type="button" variant="ghost" size="sm" onClick={() => remove(indice)}>
-                <Trash2 className="text-destructive" data-icon="inline-start" />
-                Quitar
-              </Button>
-            )}
-          </div>
-          <FormularioApoderado form={form} indice={indice} idAlumno={idAlumno} />
-        </TarjetaSeccion>
-      ))}
+    <div className="flex min-h-0 flex-1 flex-col gap-4">
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-0.5 pb-1">
+        {fields.map((field, indice) => (
+          <TarjetaSeccion key={field.id}>
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <p className="text-sm font-semibold">
+                {indice === 0 ? "Apoderado principal" : "Apoderado secundario"}
+              </p>
+              {indice > 0 && (
+                <Button type="button" variant="ghost" size="sm" onClick={() => remove(indice)}>
+                  <Trash2 className="text-destructive" data-icon="inline-start" />
+                  Quitar
+                </Button>
+              )}
+            </div>
+            <FormularioApoderado form={form} indice={indice} idAlumno={idAlumno} />
+          </TarjetaSeccion>
+        ))}
 
-      {salen.length > 0 && (
-        <Aviso icono={UserMinus} titulo="Dejará de ser apoderado de este alumno">
-          {salen.map((v) => `${v.nombre} ${v.apellidoPat}`).join(" y ")}: perderá el acceso a sus datos al crear la matrícula. Si no tiene otros hijos en el colegio, también su cuenta de apoderado.
-        </Aviso>
-      )}
+        {salen.length > 0 && (
+          <Aviso icono={UserMinus} titulo="Dejará de ser apoderado de este alumno">
+            {salen.map((v) => `${v.nombre} ${v.apellidoPat}`).join(" y ")}: perderá el acceso a sus datos al crear la matrícula. Si no tiene otros hijos en el colegio, también su cuenta de apoderado.
+          </Aviso>
+        )}
 
-      {fields.length < 2 && (
-        <Button type="button" variant="outline" className="self-start" onClick={() => append(apoderadoPasoDefault)}>
-          <Plus data-icon="inline-start" />
-          Agregar apoderado secundario
-        </Button>
-      )}
+        {fields.length < 2 && (
+          <Button type="button" variant="outline" className="self-start" onClick={() => append(apoderadoPasoDefault)}>
+            <Plus data-icon="inline-start" />
+            Agregar apoderado secundario
+          </Button>
+        )}
+      </div>
 
-      <div className="flex justify-end gap-2">
+      <div className="flex shrink-0 justify-end gap-2 px-0.5 pb-1">
         <Button type="button" variant="outline" onClick={() => onAtras(form.getValues("apoderados"))}>
           Atrás
         </Button>

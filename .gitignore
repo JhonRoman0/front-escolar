@@ -37,7 +37,6 @@ package-lock.json
 *.bak
 
 # env files
-.env
 !.env.example
 AGENTS.md
 APRENDAMOS.md
@@ -49,3 +48,4 @@ FRONTEND-BACK-CONTRATO.md
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+config.bat
