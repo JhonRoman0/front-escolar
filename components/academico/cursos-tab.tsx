@@ -652,7 +652,7 @@ function ConfiguracionCursoDialog({
       return
     }
     setConfirmando(false)
-    await ejecutar([
+    const exito = await ejecutar([
       ...(cambioSubcursos ? [{
         nombre: "la configuración de subcursos",
         guardar: () => onSubcursos(curso, habilitados),
@@ -661,6 +661,7 @@ function ConfiguracionCursoDialog({
           : `Se ${habilitados ? "habilitaron" : "deshabilitaron"} los subcursos.`,
       }] : []),
     ], ocupado)
+    if (exito) onCerrar()
   }
 
   return (
