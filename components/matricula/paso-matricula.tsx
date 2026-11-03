@@ -93,104 +93,106 @@ export function PasoMatricula({ alumno, apoderados, enviando, onAtras, onCrear }
   const principal = apoderados[0]
 
   return (
-    <div className="flex flex-col gap-5">
-      <Field>
-        <FieldLabel>Año escolar *</FieldLabel>
-        <FieldContent>
-          <Select value={idAnio ? String(idAnio) : ""} onValueChange={(valor) => setIdAnioElegido(Number(valor))}>
-            <SelectTrigger className="w-full sm:w-64">
-              <SelectValue placeholder="Selecciona">
-                {aniosMatricula.find((a) => a.idAnio === idAnio)?.anio}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                {aniosMatricula.map((a) => (
-                  <SelectItem key={a.idAnio} value={String(a.idAnio)}>
-                    {a.anio} · {estadoAnioTexto(a.estado)}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-          {opciones?.ultimoGrado && (
-            <FieldDescription className="text-xs">Último grado: {opciones.ultimoGrado}</FieldDescription>
-          )}
-        </FieldContent>
-      </Field>
+    <div className="flex min-h-0 flex-1 flex-col gap-5">
+      <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-0.5 pb-1">
+        <Field>
+          <FieldLabel>Año escolar *</FieldLabel>
+          <FieldContent>
+            <Select value={idAnio ? String(idAnio) : ""} onValueChange={(valor) => setIdAnioElegido(Number(valor))}>
+              <SelectTrigger className="w-full sm:w-64">
+                <SelectValue placeholder="Selecciona">
+                  {aniosMatricula.find((a) => a.idAnio === idAnio)?.anio}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  {aniosMatricula.map((a) => (
+                    <SelectItem key={a.idAnio} value={String(a.idAnio)}>
+                      {a.anio} · {estadoAnioTexto(a.estado)}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+            {opciones?.ultimoGrado && (
+              <FieldDescription className="text-xs">Último grado: {opciones.ultimoGrado}</FieldDescription>
+            )}
+          </FieldContent>
+        </Field>
 
-      {isLoading ? (
-        <Skeleton className="h-32 w-full" />
-      ) : opciones?.bloqueo ? (
-        <AvisoError>{opciones.bloqueo}</AvisoError>
-      ) : opciones && !opciones.grados.length ? (
-        <AvisoError>No hay secciones con cupo disponible en {aniosMatricula.find((a) => a.idAnio === idAnio)?.anio}.</AvisoError>
-      ) : opciones ? (
-        <>
-          <SelectorSeccion
-            grados={grados}
-            value={seleccion}
-            onChange={(nueva) => setElegida({ idAnio, seleccion: nueva })}
-            errores={erroresSeccion}
-          />
+        {isLoading ? (
+          <Skeleton className="h-32 w-full" />
+        ) : opciones?.bloqueo ? (
+          <AvisoError>{opciones.bloqueo}</AvisoError>
+        ) : opciones && !opciones.grados.length ? (
+          <AvisoError>No hay secciones con cupo disponible en {aniosMatricula.find((a) => a.idAnio === idAnio)?.anio}.</AvisoError>
+        ) : opciones ? (
+          <>
+            <SelectorSeccion
+              grados={grados}
+              value={seleccion}
+              onChange={(nueva) => setElegida({ idAnio, seleccion: nueva })}
+              errores={erroresSeccion}
+            />
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field>
-              <FieldLabel>Monto de matrícula</FieldLabel>
-              <FieldContent>
-                <Input value={grado ? formatoSoles(grado.monto) : ""} placeholder="S/ 0.00" disabled />
-              </FieldContent>
-            </Field>
-            <Field>
-              <FieldLabel>Fecha de pago</FieldLabel>
-              <FieldContent>
-                <Input value={formatearFecha(fechaHoyISO())} disabled />
-              </FieldContent>
-            </Field>
-          </div>
-          {sinMonto && (
-            <AvisoError>
-              El monto de matrícula de {grado?.nivel} no está configurado para este año. Configúralo en el módulo Pagos.
-            </AvisoError>
-          )}
-
-          <CamposPago
-            metodos={metodos}
-            idMetodoPago={idMetodoPago}
-            onMetodo={setIdMetodoPago}
-            codigo={codigo}
-            onCodigo={setCodigo}
-            comprobante={comprobante}
-            onComprobante={setComprobante}
-            errores={erroresPago}
-          />
-
-          <Field>
-            <FieldLabel>Observaciones</FieldLabel>
-            <FieldContent>
-              <Textarea rows={2} maxLength={500} placeholder="Opcional" value={observaciones} onChange={(e) => setObservaciones(e.target.value)} />
-            </FieldContent>
-          </Field>
-
-          <div className="flex gap-4 rounded-lg bg-brand-subtle/60 p-4">
-            <BookOpen className="mt-0.5 size-5 shrink-0 text-brand" />
-            <div className="space-y-1 text-sm">
-              <p className="font-semibold">Resumen</p>
-              <p className="text-brand dark:text-white">
-                {nombreAlumno}
-                {grado && seccion ? ` · ${grado.grado} ${grado.nivel} ${seccion.seccion} (${seccion.turno})` : ""}
-                {grado?.monto != null ? ` · ${formatoSoles(grado.monto)}` : ""}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Apoderado: {principal.nombre} {principal.apellidoPat}
-                {apoderados[1] ? ` y ${apoderados[1].nombre} ${apoderados[1].apellidoPat}` : ""}. Revisa la información antes de crear la matrícula.
-              </p>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Field>
+                <FieldLabel>Monto de matrícula</FieldLabel>
+                <FieldContent>
+                  <Input value={grado ? formatoSoles(grado.monto) : ""} placeholder="S/ 0.00" disabled />
+                </FieldContent>
+              </Field>
+              <Field>
+                <FieldLabel>Fecha de pago</FieldLabel>
+                <FieldContent>
+                  <Input value={formatearFecha(fechaHoyISO())} disabled />
+                </FieldContent>
+              </Field>
             </div>
-          </div>
-        </>
-      ) : null}
+            {sinMonto && (
+              <AvisoError>
+                El monto de matrícula de {grado?.nivel} no está configurado para este año. Configúralo en el módulo Pagos.
+              </AvisoError>
+            )}
 
-      <div className="flex justify-end gap-2">
+            <CamposPago
+              metodos={metodos}
+              idMetodoPago={idMetodoPago}
+              onMetodo={setIdMetodoPago}
+              codigo={codigo}
+              onCodigo={setCodigo}
+              comprobante={comprobante}
+              onComprobante={setComprobante}
+              errores={erroresPago}
+            />
+
+            <Field>
+              <FieldLabel>Observaciones</FieldLabel>
+              <FieldContent>
+                <Textarea rows={2} maxLength={500} placeholder="Opcional" value={observaciones} onChange={(e) => setObservaciones(e.target.value)} />
+              </FieldContent>
+            </Field>
+
+            <div className="flex gap-4 rounded-lg bg-brand-subtle/60 p-4">
+              <BookOpen className="mt-0.5 size-5 shrink-0 text-brand" />
+              <div className="space-y-1 text-sm">
+                <p className="font-semibold">Resumen</p>
+                <p className="text-brand dark:text-white">
+                  {nombreAlumno}
+                  {grado && seccion ? ` · ${grado.grado} ${grado.nivel} ${seccion.seccion} (${seccion.turno})` : ""}
+                  {grado?.monto != null ? ` · ${formatoSoles(grado.monto)}` : ""}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Apoderado: {principal.nombre} {principal.apellidoPat}
+                  {apoderados[1] ? ` y ${apoderados[1].nombre} ${apoderados[1].apellidoPat}` : ""}. Revisa la información antes de crear la matrícula.
+                </p>
+              </div>
+            </div>
+          </>
+        ) : null}
+      </div>
+
+      <div className="flex shrink-0 justify-end gap-2 px-0.5 pb-1">
         <Button type="button" variant="outline" onClick={onAtras} disabled={enviando}>Atrás</Button>
         <Button
           type="button"

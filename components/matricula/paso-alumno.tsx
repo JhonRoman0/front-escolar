@@ -172,156 +172,158 @@ export function PasoAlumno({ value, onCancelar, onSiguiente }: PasoAlumnoProps) 
   const iniciales = `${nombre?.[0] ?? ""}${apellidoPat?.[0] ?? ""}`.toUpperCase()
 
   return (
-    <div className="flex flex-col gap-5">
-      <div className="flex flex-col items-center gap-1">
-        <div className="flex w-full justify-center">
-          <BloqueFoto
-            preview={preview}
-            alt="Foto del alumno"
-            iniciales={iniciales}
-            fallback="A"
-            hayFotoNueva={!!foto}
-            mostrarQuitar={!!foto}
-            notaSinFoto={errorFoto ? null : "Obligatoria"}
-            onChangeArchivo={handleArchivo}
-            onQuitar={handleQuitarFoto}
-          />
-        </div>
-        {errorFoto && <p className="text-xs text-destructive">La foto del alumno es obligatoria</p>}
-      </div>
-
-      {existente && (
-        <div className="flex gap-3 rounded-lg border border-brand/25 bg-brand-subtle/40 p-3 text-sm">
-          <GraduationCap className="mt-0.5 size-4 shrink-0 text-brand" />
-          <div>
-            <p className="font-medium">Alumno del colegio</p>
-            <p className="text-xs text-muted-foreground">
-              {existente.ultimaMatricula
-                ? `Última matrícula: ${existente.ultimaMatricula}. `
-                : "Aún no tiene matrículas. "}
-              Sus datos se conservan; aquí solo puedes actualizar la foto y la dirección.
-            </p>
+    <div className="flex min-h-0 flex-1 flex-col gap-5">
+      <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-0.5 pb-1">
+        <div className="flex flex-col items-center gap-1">
+          <div className="flex w-full justify-center">
+            <BloqueFoto
+              preview={preview}
+              alt="Foto del alumno"
+              iniciales={iniciales}
+              fallback="A"
+              hayFotoNueva={!!foto}
+              mostrarQuitar={!!foto}
+              notaSinFoto={errorFoto ? null : "Obligatoria"}
+              onChangeArchivo={handleArchivo}
+              onQuitar={handleQuitarFoto}
+            />
           </div>
+          {errorFoto && <p className="text-xs text-destructive">La foto del alumno es obligatoria</p>}
         </div>
-      )}
 
-      <Controller
-        control={form.control}
-        name="documentoIdentidad"
-        render={({ field }) => (
-          <CampoDni
-            value={field.value}
-            onChange={handleCambiarDni}
-            onBlur={() => { field.onBlur(); void comprobacionDni.comprobar(field.value) }}
-            name={field.name}
-            inputRef={field.ref}
-            cargando={comprobacionDni.buscando}
-            onBuscar={handleBuscar}
-            error={form.formState.errors.documentoIdentidad}
-            autoFocus
-            label="Documento de identidad *"
-            placeholder="Ingrese el DNI"
-          />
+        {existente && (
+          <div className="flex gap-3 rounded-lg border border-brand/25 bg-brand-subtle/40 p-3 text-sm">
+            <GraduationCap className="mt-0.5 size-4 shrink-0 text-brand" />
+            <div>
+              <p className="font-medium">Alumno del colegio</p>
+              <p className="text-xs text-muted-foreground">
+                {existente.ultimaMatricula
+                  ? `Última matrícula: ${existente.ultimaMatricula}. `
+                  : "Aún no tiene matrículas. "}
+                Sus datos se conservan; aquí solo puedes actualizar la foto y la dirección.
+              </p>
+            </div>
+          </div>
         )}
-      />
 
-      <div className="flex flex-col gap-4">
-        <fieldset disabled={bloqueado} className="flex flex-col gap-4">
-          <CamposNombres control={form.control} errors={form.formState.errors} />
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Controller
-              control={form.control}
-              name="fechaNacimiento"
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel>Fecha de nacimiento *</FieldLabel>
-                  <FieldContent>
-                    <Input
-                      type="date"
-                      onFocus={(event) => { if (!bloqueado) event.currentTarget.max = hoyNacimiento() }}
-                      min={bloqueado ? undefined : NACIMIENTO_MINIMO_ALUMNO}
-                      max={bloqueado ? undefined : hoyNacimiento()}
-                      {...field}
-                    />
-                    <FieldError errors={[form.formState.errors.fechaNacimiento]} />
-                  </FieldContent>
-                </Field>
-              )}
-            />
-            <Controller
-              control={form.control}
-              name="sexo"
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel>Sexo *</FieldLabel>
-                  <FieldContent>
-                    <Select value={field.value} onValueChange={(v) => field.onChange(v ?? "")} disabled={bloqueado}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Selecciona">
-                          {sexos.find((s) => s.valor === field.value)?.nombre}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          {sexos.map((s) => (
-                            <SelectItem key={s.valor} value={s.valor}>{s.nombre}</SelectItem>
-                          ))}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-                    <FieldError errors={[form.formState.errors.sexo]} />
-                  </FieldContent>
-                </Field>
-              )}
-            />
-          </div>
-
-        </fieldset>
-
-          <Controller
-            control={form.control}
-            name="direccion"
-            render={({ field }) => (
-              <Field>
-                <FieldLabel>Dirección *</FieldLabel>
-                <FieldContent>
-                  <Input placeholder="Av. Villahermosa 123" maxLength={120} {...field} />
-                  <FieldError errors={[form.formState.errors.direccion]} />
-                </FieldContent>
-              </Field>
-            )}
-          />
-
-        <fieldset disabled={bloqueado} className="flex flex-col gap-4">
-          <Controller
-            control={form.control}
-            name="tieneDiscapacidad"
-            render={({ field }) => (
-              <CampoChip checked={field.value} onCheckedChange={field.onChange} disabled={bloqueado}>
-                Tiene alguna discapacidad
-              </CampoChip>
-            )}
-          />
-          {tieneDiscapacidad && (
-            <Controller
-              control={form.control}
-              name="discapacidad"
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel>Discapacidad *</FieldLabel>
-                  <FieldContent>
-                    <Textarea placeholder="Describe la discapacidad del alumno" maxLength={255} rows={2} {...field} />
-                    <FieldError errors={[form.formState.errors.discapacidad]} />
-                  </FieldContent>
-                </Field>
-              )}
+        <Controller
+          control={form.control}
+          name="documentoIdentidad"
+          render={({ field }) => (
+            <CampoDni
+              value={field.value}
+              onChange={handleCambiarDni}
+              onBlur={() => { field.onBlur(); void comprobacionDni.comprobar(field.value) }}
+              name={field.name}
+              inputRef={field.ref}
+              cargando={comprobacionDni.buscando}
+              onBuscar={handleBuscar}
+              error={form.formState.errors.documentoIdentidad}
+              autoFocus
+              label="Documento de identidad *"
+              placeholder="Ingrese el DNI"
             />
           )}
-        </fieldset>
+        />
+
+        <div className="flex flex-col gap-4">
+          <fieldset disabled={bloqueado} className="flex flex-col gap-4">
+            <CamposNombres control={form.control} errors={form.formState.errors} />
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Controller
+                control={form.control}
+                name="fechaNacimiento"
+                render={({ field }) => (
+                  <Field>
+                    <FieldLabel>Fecha de nacimiento *</FieldLabel>
+                    <FieldContent>
+                      <Input
+                        type="date"
+                        onFocus={(event) => { if (!bloqueado) event.currentTarget.max = hoyNacimiento() }}
+                        min={bloqueado ? undefined : NACIMIENTO_MINIMO_ALUMNO}
+                        max={bloqueado ? undefined : hoyNacimiento()}
+                        {...field}
+                      />
+                      <FieldError errors={[form.formState.errors.fechaNacimiento]} />
+                    </FieldContent>
+                  </Field>
+                )}
+              />
+              <Controller
+                control={form.control}
+                name="sexo"
+                render={({ field }) => (
+                  <Field>
+                    <FieldLabel>Sexo *</FieldLabel>
+                    <FieldContent>
+                      <Select value={field.value} onValueChange={(v) => field.onChange(v ?? "")} disabled={bloqueado}>
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Selecciona">
+                            {sexos.find((s) => s.valor === field.value)?.nombre}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectGroup>
+                            {sexos.map((s) => (
+                              <SelectItem key={s.valor} value={s.valor}>{s.nombre}</SelectItem>
+                            ))}
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
+                      <FieldError errors={[form.formState.errors.sexo]} />
+                    </FieldContent>
+                  </Field>
+                )}
+              />
+            </div>
+
+          </fieldset>
+
+            <Controller
+              control={form.control}
+              name="direccion"
+              render={({ field }) => (
+                <Field>
+                  <FieldLabel>Dirección *</FieldLabel>
+                  <FieldContent>
+                    <Input placeholder="Av. Villahermosa 123" maxLength={120} {...field} />
+                    <FieldError errors={[form.formState.errors.direccion]} />
+                  </FieldContent>
+                </Field>
+              )}
+            />
+
+          <fieldset disabled={bloqueado} className="flex flex-col gap-4">
+            <Controller
+              control={form.control}
+              name="tieneDiscapacidad"
+              render={({ field }) => (
+                <CampoChip checked={field.value} onCheckedChange={field.onChange} disabled={bloqueado}>
+                  Tiene alguna discapacidad
+                </CampoChip>
+              )}
+            />
+            {tieneDiscapacidad && (
+              <Controller
+                control={form.control}
+                name="discapacidad"
+                render={({ field }) => (
+                  <Field>
+                    <FieldLabel>Discapacidad *</FieldLabel>
+                    <FieldContent>
+                      <Textarea placeholder="Describe la discapacidad del alumno" maxLength={255} rows={2} {...field} />
+                      <FieldError errors={[form.formState.errors.discapacidad]} />
+                    </FieldContent>
+                  </Field>
+                )}
+              />
+            )}
+          </fieldset>
+        </div>
       </div>
 
-      <div className="flex justify-end gap-2">
+      <div className="flex shrink-0 justify-end gap-2 px-0.5 pb-1">
         <Button type="button" variant="outline" onClick={onCancelar}>Cancelar</Button>
         <Button type="button" variant="brand" onClick={handleSiguiente} disabled={form.formState.isSubmitting}>Siguiente</Button>
       </div>
