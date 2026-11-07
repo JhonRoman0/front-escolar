@@ -62,6 +62,7 @@ export interface FichaMatricula {
 }
 
 export interface MatriculaResponse {
+  tipoIngreso?: "NUEVO_INGRESO" | "CONTINUANTE" | null
   idMatricula: number
   idAlumno: number
   idAlumnoApoderado: number

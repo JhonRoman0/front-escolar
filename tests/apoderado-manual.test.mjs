@@ -63,7 +63,7 @@ function formulario({ valores = {}, buscar, consultar, indice = 0 } = {}) {
     Error, REGEX_DNI, apoderadoPasoDefault, idAlumno: 42, base, original: undefined,
     version: { current: 0 }, consultaExterna: { current: 0 }, comprobacion: { current: null },
     edicionesNombres: { current: { nombre: 0, apellidoPat: 0, apellidoMat: 0 } },
-    consultando: false,
+    consultando: false, mejorasMatricula: false,
     form: {
       formState: { isSubmitted: false },
       getValues: (path) => path === base ? datos : datos[path.slice(base.length + 1)],

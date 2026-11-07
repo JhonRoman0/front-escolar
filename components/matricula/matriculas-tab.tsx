@@ -17,6 +17,7 @@ import {
 
 import { ConfirmarEliminar } from "@/components/seguridad/confirmar-eliminar"
 import { EstadoBadge } from "@/components/seguridad/estado-badge"
+import { Badge } from "@/components/ui/badge"
 import { TablaPaginacion } from "@/components/shared/paginacion-tabla"
 import { FilterSelect } from "@/components/shared/filter-select"
 import { ACCESO, anioParaFiltro, estadoAnioTexto, OPCIONES_ESTADO_ACCESO } from "@/lib/api/academico"
@@ -195,6 +196,11 @@ export function MatriculasTab() {
                   <TableRow key={matricula.idMatricula}>
                     <TableCell>
                       <p className="font-medium">{matricula.alumno}</p>
+                      {(matricula.tipoIngreso === "NUEVO_INGRESO" || matricula.tipoIngreso === "CONTINUANTE") && (
+                        <Badge variant={matricula.tipoIngreso === "NUEVO_INGRESO" ? "info" : "secondary"} className="my-1">
+                          {matricula.tipoIngreso === "NUEVO_INGRESO" ? "Nuevo ingreso" : "Continuante"}
+                        </Badge>
+                      )}
                       <p className="font-mono text-xs text-muted-foreground">
                         {matricula.codigoAlumno}
                       </p>

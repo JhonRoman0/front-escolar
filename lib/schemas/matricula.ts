@@ -65,6 +65,7 @@ const apoderadoPasoSchema = z
     apellidoMat: z.string(),
     fechaNaci: z.string(),
     sexo: z.string(),
+    sexoSugerido: z.string().optional(),
     direccion: z.string().max(120, "Máximo 120 caracteres"),
     idParentesco: z.number().int(),
     celular: z.string(),

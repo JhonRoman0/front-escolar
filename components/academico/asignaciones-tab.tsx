@@ -750,10 +750,10 @@ function AsignacionFormDialog({
                                 max={turno ? horaCorta(turno.horaSalida) : null}
                                 invalido={!!error?.horaFin}
                                 ariaLabel="Hora de fin"
-                                // Ni se termina una clase que atraviesa el recreo.
+                                // El fin debe ser posterior al inicio y no atravesar el recreo.
                                 deshabilitada={(hora) => {
                                   const inicio = horarios[index]?.horaInicio
-                                  return !!inicio && recreosDelDia(dia).some((r) => inicio < r.fin && r.inicio < hora)
+                                  return !!inicio && (hora <= inicio || recreosDelDia(dia).some((r) => inicio < r.fin && r.inicio < hora))
                                 }}
                                 // Con hora académica: bloques completos desde el inicio.
                                 {...(minutosBloque ? { bloquesDesde: horarios[index]?.horaInicio || null, minutosBloque } : {})}

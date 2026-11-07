@@ -74,13 +74,7 @@ export function NuevaMatriculaDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-2xl">
-        <DialogHeader className="shrink-0">
-          <DialogTitle className="text-lg font-semibold tracking-tight">Nueva matrícula</DialogTitle>
-        </DialogHeader>
-        {/* Se monta al abrir: cada apertura empieza desde el paso 1 limpio. */}
-        {open && <Asistente onCerrar={() => onOpenChange(false)} onCreada={onCreada} />}
-      </DialogContent>
+      {open && <Asistente onCerrar={() => onOpenChange(false)} onCreada={onCreada} />}
     </Dialog>
   )
 }
@@ -155,23 +149,19 @@ function Asistente({ onCerrar, onCreada }: { onCerrar: () => void; onCreada?: (m
     }
   }
 
-  if (matriculaCreada) {
-    return (
-      <div className="flex flex-col items-center gap-4 py-8 text-center">
-        <CircleCheck className="size-12 text-emerald-600" aria-hidden />
-        <div className="space-y-1">
+  const contenido = matriculaCreada ? (
+      <div className="flex min-h-0 flex-col items-center gap-3 overflow-y-auto py-2 text-center">
+        <CircleCheck className="size-10 shrink-0 text-exito" aria-hidden />
+        <div className="w-full min-w-0 space-y-1 break-words">
           <p className="text-base font-semibold">Matrícula creada</p>
           <p className="text-sm text-muted-foreground">{matriculaCreada.alumno}</p>
         </div>
-        <div className="flex flex-wrap justify-center gap-2">
+        <div className="flex shrink-0 flex-wrap justify-center gap-2">
           <Button variant="outline" onClick={onCerrar}>Cerrar</Button>
           <BotonFicha idMatricula={matriculaCreada.idMatricula} alumno={matriculaCreada.alumno} conTexto />
         </div>
       </div>
-    )
-  }
-
-  return (
+    ) : (
     <div className="flex min-h-0 flex-1 flex-col gap-5">
       <div className="shrink-0">
         <Stepper steps={PASOS} paso={paso} />
@@ -202,5 +192,13 @@ function Asistente({ onCerrar, onCreada }: { onCerrar: () => void; onCreada?: (m
         )}
       </div>
     </div>
+  )
+  return (
+    <DialogContent className={`flex max-h-[90vh] flex-col ${matriculaCreada ? "sm:max-w-md" : "sm:max-w-2xl"}`}>
+        <DialogHeader className="shrink-0">
+          <DialogTitle className="text-lg font-semibold tracking-tight">Nueva matrícula</DialogTitle>
+        </DialogHeader>
+      {contenido}
+    </DialogContent>
   )
 }
