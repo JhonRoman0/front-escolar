@@ -62,6 +62,7 @@ import {
 } from "@/lib/api/academico"
 
 const LUNES_A_VIERNES = [1, 2, 3, 4, 5]
+const MAX_RECREOS = 2
 const HORA = /^([01]\d|2[0-3]):[0-5]\d$/
 
 const franjaSchema = z
@@ -79,7 +80,7 @@ const recreoSchema = z
     idTurno: z.number({ error: "Selecciona el turno" }).int().min(1, "Selecciona el turno"),
     idGrados: z.array(z.number()).min(1, "Selecciona al menos un grado"),
     dias: z.array(z.number()).min(1, "Selecciona al menos un día"),
-    franjas: z.array(franjaSchema).min(1, "Agrega al menos un recreo"),
+    franjas: z.array(franjaSchema).min(1, "Agrega al menos un recreo").max(MAX_RECREOS, "Se permiten como máximo dos recreos"),
   })
   .superRefine((valores, ctx) => {
     valores.franjas.forEach((a, i) => {
@@ -305,7 +306,7 @@ function NuevoRecreoDialog({
   const nivel = niveles.find((n) => n.idNivel === idNivel) ?? nivelInicial
   const { data: grados = [], isLoading: cargandoGrados } = useGradosDelAnio(nivel.idNivel, anio.idAnio)
   // Recreos ya guardados del año y nivel: en un vigente marcan los grados ya configurados.
-  const { data: recreosDelAnio = [] } = useRecreos({ idAnio: anio.idAnio, idNivel: nivel.idNivel })
+  const { data: recreosDelAnio = [], isLoading: cargandoRecreos, isError: errorRecreos } = useRecreos({ idAnio: anio.idAnio, idNivel: nivel.idNivel })
   const form = useForm<RecreoValues>({
     resolver: zodResolver(recreoSchema),
     defaultValues: {
@@ -316,6 +317,8 @@ function NuevoRecreoDialog({
     },
   })
   const franjas = useFieldArray({ control: form.control, name: "franjas" })
+  const horarios = useWatch({ control: form.control, name: "franjas" })
+  const [idGrados, dias] = useWatch({ control: form.control, name: ["idGrados", "dias"] })
   const idTurno = useWatch({ control: form.control, name: "idTurno" })
   const turno = turnos.find((t) => t.idTurno === idTurno)
   const vigente = anio.estado === ESTADO_ANIO.VIGENTE
@@ -329,7 +332,25 @@ function NuevoRecreoDialog({
   )
   const elegibles = gradosDelTurno.filter((g) => !vigente || !yaConfigurados.has(g.idGrado))
 
+  function calcularCupos(values: Pick<RecreoValues, "idTurno" | "idGrados" | "dias">) {
+    const combinaciones = values.idGrados.flatMap((idGrado) => values.dias.map((dia) => {
+      const existentes = recreosDelAnio.filter((r) => r.idTurno === values.idTurno && r.idGrado === idGrado && r.diaSemana === dia).length
+      return { idGrado, dia, cupo: Math.max(0, MAX_RECREOS - existentes) }
+    }))
+    return {
+      disponible: values.idTurno && combinaciones.length ? Math.min(...combinaciones.map((c) => c.cupo)) : 0,
+      sinCupo: combinaciones.filter((c) => c.cupo === 0),
+    }
+  }
+  const { disponible, sinCupo } = calcularCupos({ idTurno, idGrados, dias })
+  const seleccionCompleta = !!turno && idGrados.length > 0 && dias.length > 0
+  const cuposPendientes = cargandoRecreos || errorRecreos
+  const excedeCupo = seleccionCompleta && !cuposPendientes && horarios.length > disponible
+  const envioBloqueado = !seleccionCompleta || cuposPendientes || excedeCupo
+
   async function onSubmit(values: RecreoValues) {
+    if (cuposPendientes || !values.idTurno || !values.idGrados.length || !values.dias.length || values.franjas.length > calcularCupos(values).disponible) return
+
     await guardarConToast(async () => {
       const creados = await crear.mutateAsync({
         idAnio: anio.idAnio,
@@ -346,14 +367,15 @@ function NuevoRecreoDialog({
 
   return (
     <Dialog open onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-xl">
-        <DialogHeader>
+      <DialogContent className="flex max-h-[90dvh] flex-col overflow-hidden sm:max-w-xl">
+        <DialogHeader className="shrink-0">
           <DialogTitle className="text-lg font-semibold tracking-tight">Nuevo recreo</DialogTitle>
           <DialogDescription>
             Se crea un recreo por cada grado y día que marques.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5" noValidate>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="flex min-h-0 flex-1 flex-col gap-5" noValidate>
+          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field>
               <FieldLabel>Año escolar</FieldLabel>
@@ -409,7 +431,7 @@ function NuevoRecreoDialog({
                     value={field.value ? String(field.value) : ""}
                     onValueChange={(v) => {
                       field.onChange(v ? Number(v) : 0)
-                      // Los grados y las horas dependen del turno.
+                      // Los grados dependen del turno.
                       form.setValue("idGrados", [])
                       form.setValue("franjas", [{ horaInicio: "", horaFin: "" }])
                     }}
@@ -497,7 +519,11 @@ function NuevoRecreoDialog({
                           render={({ field }) => (
                             <SelectorHora
                               value={field.value}
-                              onChange={field.onChange}
+                              onChange={(inicio) => {
+                                field.onChange(inicio)
+                                const fin = form.getValues(`franjas.${i}.horaFin`)
+                                if (fin && fin <= inicio) form.setValue(`franjas.${i}.horaFin`, "")
+                              }}
                               min={turno ? horaCorta(turno.horaEntrada) : null}
                               max={turno ? horaCorta(turno.horaSalida) : null}
                               invalido={!!errores?.horaInicio}
@@ -517,6 +543,10 @@ function NuevoRecreoDialog({
                               max={turno ? horaCorta(turno.horaSalida) : null}
                               invalido={!!errores?.horaFin}
                               ariaLabel={`Fin del recreo ${i + 1}`}
+                              deshabilitada={(hora) => {
+                                const inicio = horarios[i]?.horaInicio
+                                return !!inicio && hora <= inicio
+                              }}
                             />
                           )}
                         />
@@ -541,6 +571,7 @@ function NuevoRecreoDialog({
                   size="sm"
                   className="w-fit"
                   onClick={() => franjas.append({ horaInicio: "", horaFin: "" })}
+                  disabled={!seleccionCompleta || cuposPendientes || franjas.fields.length >= disponible}
                 >
                   <Plus data-icon="inline-start" />
                   Agregar otro recreo
@@ -554,11 +585,23 @@ function NuevoRecreoDialog({
             </FieldContent>
           </Field>
 
-          <DialogFooter>
+          <FieldDescription className="text-xs" aria-live="polite">
+            {cargandoRecreos ? "Cargando cupos..." : errorRecreos ? "No se pudieron cargar los cupos." : !seleccionCompleta ? "Selecciona turno, grados y días para consultar los cupos." : `Cupos disponibles por combinación seleccionada: ${disponible}.`}
+          </FieldDescription>
+          {seleccionCompleta && !cuposPendientes && sinCupo.length > 0 && (
+            <FieldDescription className="text-xs">
+              Sin cupos: {sinCupo.map((c) => `${grados.find((g) => g.idGrado === c.idGrado)?.nombre}, ${DIAS_CLASE.find((d) => d.value === c.dia)?.label}`).join("; ")}.
+            </FieldDescription>
+          )}
+          {excedeCupo && <FieldError>Las franjas ingresadas exceden el cupo disponible ({disponible}). Quita franjas o cambia la selección para continuar.</FieldError>}
+
+          <FieldError errors={[form.formState.errors.franjas?.root ?? (Array.isArray(form.formState.errors.franjas) ? undefined : form.formState.errors.franjas)]} />
+          </div>
+          <DialogFooter className="shrink-0">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
-            <BotonGuardar etiqueta="Crear recreos" enviando={form.formState.isSubmitting} />
+            <BotonGuardar etiqueta="Crear recreos" enviando={form.formState.isSubmitting} disabled={envioBloqueado} />
           </DialogFooter>
         </form>
       </DialogContent>
@@ -657,6 +700,7 @@ function EditarRecreoDialog({
   })
   const min = turno ? horaCorta(turno.horaEntrada) : null
   const max = turno ? horaCorta(turno.horaSalida) : null
+  const inicio = useWatch({ control: form.control, name: "horaInicio" })
 
   async function onSubmit(values: EditarValues) {
     await guardarConToast(async () => {
@@ -705,7 +749,17 @@ function EditarRecreoDialog({
                 <Field>
                   <FieldLabel>Inicio</FieldLabel>
                   <FieldContent>
-                    <SelectorHora value={field.value} onChange={field.onChange} min={min} max={max} ariaLabel="Hora de inicio" />
+                    <SelectorHora
+                      value={field.value}
+                      onChange={(inicio) => {
+                        field.onChange(inicio)
+                        const fin = form.getValues("horaFin")
+                        if (fin && fin <= inicio) form.setValue("horaFin", "")
+                      }}
+                      min={min}
+                      max={max}
+                      ariaLabel="Hora de inicio"
+                    />
                     <FieldError errors={[form.formState.errors.horaInicio]} />
                   </FieldContent>
                 </Field>
@@ -718,7 +772,14 @@ function EditarRecreoDialog({
                 <Field>
                   <FieldLabel>Fin</FieldLabel>
                   <FieldContent>
-                    <SelectorHora value={field.value} onChange={field.onChange} min={min} max={max} ariaLabel="Hora de fin" />
+                    <SelectorHora
+                      value={field.value}
+                      onChange={field.onChange}
+                      min={min}
+                      max={max}
+                      ariaLabel="Hora de fin"
+                      deshabilitada={(hora) => !!inicio && hora <= inicio}
+                    />
                     <FieldError errors={[form.formState.errors.horaFin]} />
                   </FieldContent>
                 </Field>
