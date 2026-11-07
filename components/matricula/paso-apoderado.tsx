@@ -83,7 +83,7 @@ export function PasoApoderado({ value, idAlumno, vinculados, validando, onAtras,
                 </Button>
               )}
             </div>
-            <FormularioApoderado form={form} indice={indice} idAlumno={idAlumno} />
+            <FormularioApoderado form={form} indice={indice} idAlumno={idAlumno} mejorasMatricula />
           </TarjetaSeccion>
         ))}
 
@@ -120,6 +120,7 @@ export function FormularioApoderado({
   idAlumno,
   original,
   onCambiarCorreo,
+  mejorasMatricula = false,
 }: {
   form: UseFormReturn<ApoderadosPasoValues>
   indice: number
@@ -127,6 +128,7 @@ export function FormularioApoderado({
   /** Al editar: la persona actual, a la que se vuelve si se escribe de nuevo su DNI. */
   original?: ApoderadoPasoValues
   onCambiarCorreo?: (anterior: string, nuevo: string) => void
+  mejorasMatricula?: boolean
 }) {
   const buscar = useBuscarApoderadoInscripcion()
   const consultarDni = useConsultarDni()
@@ -237,7 +239,7 @@ export function FormularioApoderado({
       }
       const origen = r.origen === "LOCAL" ? "el colegio" : r.origen === "CACHE" ? "la caché de consultas" : r.origen === "RENIEC" ? "RENIEC" : "el servicio de consulta"
       setAvisoConsulta(completados
-        ? `Se completaron campos vacíos con datos de ${origen}. Revisa la información antes de continuar.`
+        ? mejorasMatricula ? "Se completaron algunos datos automáticamente. Verifica la información" : `Se completaron campos vacíos con datos de ${origen}. Revisa la información antes de continuar.`
         : "La consulta no añadió datos. Se conservaron los campos manuales; puedes completarlos y continuar.")
     } catch {
       if (sigueVigente(dni, solicitud) && consulta === consultaExterna.current) {
@@ -288,11 +290,11 @@ export function FormularioApoderado({
         )}
       />
 
-      {estado !== "EDICION" && <p role="status" className="text-xs text-muted-foreground">
+      {estado !== "EDICION" && !(mejorasMatricula && avisoConsulta && !comprobando) && <p role="status" className="text-xs text-muted-foreground">
         {comprobando
           ? "Comprobando el DNI en la base del colegio. Puedes seguir llenando los campos."
           : estado === "NUEVO"
-            ? "DNI comprobado en el colegio: persona nueva. Completa los datos manualmente o usa la lupa como ayuda opcional."
+            ? mejorasMatricula ? "DNI no registrado. Completa los datos o consulta con la lupa" : "DNI comprobado en el colegio: persona nueva. Completa los datos manualmente o usa la lupa como ayuda opcional."
             : estado === ""
               ? "Al salir del DNI se comprobará si ya existe en el colegio. Esta comprobación es necesaria para continuar; la consulta de datos es opcional."
               : "Se reutilizarán los datos registrados en el colegio; no se creará una persona duplicada."}
@@ -368,7 +370,17 @@ export function FormularioApoderado({
                   <FieldContent>
                     <Select
                       value={field.value ? String(field.value) : ""}
-                      onValueChange={(v) => field.onChange(Number(v))}
+                      onValueChange={(v) => {
+                        field.onChange(Number(v))
+                        const actual = form.getValues(base)
+                        if (!mejorasMatricula || actual.estado === "APODERADO" || (actual.sexo && actual.sexo !== actual.sexoSugerido)) return
+                        const parentesco = parentescos.find((p) => p.idParentesco === Number(v))?.nombre.toLowerCase()
+                        const etiqueta = parentesco === "padre" ? "masculino" : parentesco === "madre" ? "femenino" : null
+                        const sugerido = etiqueta ? sexos.find((s) => s.nombre.toLowerCase() === etiqueta)?.valor : ""
+                        if (sugerido === undefined) return
+                        form.setValue(`${base}.sexoSugerido`, sugerido)
+                        form.setValue(`${base}.sexo`, sugerido, { shouldValidate: true })
+                      }}
                       disabled={vinculado}
                     >
                       <SelectTrigger className="w-full">
@@ -399,7 +411,10 @@ export function FormularioApoderado({
                 <Field>
                   <FieldLabel>Sexo *</FieldLabel>
                   <FieldContent>
-                    <Select value={field.value} onValueChange={(v) => field.onChange(v ?? "")} disabled={yaEsApoderado}>
+                    <Select value={field.value} onValueChange={(v) => {
+                      if (mejorasMatricula) form.setValue(`${base}.sexoSugerido`, "")
+                      field.onChange(v ?? "")
+                    }} disabled={yaEsApoderado}>
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Selecciona">
                           {sexos.find((s) => s.valor === field.value)?.nombre}

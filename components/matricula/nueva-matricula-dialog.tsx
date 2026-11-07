@@ -157,13 +157,13 @@ function Asistente({ onCerrar, onCreada }: { onCerrar: () => void; onCreada?: (m
 
   if (matriculaCreada) {
     return (
-      <div className="flex flex-col items-center gap-4 py-8 text-center">
-        <CircleCheck className="size-12 text-emerald-600" aria-hidden />
-        <div className="space-y-1">
+      <div className="flex min-h-0 flex-col items-center gap-3 overflow-y-auto py-2 text-center">
+        <CircleCheck className="size-10 shrink-0 text-exito" aria-hidden />
+        <div className="w-full min-w-0 space-y-1 break-words">
           <p className="text-base font-semibold">Matrícula creada</p>
           <p className="text-sm text-muted-foreground">{matriculaCreada.alumno}</p>
         </div>
-        <div className="flex flex-wrap justify-center gap-2">
+        <div className="flex shrink-0 flex-wrap justify-center gap-2">
           <Button variant="outline" onClick={onCerrar}>Cerrar</Button>
           <BotonFicha idMatricula={matriculaCreada.idMatricula} alumno={matriculaCreada.alumno} conTexto />
         </div>

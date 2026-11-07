@@ -335,18 +335,31 @@ function NuevoRecreoDialog({
   function calcularCupos(values: Pick<RecreoValues, "idTurno" | "idGrados" | "dias">) {
     const combinaciones = values.idGrados.flatMap((idGrado) => values.dias.map((dia) => {
       const existentes = recreosDelAnio.filter((r) => r.idTurno === values.idTurno && r.idGrado === idGrado && r.diaSemana === dia).length
-      return { idGrado, dia, cupo: Math.max(0, MAX_RECREOS - existentes) }
+      return { idGrado, dia, existentes, cupo: Math.max(0, MAX_RECREOS - existentes) }
     }))
     return {
       disponible: values.idTurno && combinaciones.length ? Math.min(...combinaciones.map((c) => c.cupo)) : 0,
-      sinCupo: combinaciones.filter((c) => c.cupo === 0),
+      combinaciones,
     }
   }
-  const { disponible, sinCupo } = calcularCupos({ idTurno, idGrados, dias })
+  const { disponible, combinaciones } = calcularCupos({ idTurno, idGrados, dias })
   const seleccionCompleta = !!turno && idGrados.length > 0 && dias.length > 0
   const cuposPendientes = cargandoRecreos || errorRecreos
   const excedeCupo = seleccionCompleta && !cuposPendientes && horarios.length > disponible
   const envioBloqueado = !seleccionCompleta || cuposPendientes || excedeCupo
+  const afectadas = combinaciones.filter((c) => horarios.length > c.cupo)
+  const identificar = (c: (typeof combinaciones)[number]) => `${grados.find((g) => g.idGrado === c.idGrado)?.nombre}, ${DIAS_CLASE.find((d) => d.value === c.dia)?.label.toLowerCase()}`
+  let advertencia = ""
+  if (afectadas.length === 1) {
+    const c = afectadas[0]
+    const grado = grados.find((g) => g.idGrado === c.idGrado)?.nombre
+    const dia = DIAS_CLASE.find((d) => d.value === c.dia)?.label.toLowerCase()
+    advertencia = c.cupo === 0
+      ? `El grado de ${grado} ${c.existentes === MAX_RECREOS ? "ya tiene dos recreos registrados" : "ya alcanzó el máximo de dos recreos"} el ${dia} en el turno ${turno?.nombre}. Selecciona otro día o grado para continuar.`
+      : `Solo puedes agregar un recreo más para el grado, día y turno seleccionados: ${identificar(c)}, turno ${turno?.nombre}.`
+  } else if (afectadas.length > 1) {
+    advertencia = `Revisa estas combinaciones: ${afectadas.map((c) => `${identificar(c)}: ${c.cupo === 0 ? "sin cupos" : "solo un recreo más"}`).join("; ")}. Turno ${turno?.nombre}. Reduce las franjas o cambia la selección para continuar.`
+  }
 
   async function onSubmit(values: RecreoValues) {
     if (cuposPendientes || !values.idTurno || !values.idGrados.length || !values.dias.length || values.franjas.length > calcularCupos(values).disponible) return
@@ -579,21 +592,18 @@ function NuevoRecreoDialog({
               </div>
               <FieldDescription className="text-xs">
                 {turno
-                  ? `Solo horas del turno ${turno.nombre}: de ${horaCorta(turno.horaEntrada)} a ${horaCorta(turno.horaSalida)}.`
+                  ? `El turno de la ${turno.nombre} es de ${horaCorta(turno.horaEntrada)} a ${horaCorta(turno.horaSalida)}.`
                   : "Elige el turno para habilitar las horas."}
               </FieldDescription>
             </FieldContent>
           </Field>
 
-          <FieldDescription className="text-xs" aria-live="polite">
-            {cargandoRecreos ? "Cargando cupos..." : errorRecreos ? "No se pudieron cargar los cupos." : !seleccionCompleta ? "Selecciona turno, grados y días para consultar los cupos." : `Cupos disponibles por combinación seleccionada: ${disponible}.`}
-          </FieldDescription>
-          {seleccionCompleta && !cuposPendientes && sinCupo.length > 0 && (
-            <FieldDescription className="text-xs">
-              Sin cupos: {sinCupo.map((c) => `${grados.find((g) => g.idGrado === c.idGrado)?.nombre}, ${DIAS_CLASE.find((d) => d.value === c.dia)?.label}`).join("; ")}.
+          {(cuposPendientes || !seleccionCompleta) && (
+            <FieldDescription className="text-xs" aria-live="polite">
+              {cargandoRecreos ? "Cargando cupos..." : errorRecreos ? "No se pudieron cargar los cupos." : "Selecciona turno, grados y días para consultar los cupos."}
             </FieldDescription>
           )}
-          {excedeCupo && <FieldError>Las franjas ingresadas exceden el cupo disponible ({disponible}). Quita franjas o cambia la selección para continuar.</FieldError>}
+          {excedeCupo && <FieldError>{advertencia}</FieldError>}
 
           <FieldError errors={[form.formState.errors.franjas?.root ?? (Array.isArray(form.formState.errors.franjas) ? undefined : form.formState.errors.franjas)]} />
           </div>
@@ -789,6 +799,7 @@ function EditarRecreoDialog({
           <DialogFooter className="sm:justify-between">
             {puedeEliminar ? (
               <ConfirmarEliminar
+                forceOverlay
                 titulo="Eliminar recreo"
                 descripcion={`Se eliminará el recreo de ${recreo.grado} de ${rango(recreo)}.`}
                 icono={<Trash2 className="text-destructive" />}

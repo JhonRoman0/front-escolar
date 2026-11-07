@@ -22,6 +22,7 @@ interface ConfirmarEliminarProps {
   onConfirm: () => Promise<void>
   className?: string
   disabled?: boolean
+  forceOverlay?: boolean
   // Los siguientes existen para reutilizar la confirmacion en acciones que no
   // son borrados (por ejemplo activar un año como vigente). Sus defaults
   // reproducen exactamente el comportamiento de eliminar, asi que los call
@@ -43,6 +44,7 @@ export function ConfirmarEliminar({
   onConfirm,
   className,
   disabled,
+  forceOverlay = false,
   textoBoton = "Eliminar",
   icono = <Trash2 className="text-destructive" />,
   variantConfirmar = "destructive",
@@ -88,7 +90,7 @@ export function ConfirmarEliminar({
           {icono}
         </DialogTrigger>
       )}
-      <DialogContent>
+      <DialogContent forceOverlay={forceOverlay}>
         <DialogHeader>
           <DialogTitle>{titulo}</DialogTitle>
           <DialogDescription>{descripcion}</DialogDescription>
