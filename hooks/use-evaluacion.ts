@@ -6,17 +6,14 @@ import {
 
 import { useAuth } from "@/components/auth-provider"
 import { useAsignaciones } from "@/hooks/use-academico"
-import { useInvalidarMutacion } from "@/hooks/use-invalidar"
 import {
   competenciasApi,
   notasApi,
-  type NotaBatchRequest,
 } from "@/lib/api/evaluacion"
 
 const KEYS = {
   competencias: ["competencias"] as const,
   notas: ["notas"] as const,
-  consolidado: ["consolidado"] as const,
 }
 
 // ── Asignaciones del usuario ──────────────────────────────────────────────
@@ -47,48 +44,12 @@ export function useNotasPorCompetencia(idCompetencia?: number, bimestre?: number
   })
 }
 
-export function useConsolidado(
-  idGradoSeccion?: number,
-  bimestre?: number,
-  idCurso?: number
-) {
-  return useQuery({
-    queryKey: [KEYS.consolidado, idGradoSeccion, bimestre, idCurso],
-    queryFn: () =>
-      notasApi.consolidado(idGradoSeccion as number, bimestre as number, idCurso as number),
-    enabled: idGradoSeccion != null && idGradoSeccion > 0 && !!bimestre && !!idCurso,
-    placeholderData: keepPreviousData,
-  })
-}
-
-export function usePromedio(idMatricula?: number) {
-  return useQuery({
-    queryKey: [...KEYS.notas, "promedio", idMatricula],
-    queryFn: () => notasApi.promedio(idMatricula as number),
-    enabled: !!idMatricula,
-  })
-}
-
 // ── Mutaciones ───────────────────────────────────────────────────────────
-
-export function useRegistrarNotasBatch() {
-  const invalidar = useInvalidarMutacion(KEYS.notas, KEYS.consolidado)
-  return useMutation({
-    mutationFn: (data: NotaBatchRequest) => notasApi.registrarLote(data),
-    onSuccess: invalidar,
-  })
-}
 
 export function useGenerarAutorizacion() {
   return useMutation({
     mutationFn: ({ idUsuarioDestinatario }: { idUsuarioDestinatario: number }) =>
       notasApi.generarAutorizacion(idUsuarioDestinatario),
-  })
-}
-
-export function useValidarAutorizacion() {
-  return useMutation({
-    mutationFn: (codigo: string) => notasApi.validarAutorizacion(codigo),
   })
 }
 
