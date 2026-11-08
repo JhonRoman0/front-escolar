@@ -3,6 +3,7 @@ import type {
   ReporteGeneralItem,
   NotaReporteItem,
 } from "@/lib/api/reportes"
+import { descargarBlob } from "@/lib/descargas"
 import { formatearHora } from "@/lib/fechas"
 import { fechaCorta, fechaHora, type ColumnaReporte, type TablaReporte } from "./formato"
 
@@ -31,12 +32,7 @@ function descargarCsv(encabezados: string[], filas: string[][], nombre: string, 
   const blob = new Blob([`\uFEFF${lineas}`], {
     type: "text/csv;charset=utf-8;",
   })
-  const url = URL.createObjectURL(blob)
-  const enlace = document.createElement("a")
-  enlace.href = url
-  enlace.download = nombre
-  enlace.click()
-  URL.revokeObjectURL(url)
+  descargarBlob(blob, nombre)
 }
 
 // ── Asistencia general ───────────────────────────────────────────────────

@@ -17,7 +17,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
-import { dateAIso, formatearFecha, isoADate } from "@/lib/fechas"
+import { dateAIso, diaSemanaIso, formatearFecha, isoADate } from "@/lib/fechas"
 import { CalendarIcon } from "lucide-react"
 
 export interface SelectorFechaProps {
@@ -30,6 +30,10 @@ export interface SelectorFechaProps {
   /** "YYYY-MM-DD" inclusive. */
   min?: string | undefined
   max?: string | undefined
+  /** Días de la semana elegibles (1 = lunes … 7 = domingo). Sin valor: todos. */
+  diasSemana?: number[]
+  /** Fechas "YYYY-MM-DD" que no se pueden elegir, por ejemplo feriados. */
+  fechasBloqueadas?: string[]
   placeholder?: string
   deshabilitado?: boolean
   autoFocus?: boolean
@@ -44,6 +48,8 @@ export function SelectorFecha({
   error,
   min,
   max,
+  diasSemana,
+  fechasBloqueadas,
   placeholder = "Selecciona una fecha",
   deshabilitado,
   autoFocus,
@@ -71,8 +77,13 @@ export function SelectorFecha({
     const matcher: Matcher[] = []
     if (antes) matcher.push((dia) => dia < antes)
     if (despues) matcher.push((dia) => dia > despues)
+    if (diasSemana) matcher.push((dia) => !diasSemana.includes(diaSemanaIso(dia)))
+    if (fechasBloqueadas?.length) {
+      const bloqueadas = new Set(fechasBloqueadas)
+      matcher.push((dia) => bloqueadas.has(dateAIso(dia)))
+    }
     return matcher.length ? matcher : undefined
-  }, [min, max])
+  }, [min, max, diasSemana, fechasBloqueadas])
 
   return (
     <Field className={className} data-invalid={error ? "" : undefined}>

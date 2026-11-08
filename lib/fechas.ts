@@ -16,6 +16,11 @@ function aFecha(fecha: string | Date): Date {
 }
 
 /** Fecha como dd/mm/yyyy; "—" si es nula o inválida. */
+/** 1 = lunes … 7 = domingo, como el backend. */
+export function diaSemanaIso(fecha: Date): number {
+  return fecha.getDay() === 0 ? 7 : fecha.getDay()
+}
+
 export function formatearFecha(
   fecha: string | Date | null | undefined
 ): string {

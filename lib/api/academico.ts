@@ -810,7 +810,20 @@ export const recreosApi = {
 
 // ── Configuración académica ──────────────────────────────────────────────
 
-/** Duración de la hora académica de un nivel en un año escolar. */
+export type EscalaCalificacion = "LITERAL" | "VIGESIMAL"
+export type TipoPeriodo = "BIMESTRE" | "TRIMESTRE"
+export type EstadoPeriodo = "POR_COMENZAR" | "ABIERTO" | "CERRADO"
+
+/** Bimestre o trimestre; su estado sale de la fecha de hoy. */
+export interface PeriodoEvaluacion {
+  numero: number
+  nombre: string
+  fechaInicio: string
+  fechaFin: string
+  estado: EstadoPeriodo
+}
+
+/** Hora académica, escala y periodos de un nivel en un año escolar. */
 export interface ConfiguracionAcademicaResponse {
   idAnio: number
   anio: string
@@ -823,12 +836,21 @@ export interface ConfiguracionAcademicaResponse {
   anioOrigen: string | null
   /** Con alguna asignación en el año y nivel, la duración ya no cambia. */
   asignaciones: number
+  escala: EscalaCalificacion
+  tipoPeriodo: TipoPeriodo
+  periodos: PeriodoEvaluacion[]
+  editable: boolean
+  motivoBloqueo: string | null
 }
 
 export interface ConfiguracionAcademicaRequest {
   idAnio: number
   idNivel: number
   minutosHoraAcademica: number | null
+  escala: EscalaCalificacion
+  tipoPeriodo: TipoPeriodo
+  /** null: se mantienen los guardados (o se borran si cambia el tipo). */
+  periodos: { fechaInicio: string; fechaFin: string }[] | null
 }
 
 export const configuracionAcademicaApi = {
