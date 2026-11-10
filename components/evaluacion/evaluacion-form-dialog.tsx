@@ -94,7 +94,7 @@ function fechaInicial(curso: CursoEvaluable, periodo: PeriodoEvaluacion): string
 }
 
 function textoDias(dias: number[]): string {
-  const nombres = dias.map((d) => NOMBRES_DIA[d - 1])
+  const nombres = dias.map((d) => `${NOMBRES_DIA[d - 1]}${d >= 6 ? "s" : ""}`)
   return nombres.length === 1 ? nombres[0] : `${nombres.slice(0, -1).join(", ")} y ${nombres.at(-1)}`
 }
 
@@ -147,9 +147,12 @@ function Formulario({ curso, periodo, evaluacion, avance, onCerrar }: {
 
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-4">
-      <p className="text-sm text-muted-foreground">
-        {curso.curso} · {periodo.nombre} ({formatearFecha(periodo.fechaInicio)} al {formatearFecha(periodo.fechaFin)})
-      </p>
+      <div className="space-y-1">
+        <p className="break-words text-sm font-medium">{curso.curso}</p>
+        <p className="text-xs text-muted-foreground" title={`${formatearFecha(periodo.fechaInicio)} al ${formatearFecha(periodo.fechaFin)}`}>
+          {periodo.nombre}
+        </p>
+      </div>
       {bloqueada && (
         <p className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs">
           Ya tiene notas registradas: solo se puede cambiar el nombre.
@@ -185,7 +188,7 @@ function Formulario({ curso, periodo, evaluacion, avance, onCerrar }: {
             error={errors.fecha}
             descripcion={
               curso.diasClase.length
-                ? `Día en que se toma. ${curso.curso} se dicta ${textoDias(curso.diasClase)}.`
+                ? `Este curso se dicta los ${textoDias(curso.diasClase)}`
                 : "Este curso no tiene horario registrado: se permiten de lunes a viernes."
             }
           />
@@ -193,9 +196,9 @@ function Formulario({ curso, periodo, evaluacion, avance, onCerrar }: {
       />
 
       <div className="flex flex-col gap-1.5">
-        <p className="text-sm font-medium">Competencias que afecta *</p>
+        <p className="text-sm font-medium">Competencias que se evaluarán *</p>
         <p className="text-xs text-muted-foreground">
-          La nota de esta evaluación aparecerá como guía en la nota final de cada competencia marcada.
+          Selecciona las competencias que evaluarás
         </p>
         <Controller
           name="competencias"

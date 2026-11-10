@@ -1,4 +1,6 @@
 "use client"
+import type { PeriodoEvaluacion } from "@/lib/api/academico"
+
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
@@ -16,9 +18,11 @@ import { ProcedenciaCalificacion } from "./procedencia-calificacion"
  */
 export function RegistroAuxiliar({
   idAsignacion,
+  periodos,
   periodo,
   onAbrirEvaluacion,
 }: {
+  periodos: PeriodoEvaluacion[]
   idAsignacion: number
   periodo: number
   onAbrirEvaluacion: (idEvaluacion: number) => void
@@ -69,7 +73,7 @@ export function RegistroAuxiliar({
               <TableCell className="text-muted-foreground">{i + 1}</TableCell>
               <TableCell>
                 <p className="font-medium">{a.nombre}</p>
-                {a.tieneHistorial && <HistorialCalificacionesDialog idMatricula={a.idMatricula} idAsignacion={idAsignacion} nombre={a.nombre} />}
+                {a.tieneHistorial && <HistorialCalificacionesDialog periodos={periodos} idMatricula={a.idMatricula} idAsignacion={idAsignacion} nombre={a.nombre} />}
                 <p className="text-xs text-muted-foreground">{a.codigo}</p>
               </TableCell>
               {data.evaluaciones.map((e) => (
