@@ -6,7 +6,7 @@ export interface Candidata { idEvaluacion: number; nombre: string; bloqueo: stri
 export interface Reconocimiento {
   idReconocimiento: number; idEvaluacionDestino: number; evaluacionDestino: string; seccionDestino: string
   calificacion: string; estado: "ACTIVO" | "ANULADO"; usuario: string; fecha: string
-  motivoAnulacion: string | null; usuarioAnulacion: string | null; fechaAnulacion: string | null; puedeAnular: boolean
+  motivoAnulacion: string | null; usuarioAnulacion: string | null; fechaAnulacion: string | null; puedeAnular: boolean; enSeccionActual: boolean
 }
 export interface NotaHistorica {
   idNotaOrigen: number; seccion: string; curso: string; area: string | null; evaluacion: string
@@ -43,6 +43,7 @@ export interface CursoEvaluable {
 }
 
 export interface EvaluacionResumen {
+  tieneNotasRegistradas: boolean
   idEvaluacion: number
   nombre: string
   fecha: string

@@ -1,4 +1,6 @@
 "use client"
+import type { PeriodoEvaluacion } from "@/lib/api/academico"
+
 
 import { useState } from "react"
 import { toast } from "sonner"
@@ -20,9 +22,11 @@ import { ProcedenciaCalificacion } from "./procedencia-calificacion"
 /** Notas de los alumnos en una evaluación. Sin permiso o con el periodo cerrado, solo lectura. */
 export function NotasEvaluacionDialog({
   idEvaluacion,
+  periodos,
   onOpenChange,
   puedeCalificar,
 }: {
+  periodos: PeriodoEvaluacion[]
   idEvaluacion: number | null
   onOpenChange: (open: boolean) => void
   puedeCalificar: boolean
@@ -41,6 +45,7 @@ export function NotasEvaluacionDialog({
             // Al guardar llega el detalle nuevo y el formulario arranca de él.
             key={JSON.stringify(data.alumnos)}
             detalle={data}
+            periodos={periodos}
             editable={puedeCalificar && data.evaluacion.editable}
             onCerrar={() => onOpenChange(false)}
           />
@@ -50,7 +55,8 @@ export function NotasEvaluacionDialog({
   )
 }
 
-function Contenido({ detalle, editable, onCerrar }: {
+function Contenido({ detalle, editable, onCerrar, periodos }: {
+  periodos: PeriodoEvaluacion[]
   detalle: EvaluacionDetalle
   editable: boolean
   onCerrar: () => void
@@ -134,7 +140,7 @@ function Contenido({ detalle, editable, onCerrar }: {
                   <TableCell className="text-muted-foreground">{i + 1}</TableCell>
                   <TableCell>
                     <p className="font-medium">{a.nombre}</p>
-                    {a.tieneHistorial && <HistorialCalificacionesDialog idMatricula={a.idMatricula} idAsignacion={detalle.idAsignacion} nombre={a.nombre} disabled={cambiados.length > 0 || registrar.isPending} />}
+                    {a.tieneHistorial && <HistorialCalificacionesDialog periodos={periodos} idMatricula={a.idMatricula} idAsignacion={detalle.idAsignacion} nombre={a.nombre} disabled={cambiados.length > 0 || registrar.isPending} />}
                     <p className="text-xs text-muted-foreground">{a.codigo}</p>
                   </TableCell>
                   <TableCell>

@@ -179,6 +179,7 @@ export default function EvaluacionesTab() {
         ) : vista === "registro" && curso && periodo ? (
           <RegistroAuxiliar
             idAsignacion={curso.idAsignacion}
+            periodos={curso.periodos}
             periodo={periodo.numero}
             onAbrirEvaluacion={setIdCalificando}
           />
@@ -248,11 +249,11 @@ export default function EvaluacionesTab() {
                             </Button>
                           )}
                           {puedeEliminar && e.editable && (
-                            <span title={e.notasRegistradas ? "Tiene notas registradas: no se puede eliminar" : undefined}>
+                            <span title={e.tieneNotasRegistradas ? "Tiene notas registradas: no se puede eliminar" : undefined}>
                               <ConfirmarEliminar
                                 titulo="Eliminar evaluación"
                                 descripcion={`Se eliminará "${e.nombre}".`}
-                                disabled={e.notasRegistradas > 0}
+                                disabled={e.tieneNotasRegistradas}
                                 onConfirm={() => handleEliminar(e)}
                               />
                             </span>
@@ -279,6 +280,7 @@ export default function EvaluacionesTab() {
         )}
         <NotasEvaluacionDialog
           idEvaluacion={idCalificando}
+          periodos={curso?.periodos ?? []}
           onOpenChange={(open) => !open && setIdCalificando(null)}
           puedeCalificar={puedeCrear}
         />
