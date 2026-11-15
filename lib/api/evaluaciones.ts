@@ -1,6 +1,19 @@
 import { apiFetch } from "@/lib/api"
 import type { EscalaCalificacion, PeriodoEvaluacion, TipoPeriodo } from "@/lib/api/academico"
 
+export interface Procedencia { idReconocimiento: number; seccion: string; evaluacion: string }
+export interface Candidata { idEvaluacion: number; nombre: string; bloqueo: string | null }
+export interface Reconocimiento {
+  idReconocimiento: number; idEvaluacionDestino: number; evaluacionDestino: string; seccionDestino: string
+  calificacion: string; estado: "ACTIVO" | "ANULADO"; usuario: string; fecha: string
+  motivoAnulacion: string | null; usuarioAnulacion: string | null; fechaAnulacion: string | null; puedeAnular: boolean; enSeccionActual: boolean
+}
+export interface NotaHistorica {
+  idNotaOrigen: number; seccion: string; curso: string; area: string | null; evaluacion: string
+  competencias: CompetenciaEvaluada[]; periodo: number; fecha: string; calificacion: string
+  bloqueo: string | null; reconocimientos: Reconocimiento[]
+}
+
 export interface CompetenciaEvaluada {
   idCompetencia: number
   codigo: string
@@ -30,6 +43,7 @@ export interface CursoEvaluable {
 }
 
 export interface EvaluacionResumen {
+  tieneNotasRegistradas: boolean
   idEvaluacion: number
   nombre: string
   fecha: string
@@ -45,6 +59,9 @@ export interface EvaluacionResumen {
 }
 
 export interface AlumnoEvaluado {
+  notaProtegida: boolean
+  tieneHistorial: boolean
+  procedencia: Procedencia | null
   idMatricula: number
   codigo: string
   nombre: string
@@ -54,6 +71,7 @@ export interface AlumnoEvaluado {
 }
 
 export interface EvaluacionDetalle {
+  idAsignacion: number
   evaluacion: EvaluacionResumen
   escala: EscalaCalificacion
   alumnos: AlumnoEvaluado[]
@@ -73,6 +91,8 @@ export interface RegistroAuxiliar {
   evaluaciones: EvaluacionResumen[]
   competencias: CompetenciaEvaluada[]
   alumnos: {
+    tieneHistorial: boolean
+    procedencias: Record<number, Procedencia>
     idMatricula: number
     codigo: string
     nombre: string
@@ -102,6 +122,18 @@ export interface EvaluacionRequest {
 }
 
 export const evaluacionesApi = {
+  historial(idMatricula: number, idAsignacion: number): Promise<NotaHistorica[]> {
+    return apiFetch(`/evaluaciones/historial-calificaciones?idMatricula=${idMatricula}&idAsignacion=${idAsignacion}`)
+  },
+  candidatas(idNotaOrigen: number, idAsignacion: number): Promise<Candidata[]> {
+    return apiFetch(`/evaluaciones/reconocimientos/candidatas?idNotaOrigen=${idNotaOrigen}&idAsignacion=${idAsignacion}`)
+  },
+  reconocer(data: { idNotaOrigen: number; idEvaluacionDestino: number; calificacionOrigen: string }) {
+    return apiFetch<Reconocimiento>("/evaluaciones/reconocimientos", { method: "POST", body: JSON.stringify(data) })
+  },
+  anular(id: number, motivo: string) {
+    return apiFetch<void>(`/evaluaciones/reconocimientos/${id}/anulacion`, { method: "POST", body: JSON.stringify({ motivo }) })
+  },
   cursos(idAnio: number): Promise<CursoEvaluable[]> {
     return apiFetch<CursoEvaluable[]>(`/evaluaciones/cursos?idAnio=${idAnio}`)
   },
@@ -137,3 +169,6 @@ export const evaluacionesApi = {
     return apiFetch<void>(`/evaluaciones/${idEvaluacion}`, { method: "DELETE" })
   },
 }
+
+export const MOTIVO_ANULACION_MAXIMO = 500
+export const RECONOCIMIENTO_ACTIVO = "ACTIVO" as const

@@ -1,4 +1,6 @@
 "use client"
+import type { PeriodoEvaluacion } from "@/lib/api/academico"
+
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
@@ -6,6 +8,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { CargandoTarjetas } from "@/components/shared/table-helpers"
 import { useRegistroAuxiliar } from "@/hooks/use-evaluaciones"
 import { formatearFecha } from "@/lib/fechas"
+import { HistorialCalificacionesDialog } from "./historial-calificaciones-dialog"
+import { ProcedenciaCalificacion } from "./procedencia-calificacion"
 
 /**
  * Registro auxiliar del curso en el periodo: cada alumno con sus notas en todas
@@ -14,9 +18,11 @@ import { formatearFecha } from "@/lib/fechas"
  */
 export function RegistroAuxiliar({
   idAsignacion,
+  periodos,
   periodo,
   onAbrirEvaluacion,
 }: {
+  periodos: PeriodoEvaluacion[]
   idAsignacion: number
   periodo: number
   onAbrirEvaluacion: (idEvaluacion: number) => void
@@ -24,14 +30,6 @@ export function RegistroAuxiliar({
   const { data, isLoading } = useRegistroAuxiliar(idAsignacion, periodo)
   if (isLoading || !data) return <CargandoTarjetas filas={2} />
   const vigesimal = data.escala === "VIGESIMAL"
-
-  if (!data.evaluaciones.length) {
-    return (
-      <p className="rounded-lg border p-8 text-center text-sm text-muted-foreground">
-        Aún no hay evaluaciones en este periodo.
-      </p>
-    )
-  }
 
   return (
     <div className="overflow-x-auto rounded-md border">
@@ -75,11 +73,13 @@ export function RegistroAuxiliar({
               <TableCell className="text-muted-foreground">{i + 1}</TableCell>
               <TableCell>
                 <p className="font-medium">{a.nombre}</p>
+                {a.tieneHistorial && <HistorialCalificacionesDialog periodos={periodos} idMatricula={a.idMatricula} idAsignacion={idAsignacion} nombre={a.nombre} />}
                 <p className="text-xs text-muted-foreground">{a.codigo}</p>
               </TableCell>
               {data.evaluaciones.map((e) => (
                 <TableCell key={e.idEvaluacion} className="text-center font-mono">
                   {a.notas[e.idEvaluacion] ?? <span className="text-muted-foreground">—</span>}
+                  <ProcedenciaCalificacion procedencia={a.procedencias[e.idEvaluacion]} />
                 </TableCell>
               ))}
               {a.competencias.map((c) => (

@@ -1,3 +1,4 @@
+import { EVALUACIONES_KEY, NOTAS_FINALES_KEY } from "@/lib/query-keys"
 import {
   useMutation,
   useQuery,
@@ -66,7 +67,7 @@ export function useBuscarApoderadoInscripcion() {
 }
 
 export function useCrudMatriculas() {
-  const invalidar = useInvalidarMutacion(KEYS.matriculas, KEYS.alumnos, KEYS.apoderados)
+  const invalidar = useInvalidarMutacion(KEYS.matriculas, KEYS.alumnos, KEYS.apoderados, EVALUACIONES_KEY, NOTAS_FINALES_KEY)
   return {
     validar: useMutation({
       mutationFn: (data: InscripcionRequest) => matriculasApi.validar(data),
