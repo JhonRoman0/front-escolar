@@ -13,16 +13,14 @@ export function ListaPeriodos({ periodos }: { periodos: PeriodoEvaluacion[] }) {
     return <p className="text-xs text-muted-foreground">Aún no tiene periodos definidos.</p>
   }
   return (
-    <ul className="flex flex-col divide-y rounded-md border">
+    <ul className="flex flex-col divide-y rounded-md border text-xs">
       {periodos.map((p) => (
-        <li key={p.numero} className="flex items-center justify-between gap-2 px-3 py-2 text-sm">
-          <div className="min-w-0">
-            <p className="font-medium">{p.nombre}</p>
-            <p className="text-xs text-muted-foreground">
-              {formatearFecha(p.fechaInicio)} al {formatearFecha(p.fechaFin)}
-            </p>
-          </div>
-          <EstadoPeriodoBadge estado={p.estado} />
+        <li key={p.numero} className="flex items-center gap-2 px-2.5 py-1.5">
+          <span className="w-28 shrink-0 whitespace-nowrap font-medium">{p.nombre}</span>
+          <span className="text-muted-foreground">
+            {formatearFecha(p.fechaInicio)} – {formatearFecha(p.fechaFin)}
+          </span>
+          <EstadoPeriodoBadge estado={p.estado} className="ml-auto" />
         </li>
       ))}
     </ul>
@@ -53,8 +51,8 @@ export function EditorPeriodos({
     <div className="flex flex-col gap-2">
       {value.map((p, i) => (
         <div key={i} className="flex flex-col gap-1">
-          <p className="text-xs font-medium">{nombrePeriodo(tipo, i + 1)}</p>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-[120px_1fr_1fr] items-center gap-2">
+            <span className="whitespace-nowrap text-xs font-medium">{nombrePeriodo(tipo, i + 1)}</span>
             <Input
               type="date"
               aria-label={`Inicio del ${nombrePeriodo(tipo, i + 1).toLowerCase()}`}

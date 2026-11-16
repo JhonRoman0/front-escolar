@@ -313,21 +313,43 @@ interface HorarioPdfItem {
   curso: string
   docente: string
   aula: string
+  /** Segunda línea del bloque; si no viene, el docente. */
+  detalle?: string
 }
 
-export function generarPdfHorario(
-  horarios: HorarioPdfItem[],
-  titulo: string,
-  nombreColegio = "Sistema Escolar"
-): void {
+interface RecreoPdfItem {
+  diaSemana: number
+  horaInicio: string
+  horaFin: string
+}
+
+/** Una página del PDF: un horario (por ejemplo, el de un turno) con sus recreos. */
+export interface PaginaHorarioPdf {
+  titulo: string
+  horarios: HorarioPdfItem[]
+  recreos?: RecreoPdfItem[]
+}
+
+/** Un PDF con una página por horario (por turno, en el del docente). */
+export function generarPdfHorario(paginas: PaginaHorarioPdf[], nombreColegio = "Sistema Escolar"): void {
   const doc = nuevoDoc("landscape")
+  paginas.forEach((pagina, i) => {
+    if (i > 0) doc.addPage()
+    dibujarHorario(doc, pagina, nombreColegio)
+  })
+  doc.save(`horario-semanal-${new Date().toISOString().slice(0, 10)}.pdf`)
+}
+
+function dibujarHorario(doc: ReturnType<typeof nuevoDoc>, pagina: PaginaHorarioPdf, nombreColegio: string): void {
+  const { horarios, titulo } = pagina
+  const recreos = pagina.recreos ?? []
   const MINUTOS_SLOT = 30
   const NOMBRES = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"]
 
-  // Calcular rango de horas
+  // Rango de horas: clases y recreos.
   let minMin = Infinity
   let maxMin = 0
-  for (const h of horarios) {
+  for (const h of [...horarios, ...recreos]) {
     const ini = aMinutosPdf(h.horaInicio)
     const fin = aMinutosPdf(h.horaFin)
     if (ini < minMin) minMin = ini
@@ -345,7 +367,6 @@ export function generarPdfHorario(
   const COL_DIA_W = (PAGE_W - MARGIN * 2 - COL_HORA_W) / 5
   const ROW_H = 14
 
-  // Encabezado
   let y = escribirEncabezado(doc, "Horario Semanal", [
     nombreColegio,
     titulo,
@@ -362,7 +383,6 @@ export function generarPdfHorario(
     doc.setTextColor(255, 255, 255)
     doc.text(NOMBRES[i], x + COL_DIA_W / 2, y + 5, { align: "center" })
   }
-  // Celda "Hora"
   doc.setFillColor(...AZUL)
   doc.rect(MARGIN, y, COL_HORA_W, 7, "F")
   doc.setTextColor(255, 255, 255)
@@ -372,21 +392,14 @@ export function generarPdfHorario(
   // Slots de tiempo
   doc.setFont("helvetica", "normal")
   doc.setFontSize(7)
-
   for (const slotMin of slots) {
     const slotY = y + (slotMin - minMin) / MINUTOS_SLOT * ROW_H
-
-    // Columna hora
     doc.setFillColor(245, 247, 252)
     doc.rect(MARGIN, slotY, COL_HORA_W, ROW_H, "F")
     doc.setDrawColor(200, 200, 200)
     doc.rect(MARGIN, slotY, COL_HORA_W, ROW_H, "S")
     doc.setTextColor(100, 100, 100)
-    doc.text(minutosAHoraPdf(slotMin), MARGIN + COL_HORA_W / 2, slotY + ROW_H / 2 + 1, {
-      align: "center",
-    })
-
-    // Celdas de días
+    doc.text(minutosAHoraPdf(slotMin), MARGIN + COL_HORA_W / 2, slotY + ROW_H / 2 + 1, { align: "center" })
     for (let d = 0; d < 5; d++) {
       const x = MARGIN + COL_HORA_W + d * COL_DIA_W
       doc.setDrawColor(220, 220, 220)
@@ -394,45 +407,49 @@ export function generarPdfHorario(
     }
   }
 
-  // Bloques de horarios
-  for (const h of horarios) {
-    if (h.diaSemana > 5) continue
-    const diaIdx = h.diaSemana - 1
-
+  /** Posición del bloque en la grilla; null si cae en fin de semana. */
+  function caja(h: { diaSemana: number; horaInicio: string; horaFin: string }) {
+    if (h.diaSemana > 5) return null
     const iniMin = aMinutosPdf(h.horaInicio)
     const finMin = aMinutosPdf(h.horaFin)
-    const rowStart = Math.floor((iniMin - minMin) / MINUTOS_SLOT)
-    const rowSpan = Math.round((finMin - iniMin) / MINUTOS_SLOT)
+    return {
+      x: MARGIN + COL_HORA_W + (h.diaSemana - 1) * COL_DIA_W,
+      blockY: y + ((iniMin - minMin) / MINUTOS_SLOT) * ROW_H,
+      blockH: ((finMin - iniMin) / MINUTOS_SLOT) * ROW_H,
+    }
+  }
 
-    const x = MARGIN + COL_HORA_W + diaIdx * COL_DIA_W
-    const blockY = y + rowStart * ROW_H
-    const blockH = rowSpan * ROW_H
+  // Recreos: franja gris
+  for (const r of recreos) {
+    const c = caja(r)
+    if (!c) continue
+    doc.setFillColor(229, 231, 235)
+    doc.rect(c.x + 0.5, c.blockY + 0.5, COL_DIA_W - 1, c.blockH - 1, "F")
+    doc.setTextColor(90, 90, 90)
+    doc.setFont("helvetica", "bold")
+    doc.setFontSize(6.5)
+    doc.text("Recreo", c.x + COL_DIA_W / 2, c.blockY + c.blockH / 2 + 1, { align: "center" })
+  }
 
-    const colorIdx = hashCursoPdf(h.curso)
-    const color = COLORES_PDF[colorIdx]
-
-    // Fondo
+  // Bloques de clases
+  for (const h of horarios) {
+    const c = caja(h)
+    if (!c) continue
+    const color = COLORES_PDF[hashCursoPdf(h.curso)]
     doc.setFillColor(...color)
-    doc.roundedRect(x + 0.5, blockY + 0.5, COL_DIA_W - 1, blockH - 1, 2, 2, "F")
-
-    // Borde
+    doc.roundedRect(c.x + 0.5, c.blockY + 0.5, COL_DIA_W - 1, c.blockH - 1, 2, 2, "F")
     doc.setDrawColor(color[0] - 30, color[1] - 30, color[2] - 30)
-    doc.roundedRect(x + 0.5, blockY + 0.5, COL_DIA_W - 1, blockH - 1, 2, 2, "S")
+    doc.roundedRect(c.x + 0.5, c.blockY + 0.5, COL_DIA_W - 1, c.blockH - 1, 2, 2, "S")
 
-    // Texto
     doc.setTextColor(30, 30, 30)
     doc.setFont("helvetica", "bold")
     doc.setFontSize(7)
-    doc.text(h.curso, x + 3, blockY + 4)
-
+    doc.text(h.curso, c.x + 3, c.blockY + 4)
     doc.setFont("helvetica", "normal")
     doc.setFontSize(6)
-    doc.text(h.docente, x + 3, blockY + 8)
-
+    doc.text(h.detalle ?? h.docente, c.x + 3, c.blockY + 8)
     doc.setTextColor(100, 100, 100)
     doc.setFontSize(5.5)
-    doc.text(h.aula, x + 3, blockY + 11)
+    doc.text(h.aula, c.x + 3, c.blockY + 11)
   }
-
-  doc.save(`horario-semanal-${new Date().toISOString().slice(0, 10)}.pdf`)
 }

@@ -2,7 +2,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query"
 
 import { useAuth } from "@/components/auth-provider"
 import { useDocenteDeUsuario } from "@/hooks/use-academico"
-import { useAlcance } from "@/hooks/use-permisos"
+import { usePuede } from "@/hooks/use-permisos"
 import { asistenciasApi } from "@/lib/api/asistencia"
 import { horarioApi, type HorarioFiltros } from "@/lib/api/horario"
 
@@ -14,11 +14,19 @@ const KEYS = {
 // ── Vista según el alcance en Horarios ──────────────────────────────────
 
 // "admin": todos los horarios con filtros; "docente": los suyos; "apoderado": los de sus hijos.
-export type RolHorario = "admin" | "docente" | "apoderado"
+export type RolHorario = "admin" | "docente" | "apoderado" | "ninguno"
 
+/**
+ * Con "Ver horarios del colegio" (o ADMIN) se ve el de cualquier sección. Sin
+ * ella, el docente ve el suyo, el apoderado el de su hijo y los demás, nada.
+ */
 export function useRolHorario(): RolHorario {
-  const alcance = useAlcance("HORARIOS")
-  return alcance === "todo" ? "admin" : alcance
+  const { permisos } = useAuth()
+  const verColegio = usePuede("HORARIOS", "VER_COLEGIO")
+  if (verColegio) return "admin"
+  if (permisos?.vinculo === "DOCENTE") return "docente"
+  if (permisos?.vinculo === "APODERADO") return "apoderado"
+  return "ninguno"
 }
 
 // ── Queries ──────────────────────────────────────────────────────────────
@@ -45,6 +53,26 @@ export function useHorarioDocente(
     queryFn: () => horarioApi.porDocente(idDocente as number, filtros),
     enabled: !!idDocente,
     placeholderData: keepPreviousData,
+    staleTime: 1000 * 60 * 5,
+  })
+}
+
+/** Docente: todas sus clases del año (lo identifica la sesión). */
+export function useMiHorario(idAnio: number | null, enabled: boolean) {
+  return useQuery({
+    queryKey: [...KEYS.horarios, "mio", idAnio],
+    queryFn: () => horarioApi.mio(idAnio),
+    enabled,
+    staleTime: 1000 * 60 * 5,
+  })
+}
+
+/** Recreos de una sección (horario del colegio). */
+export function useRecreosSeccion(idGradoSeccion: number | null) {
+  return useQuery({
+    queryKey: [...KEYS.horarios, "recreos", idGradoSeccion],
+    queryFn: () => horarioApi.recreosDeSeccion(idGradoSeccion as number),
+    enabled: idGradoSeccion != null,
     staleTime: 1000 * 60 * 5,
   })
 }

@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { FilterSelect } from "@/components/shared/filter-select"
 import { useNiveles, useGradosPorNivel, useSeccionesPorGrado } from "@/hooks/use-academico"
 import {
   Select,
@@ -26,6 +27,8 @@ interface GradoSeccionCascadaProps {
   defaultIdNivel?: number | null
   defaultIdGrado?: number | null
   showLabels?: boolean
+  /** Como los demás filtros de barra: etiqueta dentro del botón, en una fila. */
+  compacta?: boolean
 }
 
 export function GradoSeccionCascada({
@@ -38,6 +41,7 @@ export function GradoSeccionCascada({
   defaultIdNivel = null,
   defaultIdGrado = null,
   showLabels = true,
+  compacta = false,
 }: GradoSeccionCascadaProps) {
   const { data: niveles = [] } = useNiveles()
   const [idNivel, setIdNivel] = useState<number | null>(defaultIdNivel)
@@ -89,6 +93,50 @@ export function GradoSeccionCascada({
   }
 
   const label = findLabel()
+
+  function cambiarSeccion(v: string | null) {
+    const id = v ? Number(v) : null
+    onChange(id)
+    const sec = id ? secciones.find((s) => s.idGradoSeccion === id) : null
+    onSeccionInfo?.(sec ? { idGradoSeccion: sec.idGradoSeccion, nombreSeccion: sec.nombre, turno: sec.turno } : null)
+  }
+
+  if (compacta) {
+    return (
+      <>
+        <FilterSelect
+          label="Nivel"
+          value={idNivel ? String(idNivel) : ""}
+          onValueChange={cambiarNivel}
+          options={niveles.map((n) => ({ value: String(n.idNivel), label: n.nombre }))}
+          includeAll={false}
+          allLabel="Elige"
+          className="w-[170px]"
+          disabled={disabled}
+        />
+        <FilterSelect
+          label="Grado"
+          value={idGrado ? String(idGrado) : ""}
+          onValueChange={cambiarGrado}
+          options={grados.map((g) => ({ value: String(g.idGrado), label: g.nombre }))}
+          includeAll={false}
+          allLabel="Elige"
+          className="w-[140px]"
+          disabled={disabled || !idNivel}
+        />
+        <FilterSelect
+          label="Sección"
+          value={value ? String(value) : ""}
+          onValueChange={cambiarSeccion}
+          options={secciones.map((s) => ({ value: String(s.idGradoSeccion), label: `${s.nombre} (${s.turno})` }))}
+          includeAll={false}
+          allLabel="Elige"
+          className="w-[180px]"
+          disabled={disabled || !idGrado}
+        />
+      </>
+    )
+  }
 
   return (
     <div className={className ? `grid grid-cols-1 gap-2 sm:grid-cols-3 ${className}` : "grid grid-cols-1 gap-2 sm:grid-cols-3"}>
@@ -148,16 +196,7 @@ export function GradoSeccionCascada({
         )}
         <Select
           value={value ? String(value) : ""}
-          onValueChange={(v) => {
-            const id = v ? Number(v) : null
-            onChange(id)
-            if (id) {
-              const sec = secciones.find((s) => s.idGradoSeccion === id)
-              onSeccionInfo?.(sec ? { idGradoSeccion: sec.idGradoSeccion, nombreSeccion: sec.nombre, turno: sec.turno } : null)
-            } else {
-              onSeccionInfo?.(null)
-            }
-          }}
+          onValueChange={cambiarSeccion}
           disabled={disabled || !idGrado}
         >
           <SelectTrigger>

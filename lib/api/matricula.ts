@@ -200,6 +200,9 @@ export interface GradoOpcion {
 export interface MatriculaOpciones {
   bloqueo: string | null
   ultimoGrado: string | null
+  /** Según las notas del año anterior; null si no aplica (nuevo, grado que no repite, años sin notas del año). */
+  situacion: "PROMOVIDO" | "REPITE" | null
+  areasDesaprobadas: string[] | null
   grados: GradoOpcion[]
 }
 

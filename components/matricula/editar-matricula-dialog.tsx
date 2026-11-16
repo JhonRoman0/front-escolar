@@ -26,6 +26,7 @@ import { estadoAnioTexto } from "@/lib/api/academico"
 import { ANIO_CERRADO, ANIO_POR_COMENZAR, type MatriculaResponse } from "@/lib/api/matricula"
 
 import { CamposPago, erroresDePago, formatoSoles } from "./campos-pago"
+import { AvisoPromocion } from "./aviso-promocion"
 import { agruparGrados, grupoDe, SelectorSeccion, type SeleccionSeccion } from "./selector-seccion"
 
 /**
@@ -171,6 +172,7 @@ function EdicionPorComenzar({
             {opciones.ultimoGrado && (
               <p className="text-xs text-muted-foreground">Último grado: {opciones.ultimoGrado}</p>
             )}
+            <AvisoPromocion opciones={opciones} />
             <SelectorSeccion grados={grados} value={seleccion} onChange={setSeleccion} />
           </>
         ) : null}
