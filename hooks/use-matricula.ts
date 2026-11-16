@@ -30,6 +30,15 @@ export function useMatriculas(page: number, size = 10, idAcceso?: number, idAnio
   })
 }
 
+/** Notas finales que le faltan en periodos cerrados: se avisa antes del cambio de sección. */
+export function usePendientesCambioSeccion(id: number, habilitado: boolean) {
+  return useQuery({
+    queryKey: [...KEYS.matriculas, "pendientes-cambio", id],
+    queryFn: () => matriculasApi.pendientesCambioSeccion(id),
+    enabled: habilitado,
+  })
+}
+
 export function useMatricula(id?: number) {
   return useQuery({
     queryKey: [...KEYS.matriculas, "detalle", id],

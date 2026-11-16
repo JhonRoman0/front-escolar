@@ -6,17 +6,6 @@ export function fechaCorta(iso: string): string {
   return formatearFecha(iso)
 }
 
-/** LocalDateTime del back ("YYYY-MM-DDTHH:mm:ss") → "dd/mm/yy HH:mm". */
-export function fechaHora(iso: string | null | undefined): string {
-  if (!iso) return "—"
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return "—"
-  return `${d.toLocaleDateString("es-PE")} ${d.toLocaleTimeString("es-PE", {
-    hour: "2-digit",
-    minute: "2-digit",
-  })}`
-}
-
 /** Años cumplidos a hoy. */
 export function edad(nacimiento: string | null): number | null {
   if (!nacimiento) return null

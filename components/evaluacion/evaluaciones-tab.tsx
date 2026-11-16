@@ -1,8 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { Fragment, useState } from "react"
 import { toast } from "sonner"
-import { ClipboardPen, Pencil, Plus } from "lucide-react"
+import { ChevronDown, ClipboardPen, Eye, Pencil, Plus } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -25,7 +25,8 @@ import { formatearFecha } from "@/lib/fechas"
 import { EvaluacionFormDialog } from "./evaluacion-form-dialog"
 import { FiltrosCurso, useFiltrosCurso } from "./filtros-curso"
 import { NotasEvaluacionDialog } from "./notas-evaluacion-dialog"
-import { RegistroAuxiliar } from "./registro-auxiliar"
+import { NotasDeEvaluacion } from "./notas-de-evaluacion"
+import { ResumenEvaluacionDialog } from "./resumen-evaluacion-dialog"
 
 const COLUMNAS = 5
 
@@ -64,10 +65,12 @@ export default function EvaluacionesTab() {
   const puedeCrear = usePuede("EVALUACIONES", "CREAR")
   const puedeEditar = usePuede("EVALUACIONES", "ACTUALIZAR")
   const puedeEliminar = usePuede("EVALUACIONES", "ELIMINAR")
+  const puedeVerResumen = usePuede("EVALUACIONES", "VER_RESUMEN")
+  const [idResumen, setIdResumen] = useState<number | null>(null)
 
   const [formulario, setFormulario] = useState<{ evaluacion: EvaluacionResumen | null } | null>(null)
   const [idCalificando, setIdCalificando] = useState<number | null>(null)
-  const [vista, setVista] = useState<"lista" | "registro">("lista")
+  const [expandida, setExpandida] = useState<number | null>(null)
   const periodoAbierto = !!filtrosCurso.delNivel?.anioVigente && periodo?.estado === "ABIERTO"
 
   async function handleEliminar(evaluacion: EvaluacionResumen) {
@@ -145,22 +148,6 @@ export default function EvaluacionesTab() {
             <Badge variant="outline">Escala {ESCALAS.find((e) => e.value === curso.escala)?.detalle}</Badge>
             {periodo && <EstadoPeriodoBadge estado={periodo.estado} />}
             <span>Docente: {curso.docente}</span>
-            {periodo && (
-              <div className="ml-auto flex rounded-md border p-0.5">
-                {(["lista", "registro"] as const).map((v) => (
-                  <Button
-                    key={v}
-                    type="button"
-                    size="sm"
-                    variant={vista === v ? "secondary" : "ghost"}
-                    className="h-7"
-                    onClick={() => setVista(v)}
-                  >
-                    {v === "lista" ? "Evaluaciones" : "Registro auxiliar"}
-                  </Button>
-                ))}
-              </div>
-            )}
           </div>
         )}
 
@@ -176,23 +163,17 @@ export default function EvaluacionesTab() {
           <p className="rounded-lg border p-8 text-center text-sm text-muted-foreground">
             {cargandoCursos ? "Cargando cursos…" : `${filtrosCurso.faltaElegir} para ver sus evaluaciones.`}
           </p>
-        ) : vista === "registro" && curso && periodo ? (
-          <RegistroAuxiliar
-            idAsignacion={curso.idAsignacion}
-            periodos={curso.periodos}
-            periodo={periodo.numero}
-            onAbrirEvaluacion={setIdCalificando}
-          />
         ) : (
           <div className="overflow-x-auto rounded-md border">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Evaluación</TableHead>
-                  <TableHead className="w-[110px]">Fecha</TableHead>
-                  <TableHead>Competencias</TableHead>
-                  <TableHead className="w-[100px] text-center">Notas</TableHead>
-                  <TableHead className="w-[150px] text-right">Acciones</TableHead>
+                  {/* Anchos en porcentaje: las columnas se reparten parejo a cualquier ancho. */}
+                  <TableHead className="w-[28%]">Evaluación</TableHead>
+                  <TableHead className="w-[18%] text-center">Fecha de evaluación</TableHead>
+                  <TableHead className="w-[20%] text-center">Competencias evaluadas</TableHead>
+                  <TableHead className="w-[18%] text-center">Notas registradas</TableHead>
+                  <TableHead className="w-[16%] text-center">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -201,15 +182,32 @@ export default function EvaluacionesTab() {
                 ) : evaluaciones.length === 0 ? (
                   <MensajeSinDatos columnas={COLUMNAS} mensaje="Aún no hay evaluaciones en este periodo." />
                 ) : (
-                  evaluaciones.map((e) => (
-                    <TableRow key={e.idEvaluacion}>
+                  evaluaciones.map((e) => {
+                    const abierta = expandida === e.idEvaluacion
+                    const alternar = () => setExpandida(abierta ? null : e.idEvaluacion)
+                    return (
+                    <Fragment key={e.idEvaluacion}>
+                    <TableRow className={`cursor-pointer hover:bg-muted/40 ${abierta ? "bg-muted/30" : ""}`} onClick={alternar}>
                       <TableCell>
-                        <p className="font-medium">{e.nombre}</p>
-                        <p className="text-xs text-muted-foreground">Registró: {e.registradoPor}</p>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            className="size-6 shrink-0 rounded-md"
+                            aria-label={abierta ? "Contraer" : "Ver notas de los alumnos"}
+                            onClick={(ev) => {
+                              ev.stopPropagation()
+                              alternar()
+                            }}
+                          >
+                            <ChevronDown className={`size-3.5 transition-transform ${abierta ? "rotate-180" : ""}`} />
+                          </Button>
+                          <p className="text-sm font-semibold text-foreground">{e.nombre}</p>
+                        </div>
                       </TableCell>
-                      <TableCell>{formatearFecha(e.fecha)}</TableCell>
+                      <TableCell className="text-center">{formatearFecha(e.fecha)}</TableCell>
                       <TableCell>
-                        <div className="flex flex-wrap gap-1">
+                        <div className="flex flex-wrap justify-center gap-1">
                           {e.competencias.map((c) => (
                             <Tooltip key={c.idCompetencia}>
                               <TooltipTrigger render={<Badge variant="secondary" />}>{c.codigo}</TooltipTrigger>
@@ -222,7 +220,19 @@ export default function EvaluacionesTab() {
                         {e.notasRegistradas}/{e.totalAlumnos}
                       </TableCell>
                       <TableCell>
-                        <div className="flex justify-end gap-2">
+                        {/* Las acciones no despliegan la fila. */}
+                        <div className="flex justify-center gap-2" onClick={(ev) => ev.stopPropagation()}>
+                          {puedeVerResumen && (
+                            <Button
+                              variant="outline"
+                              size="icon-sm"
+                              aria-label={`Resumen de ${e.nombre}`}
+                              title="Ver resumen"
+                              onClick={() => setIdResumen(e.idEvaluacion)}
+                            >
+                              <Eye />
+                            </Button>
+                          )}
                           <Button
                             variant="outline"
                             size="icon-sm"
@@ -239,14 +249,18 @@ export default function EvaluacionesTab() {
                             <ClipboardPen />
                           </Button>
                           {puedeEditar && e.editable && (
-                            <Button
-                              variant="outline"
-                              size="icon-sm"
-                              aria-label={`Editar ${e.nombre}`}
-                              onClick={() => setFormulario({ evaluacion: e })}
-                            >
-                              <Pencil />
-                            </Button>
+                            // Con alguna nota (también una usada de otra sección) ya no se edita.
+                            <span title={e.tieneNotasRegistradas ? "Ya tiene notas registradas: no se puede editar" : "Editar"}>
+                              <Button
+                                variant="outline"
+                                size="icon-sm"
+                                aria-label={`Editar ${e.nombre}`}
+                                disabled={e.tieneNotasRegistradas}
+                                onClick={() => setFormulario({ evaluacion: e })}
+                              >
+                                <Pencil />
+                              </Button>
+                            </span>
                           )}
                           {puedeEliminar && e.editable && (
                             <span title={e.tieneNotasRegistradas ? "Tiene notas registradas: no se puede eliminar" : undefined}>
@@ -261,7 +275,21 @@ export default function EvaluacionesTab() {
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))
+                    {abierta && periodo && (
+                      <TableRow className="bg-muted/20 hover:bg-muted/20">
+                        <TableCell colSpan={COLUMNAS} className="p-3">
+                          <NotasDeEvaluacion
+                            idAsignacion={curso.idAsignacion}
+                            periodo={periodo.numero}
+                            periodos={curso.periodos}
+                            idEvaluacion={e.idEvaluacion}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    )}
+                    </Fragment>
+                    )
+                  })
                 )}
               </TableBody>
             </Table>
@@ -278,6 +306,7 @@ export default function EvaluacionesTab() {
             avance={avance}
           />
         )}
+        <ResumenEvaluacionDialog idEvaluacion={idResumen} onOpenChange={(open) => !open && setIdResumen(null)} />
         <NotasEvaluacionDialog
           idEvaluacion={idCalificando}
           periodos={curso?.periodos ?? []}

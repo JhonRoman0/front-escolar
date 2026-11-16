@@ -1,6 +1,7 @@
 "use client"
 
-import { ListChecks, MessageSquareText } from "lucide-react"
+import { useState } from "react"
+import { ListChecks, LockOpen, MessageSquareText } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -14,6 +15,9 @@ import { CONCLUSION_MAXIMA, errorConclusion, requiereConclusion } from "@/lib/ca
 import { formatearFecha } from "@/lib/fechas"
 import { cn } from "@/lib/utils"
 
+/** Igual que en el backend (Nota.MOTIVO_MAXIMO). */
+export const MOTIVO_MAXIMO = 500
+
 export interface ValorNotaFinal {
   calificacion: string
   conclusion: string
@@ -26,7 +30,7 @@ function Guia({ celda, escala }: { celda: CeldaNotaFinal; escala: EscalaCalifica
       <PopoverTrigger
         render={<Button type="button" variant="ghost" size="icon-sm" aria-label="Ver notas de las evaluaciones" />}
       >
-        <ListChecks className={cn(celda.guia.length ? "text-foreground" : "text-muted-foreground/50")} />
+        <ListChecks className={cn(celda.guia.length || celda.referencias.length ? "text-foreground" : "text-muted-foreground/50")} />
       </PopoverTrigger>
       <PopoverContent className="w-72 p-3">
         <p className="mb-2 text-xs font-semibold">Evaluaciones del periodo</p>
@@ -50,12 +54,29 @@ function Guia({ celda, escala }: { celda: CeldaNotaFinal; escala: EscalaCalifica
             Promedio: <span className="font-mono font-semibold">{celda.promedio}</span>
           </p>
         )}
+        {celda.referencias.length > 0 && (
+          <div className="mt-2 border-t pt-2">
+            <p className="mb-1.5 text-xs font-semibold">De otra sección (referencia)</p>
+            <ul className="flex flex-col gap-1.5">
+              {celda.referencias.map((r, i) => (
+                <li key={i} className="flex items-start justify-between gap-2 text-xs">
+                  <span>
+                    <span className="font-medium">{r.evaluacion}</span>
+                    <span className="text-muted-foreground"> · {r.seccion} · {formatearFecha(r.fecha)}</span>
+                  </span>
+                  <span className="font-mono font-semibold">{r.calificacion}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-1.5 text-[11px] text-muted-foreground">No entran al promedio.</p>
+          </div>
+        )}
       </PopoverContent>
     </Popover>
   )
 }
 
-function Conclusion({ escala, valor, onChange, editable }: {
+export function Conclusion({ escala, valor, onChange, editable }: {
   escala: EscalaCalificacion
   valor: ValorNotaFinal
   onChange: (conclusion: string) => void
@@ -101,50 +122,151 @@ function Conclusion({ escala, valor, onChange, editable }: {
   )
 }
 
+/**
+ * nota: se escribe. conclusion: la nota la calcula el sistema (vigesimal) y solo
+ * se escribe la conclusión. lectura: nada se edita.
+ */
+export type ModoCelda = "nota" | "conclusion" | "lectura"
+
+/** Anula una nota final con su motivo para volver a registrarla. */
+export function ReabrirNota({
+  descripcion,
+  onReabrir,
+}: {
+  descripcion: string
+  /** true si se reabrió. */
+  onReabrir: (motivo: string) => Promise<boolean>
+}) {
+  const [abierto, setAbierto] = useState(false)
+  const [motivo, setMotivo] = useState("")
+  const [enviando, setEnviando] = useState(false)
+
+  async function confirmar() {
+    setEnviando(true)
+    const reabierta = await onReabrir(motivo.trim())
+    setEnviando(false)
+    if (reabierta) {
+      setAbierto(false)
+      setMotivo("")
+    }
+  }
+
+  return (
+    <Popover open={abierto} onOpenChange={setAbierto}>
+      <PopoverTrigger
+        render={<Button type="button" variant="ghost" size="icon-sm" aria-label="Reabrir la nota" title="Reabrir la nota" />}
+      >
+        <LockOpen className="text-muted-foreground" />
+      </PopoverTrigger>
+      <PopoverContent className="w-72 p-3">
+        <p className="text-xs font-semibold">Reabrir la nota</p>
+        <p className="mb-2 text-xs text-muted-foreground">{descripcion}</p>
+        <Textarea
+          rows={3}
+          maxLength={MOTIVO_MAXIMO}
+          placeholder="Motivo *"
+          value={motivo}
+          onChange={(e) => setMotivo(e.target.value)}
+        />
+        <div className="mt-2 flex justify-end">
+          <Button type="button" size="sm" variant="outline" disabled={!motivo.trim() || enviando} onClick={confirmar}>
+            Reabrir
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
 /** Nota final de una competencia: campo según la escala, guía y conclusión. */
 export function CeldaNotaFinalEditable({
   celda,
   escala,
   valor,
   onChange,
-  editable,
+  modo,
   alumno,
   competencia,
+  onReabrir,
 }: {
   celda: CeldaNotaFinal
   escala: EscalaCalificacion
   valor: ValorNotaFinal
   onChange: (valor: ValorNotaFinal) => void
-  editable: boolean
+  modo: ModoCelda
   alumno: string
   competencia: string
+  /** Solo si se puede reabrir. */
+  onReabrir?: (motivo: string) => Promise<boolean>
 }) {
+  // Sin notas de evaluaciones no hay nota final (salvo el trasladado que registra dirección).
+  const sinEvaluaciones = celda.calificacion == null && celda.guia.length === 0 && !celda.soloDireccion
   return (
     <div className="flex items-center justify-center gap-0.5">
-      {editable ? (
+      {sinEvaluaciones ? (
+        <Tooltip>
+          <TooltipTrigger render={<span className="text-center text-[11px] text-muted-foreground" />}>
+            Sin evaluaciones
+          </TooltipTrigger>
+          <TooltipContent className="max-w-xs">Primero califícalo en alguna evaluación de esta competencia.</TooltipContent>
+        </Tooltip>
+      ) : modo === "nota" ? (
         <CampoCalificacion
           escala={escala}
           value={valor.calificacion}
           onChange={(calificacion) => onChange({ ...valor, calificacion })}
           ariaLabel={`Nota de ${alumno} en la competencia ${competencia}`}
         />
+      ) : modo === "conclusion" ? (
+        <Tooltip>
+          <TooltipTrigger render={<span className="min-w-8 text-center font-mono font-semibold" />}>
+            {valor.calificacion || "—"}
+          </TooltipTrigger>
+          <TooltipContent className="max-w-xs">
+            {celda.calificacion == null
+              ? "Promedio de las evaluaciones: se registra al guardar"
+              : `Promedio registrado por ${celda.registradoPor}. Para cambiarlo, reábrela.`}
+          </TooltipContent>
+        </Tooltip>
+      ) : celda.soloDireccion ? (
+        <Tooltip>
+          <TooltipTrigger render={<span className="text-center text-[11px] text-amber-700 dark:text-amber-400" />}>
+            Pendiente · dirección
+          </TooltipTrigger>
+          <TooltipContent className="max-w-xs">
+            Cursó este periodo en otra sección y quedó sin nota final: la registra quien puede corregir notas.
+          </TooltipContent>
+        </Tooltip>
       ) : (
         <Tooltip>
           <TooltipTrigger render={<span className="min-w-8 text-center font-mono font-semibold" />}>
             {celda.calificacion ?? "—"}
+            {celda.seccionOrigen && <span className="ml-0.5 text-xs font-normal text-muted-foreground">↗</span>}
           </TooltipTrigger>
           <TooltipContent>
-            {celda.registradoPor ? `Registrada por ${celda.registradoPor}` : "Sin nota registrada"}
+            {!celda.registradoPor
+              ? "Sin nota registrada"
+              : celda.seccionOrigen
+                ? `Calificado en ${celda.seccionOrigen} por ${celda.registradoPor}`
+                : `Registrada por ${celda.registradoPor}`}
           </TooltipContent>
         </Tooltip>
       )}
       <Guia celda={celda} escala={escala} />
-      <Conclusion
-        escala={escala}
-        valor={valor}
-        editable={editable}
-        onChange={(conclusion) => onChange({ ...valor, conclusion })}
-      />
+      {!sinEvaluaciones && (
+        <Conclusion
+          escala={escala}
+          valor={valor}
+          editable={modo !== "lectura"}
+          onChange={(conclusion) => onChange({ ...valor, conclusion })}
+        />
+      )}
+      {onReabrir && (
+        <ReabrirNota
+          descripcion={`La nota de ${alumno} en la competencia ${competencia} se anula y sus evaluaciones se desbloquean para corregirlas.`}
+          onReabrir={onReabrir}
+        />
+      )}
     </div>
   )
 }

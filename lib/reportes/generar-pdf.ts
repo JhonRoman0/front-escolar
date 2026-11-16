@@ -1,7 +1,6 @@
 import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
 
-import type { AutorizacionRegistroResponse } from "@/lib/api/evaluacion"
 import type {
   ReporteGeneralItem,
   NotaReporteItem,
@@ -12,7 +11,7 @@ import type {
 } from "@/lib/api/dashboard"
 import type { EstadisticasResponse } from "@/lib/api/asistencia"
 import { formatearFecha, formatearHora } from "@/lib/fechas"
-import { celdaTexto, contarEstados, fechaCorta, fechaHora, type TablaReporte } from "./formato"
+import { celdaTexto, contarEstados, fechaCorta, type TablaReporte } from "./formato"
 
 // Paleta institucional (§6.1 de AGENTS.md): azul #004497 para encabezados.
 const AZUL: [number, number, number] = [0, 68, 151]
@@ -105,58 +104,6 @@ export function generarPdfAsistencia({
 }
 
 // ── Auditoría de códigos de autorización ─────────────────────────────────
-
-export function generarPdfAutorizaciones({
-  datos,
-  nombreColegio = "Sistema Escolar",
-}: {
-  datos: AutorizacionRegistroResponse[]
-  nombreColegio?: string
-}): void {
-  const doc = nuevoDoc("landscape")
-
-  const usados = datos.filter((d) => d.estado === "USADA").length
-  const activas = datos.filter((d) => d.estado === "ACTIVA").length
-
-  const startY = escribirEncabezado(doc, "Auditoría de Códigos de Autorización", [
-    nombreColegio,
-    `Total de códigos: ${datos.length} (activos: ${activas}, usados: ${usados})`,
-    `Generado: ${generarAhora()}`,
-  ])
-
-  autoTable(doc, {
-    startY,
-    head: [
-      [
-        "Código",
-        "Emisor",
-        "Destinatario",
-        "Asignado",
-        "Generado",
-        "Vence",
-        "Estado",
-        "Consumidor",
-        "Usado",
-      ],
-    ],
-    body: datos.map((d) => [
-      d.codigo ?? "—",
-      d.emisor,
-      d.destinatario || "—",
-      fechaHora(d.fechaAsignacion),
-      fechaHora(d.fechaGeneracion),
-      fechaHora(d.fechaExpiracion),
-      d.estado,
-      d.consumidor ?? "—",
-      fechaHora(d.fechaUso),
-    ]),
-    styles: { fontSize: 8, cellPadding: 1.5 },
-    headStyles: { fillColor: AZUL, textColor: 255, fontStyle: "bold" },
-    alternateRowStyles: { fillColor: FILA_ALTERNA },
-  })
-
-  doc.save(`auditoria-autorizaciones-${new Date().toISOString().slice(0, 10)}.pdf`)
-}
 
 // ── Resumen ejecutivo del panel ──────────────────────────────────────────
 

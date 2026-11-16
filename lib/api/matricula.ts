@@ -267,6 +267,10 @@ export const matriculasApi = {
       body: formulario(data, { comprobante }),
     })
   },
+  /** "Área: Bimestre 1, Bimestre 2" por cada área con notas finales faltantes. */
+  async pendientesCambioSeccion(id: number): Promise<string[]> {
+    return apiFetch<string[]>(`/matriculas/${id}/cambio-seccion/pendientes`)
+  },
   async cambioSeccion(
     id: number,
     idGradoSeccion: number,

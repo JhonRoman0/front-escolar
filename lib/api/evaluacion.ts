@@ -34,28 +34,6 @@ export interface NotaResponse {
 
 // ── Promedio SIAGIE ───────────────────────────────────────────────────────
 
-// ── Autorización (sin cambios) ────────────────────────────────────────────
-
-export interface AutorizacionResponse {
-  codigo: string
-  destinatario: string
-  fechaGeneracion: string
-  fechaExpiracion: string
-}
-
-export interface AutorizacionRegistroResponse {
-  idNotaAutorizacion: number
-  codigo: string | null
-  emisor: string
-  destinatario: string
-  fechaAsignacion: string
-  fechaGeneracion: string
-  fechaExpiracion: string
-  estado: "ACTIVA" | "USADA" | "EXPIRADA"
-  consumidor: string | null
-  fechaUso: string | null
-}
-
 // ── API ──────────────────────────────────────────────────────────────────
 
 export const competenciasApi = {
@@ -89,16 +67,5 @@ export const notasApi = {
   },
   async porMatricula(idMatricula: number): Promise<NotaResponse[]> {
     return apiFetch<NotaResponse[]>(`/notas/matricula/${idMatricula}`)
-  },
-  async generarAutorizacion(
-    idUsuarioDestinatario: number
-  ): Promise<AutorizacionResponse> {
-    return apiFetch<AutorizacionResponse>("/notas/autorizaciones", {
-      method: "POST",
-      body: JSON.stringify({ idUsuarioDestinatario }),
-    })
-  },
-  async listarAutorizaciones(): Promise<AutorizacionRegistroResponse[]> {
-    return apiFetch<AutorizacionRegistroResponse[]>("/notas/autorizaciones")
   },
 }

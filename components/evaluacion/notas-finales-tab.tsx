@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { toast } from "sonner"
-import { FileDown, KeyRound, Lock, TriangleAlert } from "lucide-react"
+import { FileDown, Lock, TriangleAlert } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -19,10 +19,10 @@ import { FilterSelect } from "@/components/shared/filter-select"
 import { HeaderSeccion } from "@/components/shared/header-seccion"
 import { CargandoTarjetas } from "@/components/shared/table-helpers"
 import { useAniosEscolares } from "@/hooks/use-academico"
-import { useCursosFinales, useDetalleNotaFinal, useGuardarNotasFinales } from "@/hooks/use-notas-finales"
-import { usePuede } from "@/hooks/use-permisos"
+import { useCursosFinales, useDetalleNotaFinal, useGuardarNotasFinales, useReabrirNotaFinal } from "@/hooks/use-notas-finales"
+import { usePuede, usePuedeLeer } from "@/hooks/use-permisos"
 import { anioParaFiltro, estadoAnioTexto } from "@/lib/api/academico"
-import type { DetalleNotaFinal, NotaFinalItem } from "@/lib/api/notas-finales"
+import type { CeldaNotaFinal, DetalleNotaFinal, NotaFinalItem } from "@/lib/api/notas-finales"
 import { reportesApi } from "@/lib/api/reportes"
 import { ESCALAS, errorCalificacion, errorConclusion, periodoParaFiltro } from "@/lib/calificaciones"
 import { generarCsvNotas } from "@/lib/reportes/generar-csv"
@@ -30,8 +30,9 @@ import { generarExcelNotas } from "@/lib/reportes/generar-excel"
 import { generarPdfNotas } from "@/lib/reportes/generar-pdf"
 import { BotonBoletas } from "./boton-boletas"
 import { BotonExportarSiagie } from "./boton-exportar-siagie"
-import { CeldaNotaFinalEditable, type ValorNotaFinal } from "./celda-nota-final"
+import { CeldaNotaFinalEditable, MOTIVO_MAXIMO, type ModoCelda, type ValorNotaFinal } from "./celda-nota-final"
 import { FiltrosCurso, useFiltrosCurso } from "./filtros-curso"
+import { NotasAnuales } from "./notas-anuales"
 
 const OPCIONES_PERIODO_REPORTE = [1, 2, 3, 4].map((n) => ({ value: String(n), label: `Periodo ${n}` }))
 
@@ -39,11 +40,19 @@ function clave(idMatricula: number, idCompetencia: number) {
   return `${idMatricula}-${idCompetencia}`
 }
 
+type Vista = "bimestrales" | "anuales"
+
 export default function NotasFinalesTab() {
   const { data: anios = [] } = useAniosEscolares()
   const [idAnioElegido, setIdAnioElegido] = useState<number | null>(null)
   const idAnio = idAnioElegido ?? anioParaFiltro(anios)?.idAnio ?? null
-  const { data: cursos = [], isLoading: cargandoCursos } = useCursosFinales(idAnio)
+  // Cada submódulo tiene su permiso: se ve solo el que el usuario puede leer.
+  const puedeBimestrales = usePuedeLeer("NOTAS")
+  const puedeAnuales = usePuedeLeer("NOTAS_ANUALES")
+  const [vistaElegida, setVistaElegida] = useState<Vista | null>(null)
+  const vista: Vista = vistaElegida ?? (puedeBimestrales ? "bimestrales" : "anuales")
+  const anual = vista === "anuales"
+  const { data: cursos = [], isLoading: cargandoCursos } = useCursosFinales(idAnio, anual)
 
   const filtrosCurso = useFiltrosCurso(cursos, (c) => ({
     clave: `${c.idGradoSeccion}-${c.idArea}`,
@@ -111,8 +120,13 @@ export default function NotasFinalesTab() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <HeaderSeccion
             titulo="Notas finales"
-            descripcion="Nota de cada competencia en el periodo. Las evaluaciones sirven de guía; en escala vigesimal, el promedio ya viene puesto."
+            descripcion={
+              anual
+                ? "Nota del año de cada competencia, cuando ya terminó el último periodo."
+                : "Nota de cada competencia en el periodo. En literal las evaluaciones sirven de guía; en vigesimal la nota es su promedio."
+            }
           />
+          {!anual && (
           <div className="flex flex-wrap items-center gap-2">
           {puedeImprimirBoletas && seccionElegida && periodo && (
             <BotonBoletas seccion={seccionElegida} periodo={periodo} faltaFiltro={faltaFiltro} />
@@ -135,7 +149,25 @@ export default function NotasFinalesTab() {
             </Button>
           )}
           </div>
+          )}
         </div>
+
+        {puedeBimestrales && puedeAnuales && (
+          <div className="flex w-fit rounded-md border p-0.5">
+            {(["bimestrales", "anuales"] as const).map((v) => (
+              <Button
+                key={v}
+                type="button"
+                size="sm"
+                variant={vista === v ? "secondary" : "ghost"}
+                className="h-7"
+                onClick={() => setVistaElegida(v)}
+              >
+                {v === "bimestrales" ? "Bimestrales" : "Anuales"}
+              </Button>
+            ))}
+          </div>
+        )}
 
         <div className="flex flex-wrap items-center gap-2">
           <FilterSelect
@@ -153,7 +185,7 @@ export default function NotasFinalesTab() {
             className="w-[170px]"
           />
           <FiltrosCurso {...filtrosCurso.props} cargando={cargandoCursos} />
-          {periodos.length > 0 && (
+          {!anual && periodos.length > 0 && (
             <FilterSelect
               label="Periodo"
               value={periodo ? String(periodo.numero) : ""}
@@ -177,6 +209,8 @@ export default function NotasFinalesTab() {
           <p className="rounded-lg border p-8 text-center text-sm text-muted-foreground">
             {cargandoCursos ? "Cargando cursos…" : `${filtrosCurso.faltaElegir} para ver sus notas.`}
           </p>
+        ) : anual ? (
+          <NotasAnuales curso={curso} />
         ) : cargandoDetalle || !detalle ? (
           <CargandoTarjetas filas={2} />
         ) : (
@@ -212,8 +246,10 @@ export default function NotasFinalesTab() {
 
 function TablaNotas({ detalle }: { detalle: DetalleNotaFinal }) {
   const guardar = useGuardarNotasFinales()
-  const [codigo, setCodigo] = useState("")
+  const reabrir = useReabrirNotaFinal()
+  const [motivo, setMotivo] = useState("")
   const { escala, competencias } = detalle
+  const vigesimal = escala === "VIGESIMAL"
 
   // Lo guardado, o en vigesimal el promedio de las evaluaciones como punto de partida.
   const originales: Record<string, ValorNotaFinal> = {}
@@ -230,21 +266,53 @@ function TablaNotas({ detalle }: { detalle: DetalleNotaFinal }) {
   }
   const [valores, setValores] = useState(iniciales)
 
-  // Una nota nueva la pone quien registra o quien corrige; una ya puesta, solo quien corrige.
+  // Una nota nueva la pone quien registra o quien corrige; una ya puesta, o la de un
+  // periodo cerrado que el alumno cursó en otra sección, solo quien corrige.
   const puedeGuardar = detalle.puedeRegistrar || detalle.puedeCorregir
-  function editable(calificacionGuardada: string | null) {
-    return calificacionGuardada == null ? puedeGuardar : detalle.puedeCorregir
+  function modo(celda: CeldaNotaFinal): ModoCelda {
+    const sinEvaluaciones = celda.calificacion == null && celda.guia.length === 0 && !celda.soloDireccion
+    // Con la nota del año puesta, las del periodo ya no cambian.
+    if (sinEvaluaciones || celda.conNotaAnual) return "lectura"
+    const permitido = celda.calificacion == null && !celda.soloDireccion ? puedeGuardar : detalle.puedeCorregir
+    if (!permitido) return "lectura"
+    // En vigesimal la nota es el promedio: solo se escribe la conclusión.
+    return vigesimal && (celda.guia.length > 0 || celda.calificacion != null) ? "conclusion" : "nota"
   }
+  const porCorregir = (celda: CeldaNotaFinal) => celda.calificacion != null || celda.soloDireccion
 
   const cambios = detalle.alumnos.flatMap((alumno) =>
     alumno.notas
-      .filter((celda) => editable(celda.calificacion))
+      .filter((celda) => modo(celda) !== "lectura")
       .map((celda) => ({ alumno, celda, k: clave(alumno.idMatricula, celda.idCompetencia) }))
       .filter(({ k }) => JSON.stringify(valores[k]) !== JSON.stringify(originales[k]))
   )
   const pendientes = cambios.filter(({ celda, k }) => celda.calificacion != null || valores[k].calificacion.trim())
+  // Cambiar una nota ya registrada pide motivo y deja la anterior en el historial.
+  const corregidas = pendientes.filter(({ celda }) => celda.calificacion != null)
+
+  async function onReabrir(idMatricula: number, idCompetencia: number, motivoReapertura: string) {
+    try {
+      await reabrir.mutateAsync({
+        idGradoSeccion: detalle.curso.idGradoSeccion,
+        idArea: detalle.curso.idArea,
+        periodo: detalle.periodo.numero,
+        idMatricula,
+        idCompetencia,
+        motivo: motivoReapertura,
+      })
+      toast.success("Nota reabierta: sus evaluaciones ya se pueden corregir")
+      return true
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo reabrir la nota")
+      return false
+    }
+  }
 
   async function onGuardar() {
+    if (corregidas.some(({ k }) => !valores[k].calificacion.trim())) {
+      toast.error("Para quitar una nota ya registrada, usa Reabrir")
+      return
+    }
     const conError = pendientes.filter(({ k }) =>
       errorCalificacion(escala, valores[k].calificacion) ||
       errorConclusion(escala, valores[k].calificacion, valores[k].conclusion)
@@ -253,8 +321,8 @@ function TablaNotas({ detalle }: { detalle: DetalleNotaFinal }) {
       toast.error(`Revisa ${conError.length} ${conError.length === 1 ? "nota" : "notas"}: falta la conclusión o el valor no es válido`)
       return
     }
-    if (detalle.requiereCodigo && !codigo.trim()) {
-      toast.error("El periodo está cerrado: ingresa un código de autorización")
+    if (corregidas.length && !motivo.trim()) {
+      toast.error("Escribe el motivo de la corrección")
       return
     }
     const item = ({ alumno, celda, k }: (typeof pendientes)[number]): NotaFinalItem => ({
@@ -267,22 +335,17 @@ function TablaNotas({ detalle }: { detalle: DetalleNotaFinal }) {
       idGradoSeccion: detalle.curso.idGradoSeccion,
       idArea: detalle.curso.idArea,
       periodo: detalle.periodo.numero,
-      codigoAutorizacion: codigo.trim() || null,
+      motivo: motivo.trim() || null,
     }
-    const nuevas = pendientes.filter(({ celda }) => celda.calificacion == null).map(item)
-    const correcciones = pendientes.filter(({ celda }) => celda.calificacion != null).map(item)
+    const nuevas = pendientes.filter(({ celda }) => !porCorregir(celda)).map(item)
+    const correcciones = pendientes.filter(({ celda }) => porCorregir(celda)).map(item)
     try {
-      // Con periodo cerrado el código se usa una vez, y sin permiso de registrar las
-      // nuevas van con las correcciones: en ambos casos todo va por una sola ruta.
-      if ((detalle.requiereCodigo || !detalle.puedeRegistrar) && nuevas.length && correcciones.length) {
-        await guardar.mutateAsync({ nuevas: null, correcciones: { ...base, notas: [...nuevas, ...correcciones] } })
-      } else {
-        const porCorreccion = detalle.puedeRegistrar ? correcciones : [...nuevas, ...correcciones]
-        await guardar.mutateAsync({
-          nuevas: detalle.puedeRegistrar && nuevas.length ? { ...base, notas: nuevas } : null,
-          correcciones: porCorreccion.length ? { ...base, notas: porCorreccion } : null,
-        })
-      }
+      // Sin permiso de registrar (o con el periodo cerrado) las nuevas van por la ruta de corregir.
+      const porCorreccion = detalle.puedeRegistrar ? correcciones : [...nuevas, ...correcciones]
+      await guardar.mutateAsync({
+        nuevas: detalle.puedeRegistrar && nuevas.length ? { ...base, notas: nuevas } : null,
+        correcciones: porCorreccion.length ? { ...base, notas: porCorreccion } : null,
+      })
       toast.success("Notas guardadas")
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudieron guardar las notas")
@@ -307,23 +370,17 @@ function TablaNotas({ detalle }: { detalle: DetalleNotaFinal }) {
           <Lock className="size-3.5" />
           {!detalle.periodoEditable
             ? detalle.curso.anioVigente ? "El periodo aún no empieza." : "El año no está vigente: solo lectura."
-            : "No tienes permiso para registrar notas: solo lectura."}
+            : detalle.periodo.estado === "CERRADO"
+              ? "El periodo ya cerró: sus notas las registra quien puede corregir notas."
+              : "No tienes permiso para registrar notas: solo lectura."}
         </p>
       )}
 
-      {detalle.requiereCodigo && puedeGuardar && (
-        <div className="flex flex-wrap items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs">
-          <KeyRound className="size-4 text-amber-600" />
-          <span>El periodo está cerrado: para guardar necesitas un código de autorización.</span>
-          <Input
-            className="h-8 w-[160px] uppercase"
-            placeholder="Código"
-            maxLength={8}
-            value={codigo}
-            onChange={(e) => setCodigo(e.target.value.toUpperCase())}
-            aria-label="Código de autorización"
-          />
-        </div>
+      {detalle.periodo.estado === "CERRADO" && puedeGuardar && (
+        <p className="flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs">
+          <Lock className="size-3.5 text-amber-600" />
+          El periodo ya cerró: cada cambio queda registrado y las correcciones piden motivo.
+        </p>
       )}
 
       {avisos.length > 0 && (
@@ -383,9 +440,14 @@ function TablaNotas({ detalle }: { detalle: DetalleNotaFinal }) {
                           escala={escala}
                           valor={valores[k]}
                           onChange={(v) => setValores((actual) => ({ ...actual, [k]: v }))}
-                          editable={editable(celda.calificacion)}
+                          modo={modo(celda)}
                           alumno={alumno.nombre}
                           competencia={codigoCompetencia}
+                          onReabrir={
+                            detalle.puedeCorregir && celda.calificacion != null && !celda.conNotaAnual
+                              ? (m) => onReabrir(alumno.idMatricula, celda.idCompetencia, m)
+                              : undefined
+                          }
                         />
                       </TableCell>
                     )
@@ -405,6 +467,16 @@ function TablaNotas({ detalle }: { detalle: DetalleNotaFinal }) {
             void onGuardar()
           }}
         >
+          {corregidas.length > 0 && (
+            <Input
+              className="h-8 max-w-xs"
+              placeholder="Motivo de la corrección *"
+              maxLength={MOTIVO_MAXIMO}
+              value={motivo}
+              onChange={(e) => setMotivo(e.target.value)}
+              aria-label="Motivo de la corrección"
+            />
+          )}
           <span className="text-xs text-muted-foreground">
             {pendientes.length ? `${pendientes.length} ${pendientes.length === 1 ? "cambio" : "cambios"} sin guardar` : ""}
           </span>

@@ -1,11 +1,10 @@
-import type { AutorizacionRegistroResponse } from "@/lib/api/evaluacion"
 import type {
   ReporteGeneralItem,
   NotaReporteItem,
 } from "@/lib/api/reportes"
 import { descargarBlob } from "@/lib/descargas"
 import { formatearHora } from "@/lib/fechas"
-import { fechaCorta, fechaHora, type ColumnaReporte, type TablaReporte } from "./formato"
+import { fechaCorta, type ColumnaReporte, type TablaReporte } from "./formato"
 
 // CSV con separador ";" (Excel es-PE lo abre en columnas sin pasos extra)
 // y BOM UTF-8 para que los acentos no se rompan.
@@ -72,38 +71,6 @@ export function generarCsvAsistencia({
 }
 
 // ── Auditoría de códigos de autorización ─────────────────────────────────
-
-export function generarCsvAutorizaciones({
-  datos,
-}: {
-  datos: AutorizacionRegistroResponse[]
-}): void {
-  descargarCsv(
-    [
-      "Código",
-      "Emisor",
-      "Destinatario",
-      "Asignado",
-      "Generado",
-      "Vence",
-      "Estado",
-      "Consumidor",
-      "Usado",
-    ],
-    datos.map((d) => [
-      d.codigo ?? "",
-      d.emisor,
-      d.destinatario,
-      fechaHora(d.fechaAsignacion),
-      fechaHora(d.fechaGeneracion),
-      fechaHora(d.fechaExpiracion),
-      d.estado,
-      d.consumidor ?? "",
-      fechaHora(d.fechaUso),
-    ]),
-    `auditoria-autorizaciones-${new Date().toISOString().slice(0, 10)}.csv`
-  )
-}
 
 // ── Notas ────────────────────────────────────────────────────────────────
 

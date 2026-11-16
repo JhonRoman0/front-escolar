@@ -1,6 +1,4 @@
 "use client"
-import type { PeriodoEvaluacion } from "@/lib/api/academico"
-
 
 import { useState } from "react"
 import { toast } from "sonner"
@@ -13,10 +11,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { BotonGuardar } from "@/components/shared/boton-guardar"
 import { CampoCalificacion } from "@/components/shared/campo-calificacion"
 import { CargandoTarjetas } from "@/components/shared/table-helpers"
-import { useEvaluacionDetalle, useRegistrarNotasEvaluacion } from "@/hooks/use-evaluaciones"
+import { useEvaluacionDetalle, useRegistrarNotasEvaluacion, useTraslados } from "@/hooks/use-evaluaciones"
+import { usePuede } from "@/hooks/use-permisos"
+import type { PeriodoEvaluacion } from "@/lib/api/academico"
 import type { EvaluacionDetalle } from "@/lib/api/evaluaciones"
 import { ESCALAS, errorCalificacion } from "@/lib/calificaciones"
 import { HistorialCalificacionesDialog } from "./historial-calificaciones-dialog"
+import { AnularUsoNota, UsarNotaTraslado } from "./notas-traslado"
 import { ProcedenciaCalificacion } from "./procedencia-calificacion"
 
 /** Notas de los alumnos en una evaluación. Sin permiso o con el periodo cerrado, solo lectura. */
@@ -69,6 +70,16 @@ function Contenido({ detalle, editable, onCerrar, periodos }: {
   const conNotaFinal = detalle.alumnos.filter((a) => a.notaFinalRegistrada).length
   const invalidos = detalle.alumnos.filter((a) => errorCalificacion(detalle.escala, valores[a.idMatricula] ?? ""))
   const escala = ESCALAS.find((e) => e.value === detalle.escala)
+  const puedeAnular = usePuede("EVALUACIONES", "ACTUALIZAR")
+  const traslados = useTraslados(
+    detalle.idAsignacion,
+    detalle.evaluacion.periodo,
+    editable ? detalle.evaluacion.competencias.map((c) => c.idCompetencia) : [],
+    detalle.evaluacion.idEvaluacion
+  )
+  const trasladoDe = new Map((traslados.data ?? []).map((t) => [t.idMatricula, t]))
+  // Usar o anular recarga el detalle: con notas sin guardar se perderían.
+  const conPendientes = cambiados.length > 0 || registrar.isPending
 
   async function guardar() {
     if (invalidos.length) {
@@ -135,13 +146,28 @@ function Contenido({ detalle, editable, onCerrar, periodos }: {
                 </TableCell>
               </TableRow>
             ) : (
-              detalle.alumnos.map((a, i) => (
+              detalle.alumnos.map((a, i) => {
+                const traslado = trasladoDe.get(a.idMatricula)
+                const propuesta = editable && traslado && a.calificacion == null && !a.notaFinalRegistrada
+                return (
                 <TableRow key={a.idMatricula}>
-                  <TableCell className="text-muted-foreground">{i + 1}</TableCell>
+                  <TableCell className="align-top text-muted-foreground">{i + 1}</TableCell>
                   <TableCell>
-                    <p className="font-medium">{a.nombre}</p>
-                    {a.tieneHistorial && <HistorialCalificacionesDialog periodos={periodos} idMatricula={a.idMatricula} idAsignacion={detalle.idAsignacion} nombre={a.nombre} disabled={cambiados.length > 0 || registrar.isPending} />}
+                    <div className="flex items-center gap-1">
+                      <p className="font-medium">{a.nombre}</p>
+                      {a.tieneHistorial && (
+                        <HistorialCalificacionesDialog
+                          periodos={periodos}
+                          idMatricula={a.idMatricula}
+                          idAsignacion={detalle.idAsignacion}
+                          nombre={a.nombre}
+                        />
+                      )}
+                    </div>
                     <p className="text-xs text-muted-foreground">{a.codigo}</p>
+                    {propuesta && (
+                      <UsarNotaTraslado traslado={traslado} idEvaluacion={detalle.evaluacion.idEvaluacion} disabled={conPendientes} />
+                    )}
                   </TableCell>
                   <TableCell>
                     <div className="flex justify-center">
@@ -155,17 +181,31 @@ function Contenido({ detalle, editable, onCerrar, periodos }: {
                       ) : (
                         <span
                           className="flex items-center gap-1 font-mono font-semibold"
-                          title={a.notaFinalRegistrada ? "Ya tiene nota final: no se puede cambiar" : a.notaProtegida ? "Nota vinculada a un reconocimiento: consulta su historial" : undefined}
+                          title={
+                            a.notaFinalRegistrada
+                              ? "Ya tiene nota final: no se puede cambiar"
+                              : a.notaProtegida
+                                ? "Nota de otra sección: para cambiarla, anula su uso"
+                                : undefined
+                          }
                         >
                           {a.calificacion ?? "—"}
                           {editable && a.notaFinalRegistrada && <Lock className="size-3 text-muted-foreground" />}
                         </span>
                       )}
                       <ProcedenciaCalificacion procedencia={a.procedencia} />
+                      {a.procedencia && editable && puedeAnular && !a.notaFinalRegistrada && (
+                        <AnularUsoNota
+                          idReconocimiento={a.procedencia.idReconocimiento}
+                          nombre={a.nombre}
+                          disabled={conPendientes}
+                        />
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
-              ))
+                )
+              })
             )}
           </TableBody>
         </Table>
