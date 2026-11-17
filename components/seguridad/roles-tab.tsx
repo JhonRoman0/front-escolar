@@ -40,7 +40,7 @@ import { ACCESO } from "@/lib/api/academico"
 import { rolSchema, type RolValues } from "@/lib/schemas/seguridad"
 import { usePuede } from "@/hooks/use-permisos"
 import { cn } from "@/lib/utils"
-import { COLOR_ROL_ADMIN, COLOR_ROL_FALLBACK, PALETA_COLORES, esRolAdmin } from "@/lib/roles"
+import { COLOR_ROL_ADMIN, COLOR_ROL_FALLBACK, PALETA_COLORES, esRolAdmin, esRolProtegido } from "@/lib/roles"
 import { ConfirmarEliminar } from "./confirmar-eliminar"
 import { CampoAcceso, CargandoTarjetas } from "./shared"
 
@@ -130,8 +130,9 @@ export default function RolesTab() {
           <div className="flex flex-wrap gap-4">
             {rolesOrdenados.map((rol) => {
               const admin = esRolAdmin(rol.nombre)
+              const protegido = esRolProtegido(rol.nombre)
               const inactivo = rol.accesoId === ACCESO.INACTIVO
-              const puedeGestionar = !admin && (puedeActualizar || puedeEliminar)
+              const puedeGestionar = !protegido && (puedeActualizar || puedeEliminar)
               const permisos = conteoPermisos(rol.idRol)
 
               return (
@@ -148,7 +149,7 @@ export default function RolesTab() {
                   }
                 >
                   <div className="flex items-start justify-between gap-2">
-                    {admin ? (
+                    {protegido && !inactivo ? (
                       <Badge variant="outline" className="border-white/20 bg-white/10 text-white">
                         <ShieldCheck />
                         Protegido

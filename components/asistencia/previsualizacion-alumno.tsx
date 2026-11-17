@@ -3,6 +3,7 @@
 import { CheckCircle2, Loader2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   Select,
@@ -12,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 
+import { CapturaFoto } from "@/components/shared/captura-foto"
 import { AsistenciaEstadoBadge } from "./asistencia-estado-badge"
 import type { AsistenciaResponse } from "@/lib/api/asistencia"
 import type { JustificacionResponse } from "@/lib/api/justificacion"
@@ -23,6 +25,11 @@ interface PrevisualizacionAlumnoProps {
   justificaciones: JustificacionResponse[] | undefined
   idJustificacion: number | null
   onIdJustificacionChange: (id: number | null) => void
+  /** Ingreso justificado: quién lo trajo y la foto de evidencia (obligatorios). */
+  acompanante: string
+  onAcompananteChange: (valor: string) => void
+  foto: File | null
+  onFotoChange: (foto: File | null) => void
   onRegistrar: () => void
   /** Acción secundaria ("Escanear otro"); si se omite no se muestra. */
   onVolver?: () => void
@@ -35,19 +42,23 @@ function iniciales(nombreCompleto: string): string {
 }
 
 /** Tarjeta de alumno previsualizado + motivo de justificación + botón registrar.
- *  Compartida por el modal de cámara y el de código manual. */
+ *  Se usa en el modal de registro (QR o búsqueda). */
 export function PrevisualizacionAlumno({
   previsualizacion: previa,
   justificaciones,
   idJustificacion,
   onIdJustificacionChange,
+  acompanante,
+  onAcompananteChange,
+  foto,
+  onFotoChange,
   onRegistrar,
   onVolver,
   registrando,
 }: PrevisualizacionAlumnoProps) {
   const requiereJustificacion = previa.estado === "Justificada"
   const puedeRegistrar =
-    (!requiereJustificacion || !!idJustificacion) && !registrando
+    (!requiereJustificacion || (!!idJustificacion && acompanante.trim().length >= 3 && !!foto)) && !registrando
   // Solo informativo: horario del turno del alumno (GET /turnos, caché compartida).
   const { data: turnos } = useTurnos()
   const turno = turnos?.find((t) => t.nombre === previa.turno)
@@ -113,9 +124,21 @@ export function PrevisualizacionAlumno({
             </SelectContent>
           </Select>
           <p className="text-xs text-muted-foreground">
-            Este alumno llegó fuera del horario permitido. Elige el motivo para
-            registrar su ingreso como justificado.
+            Llegó pasado el límite de tardanza: solo ingresa justificado, con quien lo trajo y una foto de evidencia.
           </p>
+          <p className="pt-1 text-sm font-medium">
+            Persona que lo trajo <span className="text-destructive">*</span>
+          </p>
+          <Input
+            placeholder="Nombre completo"
+            maxLength={150}
+            value={acompanante}
+            onChange={(e) => onAcompananteChange(e.target.value)}
+          />
+          <p className="pt-1 text-sm font-medium">
+            Foto de evidencia <span className="text-destructive">*</span>
+          </p>
+          <CapturaFoto foto={foto} onChange={onFotoChange} />
         </div>
       )}
 

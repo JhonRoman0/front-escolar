@@ -62,9 +62,11 @@ import { fechaHoyISO, formatearFecha } from "@/lib/fechas"
 export function FeriadosTab() {
   const { data, isLoading, isError, refetch } = useDiasFeriados()
   const crud = useCrudFeriados()
-  const puedeCrear = usePuede("ASISTENCIAS", "CREAR")
-  const puedeActualizar = usePuede("ASISTENCIAS", "ACTUALIZAR")
-  const puedeEliminar = usePuede("ASISTENCIAS", "ELIMINAR")
+  // Motivos y feriados: todo con "Gestionar motivos y feriados".
+  const puedeConfigurar = usePuede("ASISTENCIAS", "CONFIGURAR")
+  const puedeCrear = puedeConfigurar
+  const puedeActualizar = puedeConfigurar
+  const puedeEliminar = puedeConfigurar
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editando, setEditando] = useState<DiaFeriadoResponse | null>(null)
 

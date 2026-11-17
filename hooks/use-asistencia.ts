@@ -68,10 +68,11 @@ export function useAsistenciaMes(
   })
 }
 
-export function useEstadisticasAsistencia(rango: RangoEstadisticas, fecha: string) {
+export function useEstadisticasAsistencia(rango: RangoEstadisticas, fecha: string, idAnio: number | null) {
   return useQuery({
-    queryKey: [...KEYS.estadisticas, rango, fecha],
-    queryFn: () => asistenciasApi.estadisticas(rango, fecha),
+    queryKey: [...KEYS.estadisticas, rango, fecha, idAnio],
+    queryFn: () => asistenciasApi.estadisticas(rango, fecha, idAnio),
+    enabled: idAnio != null,
     staleTime: 1000 * 30,
   })
 }
@@ -115,7 +116,7 @@ export function usePrevisualizarAsistencia() {
 export function useConfirmarAsistencia() {
   const invalidar = useInvalidarMutacion(KEYS.asistencias, KEYS.estadisticas)
   return useMutation({
-    mutationFn: (data: AsistenciaRequest) => asistenciasApi.confirmar(data),
+    mutationFn: ({ data, foto }: { data: AsistenciaRequest; foto?: File | null }) => asistenciasApi.confirmar(data, foto),
     onSuccess: invalidar,
   })
 }
@@ -136,10 +137,11 @@ export function useJustificarAsistencia() {
 }
 
 // Eliminar un registro de asistencia (DELETE /asistencias/{id}).
-export function useEliminarAsistencia() {
+export function useAnularAsistencia() {
   const invalidar = useInvalidarMutacion(KEYS.asistencias, KEYS.estadisticas)
   return useMutation({
-    mutationFn: (idAsistencia: number) => asistenciasApi.eliminar(idAsistencia),
+    mutationFn: ({ idAsistencia, motivo }: { idAsistencia: number; motivo: string }) =>
+      asistenciasApi.anular(idAsistencia, motivo),
     onSuccess: invalidar,
   })
 }

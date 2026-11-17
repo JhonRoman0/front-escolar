@@ -57,9 +57,11 @@ import { fechaHoyISO, formatearFecha } from "@/lib/fechas"
 export function JustificacionesTab() {
   const { data, isLoading, isError, refetch } = useJustificaciones()
   const crud = useCrudJustificaciones()
-  const puedeCrear = usePuede("ASISTENCIAS", "CREAR")
-  const puedeActualizar = usePuede("ASISTENCIAS", "ACTUALIZAR")
-  const puedeEliminar = usePuede("ASISTENCIAS", "ELIMINAR")
+  // Motivos y feriados: todo con "Gestionar motivos y feriados".
+  const puedeConfigurar = usePuede("ASISTENCIAS", "CONFIGURAR")
+  const puedeCrear = puedeConfigurar
+  const puedeActualizar = puedeConfigurar
+  const puedeEliminar = puedeConfigurar
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editando, setEditando] = useState<JustificacionResponse | null>(null)
 

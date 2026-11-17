@@ -17,3 +17,8 @@ export const COLOR_ROL_FALLBACK = PALETA_COLORES[0]
 export function esRolAdmin(nombre: string | null | undefined) {
   return !!nombre && nombre.trim().toUpperCase() === "ADMIN"
 }
+
+/** Roles del sistema (ADMIN y Apoderado, que asigna la matrícula): no se editan ni eliminan. */
+export function esRolProtegido(nombre: string | null | undefined) {
+  return esRolAdmin(nombre) || (!!nombre && nombre.trim().toUpperCase() === "APODERADO")
+}
