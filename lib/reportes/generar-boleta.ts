@@ -2,7 +2,7 @@ import jsPDF from "jspdf"
 import autoTable, { type RowInput } from "jspdf-autotable"
 
 import type { Boleta, AlumnoBoleta } from "@/lib/api/notas-finales"
-import type { ColegioResponse } from "@/lib/api/portal"
+import type { ColegioResponse } from "@/lib/api/colegio"
 import {
   bandaTitulo,
   camposPdf,

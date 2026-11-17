@@ -3,7 +3,6 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import { useAuth } from "@/components/auth-provider"
 import { useDocenteDeUsuario } from "@/hooks/use-academico"
 import { usePuede } from "@/hooks/use-permisos"
-import { asistenciasApi } from "@/lib/api/asistencia"
 import { horarioApi, type HorarioFiltros } from "@/lib/api/horario"
 
 const KEYS = {
@@ -91,22 +90,12 @@ export function useHorarioAlumno(
   })
 }
 
-/** Apoderado: lista de hijos para el selector */
-export function useHijosApoderado() {
-  return useQuery({
-    queryKey: KEYS.hijos,
-    queryFn: asistenciasApi.hijos,
-    staleTime: 1000 * 60 * 10,
-  })
-}
-
 // ── Hook compuesto: resuelve el horario según el rol ────────────────────
 
 export function useHorarioSegunRol(filtrosAdmin?: HorarioFiltros) {
   const rol = useRolHorario()
   const { usuario } = useAuth()
   const docente = useDocenteDeUsuario(rol === "docente" ? usuario?.idUsuario : undefined)
-  const hijos = useHijosApoderado()
 
   // Admin — vacio hasta que llegue idGradoSeccion/idNivel
   const debeCargarAdmin = rol === "admin" && !!filtrosAdmin?.idGradoSeccion
@@ -118,12 +107,8 @@ export function useHorarioSegunRol(filtrosAdmin?: HorarioFiltros) {
   const docenteId = rol === "docente" ? docente?.idDocente ?? null : null
   const docenteQuery = useHorarioDocente(docenteId, filtrosAdmin as never)
 
-  // Apoderado — primer hijo por defecto (el selector lo cambia)
-  const primerHijo = rol === "apoderado" ? (hijos.data?.[0]?.idAlumno ?? null) : null
-  const alumnoQuery = useHorarioAlumno(primerHijo, filtrosAdmin as never)
-
-  const query =
-    rol === "admin" ? adminQuery : rol === "docente" ? docenteQuery : alumnoQuery
+  // El apoderado ve el horario de su hijo en el Portal, no aquí.
+  const query = rol === "admin" ? adminQuery : docenteQuery
 
   // Normaliza Page.content vs List
   const raw = query.data as unknown
@@ -133,8 +118,6 @@ export function useHorarioSegunRol(filtrosAdmin?: HorarioFiltros) {
   return {
     rol,
     docente,
-    hijos: hijos.data ?? [],
-    hijosCargando: hijos.isLoading,
     horarios,
     paginated,
     cargando: query.isLoading,

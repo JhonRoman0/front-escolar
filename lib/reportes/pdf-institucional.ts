@@ -1,7 +1,7 @@
 import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
 
-import type { ColegioResponse } from "@/lib/api/portal"
+import type { ColegioResponse } from "@/lib/api/colegio"
 
 /** Piezas comunes de los documentos del colegio en PDF: ficha de matrícula y boleta. */
 

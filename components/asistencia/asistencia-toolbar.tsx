@@ -1,14 +1,23 @@
 "use client"
 
-import { Search } from "lucide-react"
-
 import { Input } from "@/components/ui/input"
 
+import { BotonLimpiarFiltros } from "@/components/shared/boton-limpiar-filtros"
+import { BuscadorTabla } from "@/components/shared/buscador-tabla"
 import { FilterSelect } from "@/components/shared/filter-select"
-import { GradoSeccionCascada } from "@/components/shared/grado-seccion-cascada"
+import { useGradosPorNivel, useNiveles, useSeccionesPorGrado } from "@/hooks/use-academico"
 import { fechaHoyISO } from "@/lib/fechas"
 
 export type RangoFecha = "hoy" | "semana" | "mes"
+
+/** Dónde buscar: cada nivel ya filtra, sin tener que llegar a la sección. */
+export interface UbicacionFiltro {
+  idNivel: number | null
+  idGrado: number | null
+  idGradoSeccion: number | null
+}
+
+export const SIN_UBICACION: UbicacionFiltro = { idNivel: null, idGrado: null, idGradoSeccion: null }
 
 const RANGOS = [
   { value: "hoy", label: "Hoy" },
@@ -30,6 +39,9 @@ interface AsistenciaToolbarProps {
   idAnio: number | null
   onIdAnioChange: (value: number) => void
 
+  ubicacion: UbicacionFiltro
+  onUbicacionChange: (value: UbicacionFiltro) => void
+
   rango: RangoFecha
   onRangoChange: (value: RangoFecha) => void
 
@@ -37,90 +49,110 @@ interface AsistenciaToolbarProps {
   fecha: string
   onFechaChange: (value: string) => void
 
-  idGradoSeccionFiltro: number | null
-  onIdGradoSeccionChange: (value: number | null) => void
-
   /** Solo en la vista de hoy. */
   filtroEstado: string | null
   onFiltroEstadoChange: (value: string | null) => void
 
   busqueda: string
   onBusquedaChange: (value: string) => void
+
+  /** Hay algo distinto de lo inicial: se muestra "Limpiar filtros". */
+  hayFiltros: boolean
+  onLimpiar: () => void
 }
 
 export function AsistenciaToolbar({
   anios,
   idAnio,
   onIdAnioChange,
+  ubicacion,
+  onUbicacionChange,
   rango,
   onRangoChange,
   fecha,
   onFechaChange,
-  idGradoSeccionFiltro,
-  onIdGradoSeccionChange,
   filtroEstado,
   onFiltroEstadoChange,
   busqueda,
   onBusquedaChange,
+  hayFiltros,
+  onLimpiar,
 }: AsistenciaToolbarProps) {
+  const { data: niveles = [] } = useNiveles()
+  const { data: gradosNivel = [] } = useGradosPorNivel(ubicacion.idNivel)
+  // Solo los grados del año elegido.
+  const grados = gradosNivel.filter((g) => idAnio == null || g.idAnio === idAnio)
+  const { data: secciones = [] } = useSeccionesPorGrado(ubicacion.idGrado)
+
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex flex-wrap items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
+      <BuscadorTabla
+        value={busqueda}
+        onValueChange={onBusquedaChange}
+        placeholder="Buscar por nombre, código o DNI..."
+        className="min-w-[200px] flex-1 max-w-[358px]"
+      />
+      {/* Cuándo: año, vista y el estado (hoy) o la fecha (semana/mes). */}
+      <FilterSelect
+        label="Año"
+        value={idAnio ? String(idAnio) : ""}
+        onValueChange={(v) => onIdAnioChange(Number(v))}
+        options={anios}
+        includeAll={false}
+        className="w-[120px]"
+      />
+      <FilterSelect
+        label="Vista"
+        value={rango}
+        onValueChange={(v) => onRangoChange(v as RangoFecha)}
+        options={RANGOS}
+        includeAll={false}
+        className="w-[130px]"
+      />
+      {/* El back normaliza: semana → lunes, mes → día 1 */}
+      {rango === "hoy" ? (
         <FilterSelect
-          label="Año"
-          value={idAnio ? String(idAnio) : ""}
-          onValueChange={(v) => onIdAnioChange(Number(v))}
-          options={anios}
-          includeAll={false}
-          className="w-[150px]"
+          value={filtroEstado ?? ""}
+          onValueChange={(v) => onFiltroEstadoChange(v || null)}
+          options={ESTADOS}
+          allLabel="Todos los estados"
+          className="w-[170px]"
         />
-        {/* La key reinicia la cascada al cambiar de año: sus grados son de ese año. */}
-        <GradoSeccionCascada
-          key={idAnio ?? 0}
-          compacta
-          value={idGradoSeccionFiltro}
-          onChange={onIdGradoSeccionChange}
-          allowedAnios={idAnio != null ? new Set([idAnio]) : undefined}
+      ) : (
+        <Input
+          type="date"
+          value={fecha}
+          max={fechaHoyISO()}
+          onChange={(e) => e.target.value && onFechaChange(e.target.value)}
+          className="h-8 w-[150px]"
+          aria-label={rango === "semana" ? "Semana de" : "Mes de"}
         />
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <FilterSelect
-          label="Vista"
-          value={rango}
-          onValueChange={(v) => onRangoChange(v as RangoFecha)}
-          options={RANGOS}
-          includeAll={false}
-          className="w-[150px]"
-        />
-        {/* El back normaliza: semana → lunes, mes → día 1 */}
-        {rango !== "hoy" && (
-          <Input
-            type="date"
-            value={fecha}
-            max={fechaHoyISO()}
-            onChange={(e) => e.target.value && onFechaChange(e.target.value)}
-            className="h-8 w-[160px]"
-          />
-        )}
-        {rango === "hoy" && (
-          <FilterSelect
-            label="Estado"
-            value={filtroEstado ?? ""}
-            onValueChange={(v) => onFiltroEstadoChange(v || null)}
-            options={ESTADOS}
-            className="w-[180px]"
-          />
-        )}
-        <div className="relative ml-auto w-full sm:max-w-xs">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por nombre, código o DNI"
-            value={busqueda}
-            onChange={(e) => onBusquedaChange(e.target.value)}
-            className="h-8 pl-9"
-          />
-        </div>
-      </div>
+      )}
+      {/* Dónde: cada nivel ya filtra. */}
+      <FilterSelect
+        value={ubicacion.idNivel ? String(ubicacion.idNivel) : ""}
+        onValueChange={(v) => onUbicacionChange({ ...SIN_UBICACION, idNivel: v ? Number(v) : null })}
+        options={niveles.map((n) => ({ value: String(n.idNivel), label: n.nombre }))}
+        allLabel="Todos los niveles"
+        className="w-[170px]"
+      />
+      <FilterSelect
+        value={ubicacion.idGrado ? String(ubicacion.idGrado) : ""}
+        onValueChange={(v) => onUbicacionChange({ ...ubicacion, idGrado: v ? Number(v) : null, idGradoSeccion: null })}
+        options={grados.map((g) => ({ value: String(g.idGrado), label: g.nombre }))}
+        allLabel="Todos los grados"
+        className="w-[160px]"
+        disabled={!ubicacion.idNivel}
+      />
+      <FilterSelect
+        value={ubicacion.idGradoSeccion ? String(ubicacion.idGradoSeccion) : ""}
+        onValueChange={(v) => onUbicacionChange({ ...ubicacion, idGradoSeccion: v ? Number(v) : null })}
+        options={secciones.map((s) => ({ value: String(s.idGradoSeccion), label: `Sección ${s.nombre} (${s.turno})` }))}
+        allLabel="Todas las secciones"
+        className="w-[190px]"
+        disabled={!ubicacion.idGrado || secciones.length === 0}
+      />
+      <BotonLimpiarFiltros visible={hayFiltros} onClick={onLimpiar} />
     </div>
   )
 }

@@ -1,5 +1,4 @@
 import { apiFetch, type Paginated } from "@/lib/api"
-import type { HijoHorario } from "@/lib/api/horario"
 
 // ≡ EstadoAsistencia (catálogo sembrado en BD, ver GET /asistencias/estados).
 // Sin marca: "Pendiente" hasta el límite de tardanza de su turno, luego
@@ -258,10 +257,6 @@ export const asistenciasApi = {
       method: "POST",
       body: JSON.stringify({ motivo }),
     })
-  },
-  /** GET /asistencias/hijos — Hijos del apoderado actual (RBAC) */
-  async hijos(): Promise<HijoHorario[]> {
-    return apiFetch<HijoHorario[]>("/asistencias/hijos")
   },
   async reporteGeneral(
     params: { inicio: string; fin: string; page?: number; size?: number } & AsistenciaFiltros

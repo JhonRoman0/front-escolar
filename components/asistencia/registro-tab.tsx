@@ -22,7 +22,7 @@ import { diasSemana, fechaHoyISO } from "@/lib/fechas"
 import type { AsistenciaDiaResponse } from "@/lib/api/asistencia"
 
 import { AsistenciaKpiCards } from "./asistencia-kpi-cards"
-import { AsistenciaToolbar, type RangoFecha } from "./asistencia-toolbar"
+import { AsistenciaToolbar, SIN_UBICACION, type RangoFecha, type UbicacionFiltro } from "./asistencia-toolbar"
 import { AsistenciaTablaHoy } from "./asistencia-tabla-hoy"
 import { AsistenciaTablaSemana } from "./asistencia-tabla-semana"
 import { AsistenciaTablaMes } from "./asistencia-tabla-mes"
@@ -48,7 +48,7 @@ export function RegistroTab() {
   const [fecha, setFecha] = useState(fechaHoyISO())
   const [busqueda, setBusqueda] = useState("")
   const [filtroEstado, setFiltroEstado] = useState<string | null>(null)
-  const [idGradoSeccionFiltro, setIdGradoSeccionFiltro] = useState<number | null>(null)
+  const [ubicacion, setUbicacion] = useState<UbicacionFiltro>(SIN_UBICACION)
   const [pageHoy, setPageHoy] = useState(0)
   const [pageSemana, setPageSemana] = useState(0)
   const [pageMes, setPageMes] = useState(0)
@@ -61,6 +61,31 @@ export function RegistroTab() {
     setPageMes(0)
   }
 
+  const filtroUbicacion = {
+    idNivel: ubicacion.idNivel ?? undefined,
+    idGrado: ubicacion.idGrado ?? undefined,
+    idGradoSeccion: ubicacion.idGradoSeccion ?? undefined,
+  }
+  const hayFiltros =
+    idAnioElegido != null ||
+    ubicacion.idNivel != null ||
+    rango !== "hoy" ||
+    fecha !== fechaHoyISO() ||
+    filtroEstado != null ||
+    busqueda.trim() !== ""
+
+  /** Vuelve todo a lo inicial: año vigente, todo el colegio, hoy. */
+  function limpiarFiltros() {
+    filtrar(() => {
+      setIdAnioElegido(null)
+      setUbicacion(SIN_UBICACION)
+      setRango("hoy")
+      setFecha(fechaHoyISO())
+      setFiltroEstado(null)
+      setBusqueda("")
+    })
+  }
+
   // ── Modales de registro / acciones ──
   const [camaraOpen, setCamaraOpen] = useState(false)
   const [reporteOpen, setReporteOpen] = useState(false)
@@ -71,7 +96,7 @@ export function RegistroTab() {
   const hoyQuery = useAsistenciasHoy({
     page: pageHoy,
     size: TAMANIO_PAGINA,
-    idGradoSeccion: idGradoSeccionFiltro ?? undefined,
+    ...filtroUbicacion,
     idAnio: idAnio ?? undefined,
     estado: filtroEstado as never,
     search: busqueda || undefined,
@@ -81,7 +106,7 @@ export function RegistroTab() {
     pageSemana,
     TAMANIO_PAGINA,
     {
-      idGradoSeccion: idGradoSeccionFiltro ?? undefined,
+      ...filtroUbicacion,
       idAnio: idAnio ?? undefined,
       search: busqueda || undefined,
     }
@@ -91,7 +116,7 @@ export function RegistroTab() {
     pageMes,
     TAMANIO_PAGINA,
     {
-      idGradoSeccion: idGradoSeccionFiltro ?? undefined,
+      ...filtroUbicacion,
       idAnio: idAnio ?? undefined,
       search: busqueda || undefined,
     }
@@ -191,16 +216,18 @@ export function RegistroTab() {
         idAnio={idAnio}
         onIdAnioChange={(v) => filtrar(() => {
           setIdAnioElegido(v)
-          setIdGradoSeccionFiltro(null)
+          setUbicacion(SIN_UBICACION)
         })}
+        ubicacion={ubicacion}
+        onUbicacionChange={(v) => filtrar(() => setUbicacion(v))}
+        hayFiltros={hayFiltros}
+        onLimpiar={limpiarFiltros}
         busqueda={busqueda}
         onBusquedaChange={(v) => filtrar(() => setBusqueda(v))}
         rango={rango}
         onRangoChange={cambiaRango}
         fecha={fecha}
         onFechaChange={(v) => filtrar(() => setFecha(v))}
-        idGradoSeccionFiltro={idGradoSeccionFiltro}
-        onIdGradoSeccionChange={(v) => filtrar(() => setIdGradoSeccionFiltro(v))}
         filtroEstado={filtroEstado}
         onFiltroEstadoChange={(v) => filtrar(() => setFiltroEstado(v))}
       />

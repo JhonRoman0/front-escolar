@@ -21,7 +21,7 @@ export default function AsistenciaPage() {
       <Card>
         <CardContent className="flex flex-col items-center justify-center py-12 text-muted-foreground">
           <Users className="mb-3 size-10 opacity-40" />
-          <p className="text-sm font-medium">La asistencia de tu hijo está disponible en el portal del apoderado.</p>
+          <p className="text-sm font-medium">La asistencia de tu hijo está disponible en el módulo Portal.</p>
         </CardContent>
       </Card>
     )

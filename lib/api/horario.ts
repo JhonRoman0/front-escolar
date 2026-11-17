@@ -27,16 +27,6 @@ export interface HorarioListItem {
   idTurno?: number | null
 }
 
-// ── Hijos del apoderado (reutiliza GET /asistencias/hijos) ──────────────
-
-export interface HijoHorario {
-  idAlumno: number
-  alumno: string
-  grado: string
-  seccion: string
-  idMatricula: number
-}
-
 export interface HorarioFiltros {
   page?: number
   size?: number

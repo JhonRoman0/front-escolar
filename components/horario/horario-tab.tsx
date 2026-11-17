@@ -65,7 +65,7 @@ export default function HorarioTab() {
   const rol = useRolHorario()
   // El apoderado verá el horario de su hijo en su portal, no aquí.
   if (rol === "apoderado") {
-    return <Vacio icono={Users} titulo="El horario de tu hijo está disponible en el portal del apoderado." />
+    return <Vacio icono={Users} titulo="El horario de tu hijo está disponible en el módulo Portal." />
   }
   if (rol === "ninguno") {
     return <Vacio titulo="No tienes permiso para ver los horarios del colegio." />

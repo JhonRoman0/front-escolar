@@ -4,13 +4,13 @@ import {
   CalendarDays,
   ClipboardCheck,
   ClipboardList,
-  Globe,
   GraduationCap,
   LayoutGrid,
   Newspaper,
   School,
   Shield,
   UserCheck,
+  Users,
   Wallet,
   type LucideIcon,
 } from "lucide-react"
@@ -28,7 +28,8 @@ const ICONOS: Record<string, LucideIcon> = {
   "user-graduate": GraduationCap,
   "clipboard-list": ClipboardList,
   "clipboard-check": ClipboardCheck,
-  globe: Globe,
+  // "globe" es el icono guardado del módulo Portal, hoy del apoderado.
+  globe: Users,
   school: School,
   "user-check": UserCheck,
   portal: Newspaper,
@@ -42,7 +43,6 @@ export function iconoModulo(nombreIcono: string | null | undefined): LucideIcon 
 }
 
 // "Académico" → "/academico", "Estudiantes" → "/estudiantes"
-// "Portal" → "/gestion-portal" (via URL_OVERRIDES)
 export function urlModulo(nombre: string): string {
   const clave = nombre
     .toLowerCase()
@@ -61,18 +61,15 @@ export const RUTAS_MODULOS: string[] = [
   "/estudiantes",
   "/matricula",
   "/evaluacion",
-  "/gestion-portal",
+  "/portal",
   "/colegio",
   "/asistencia",
   "/horario",
   "/pagos",
 ]
 
-// Overrides: el back manda "Portal" pero la ruta admin es /gestion-portal
-// para no colisionar con las rutas públicas /portal/*.
 // "Consolidado" mapea a /evaluacion (ruta existente).
 const URL_OVERRIDES: Record<string, string> = {
-  portal: "/gestion-portal",
   consolidado: "/evaluacion",
 }
 

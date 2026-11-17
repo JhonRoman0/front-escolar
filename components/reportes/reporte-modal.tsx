@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { useColegioPublico } from "@/hooks/use-portal"
+import { useColegio } from "@/hooks/use-colegio"
 import { fechaHoyISO } from "@/lib/fechas"
 
 type Formato = "pdf" | "excel" | "csv"
@@ -130,7 +130,7 @@ function Contenido({
   onDescargar,
   onCerrar,
 }: Omit<ReporteModalProps, "open" | "onOpenChange" | "titulo" | "descripcion"> & { onCerrar: () => void }) {
-  const { data: colegio } = useColegioPublico()
+  const { data: colegio } = useColegio()
   const [preset, setPreset] = useState<Preset>(presets[0] ?? "todo")
   const [{ inicio, fin }, setRango] = useState(() => rangoDePreset(presets[0] ?? "todo"))
   const [generando, setGenerando] = useState<Formato | null>(null)
