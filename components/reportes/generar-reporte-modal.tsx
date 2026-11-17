@@ -1,12 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import {
-  FileSpreadsheet,
-  FileText,
-  Loader2,
-  Table,
-} from "lucide-react"
+import { FileSpreadsheet, FileText, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -28,14 +23,21 @@ import {
 } from "@/components/ui/select"
 
 import { reportesApi } from "@/lib/api/reportes"
-import { generarCsvAsistencia } from "@/lib/reportes/generar-csv"
 import { generarExcelAsistencia } from "@/lib/reportes/generar-excel"
 import { generarPdfAsistencia } from "@/lib/reportes/generar-pdf"
 import { fechaHoyISO } from "@/lib/fechas"
 
-type Formato = "pdf" | "excel" | "csv"
+type Formato = "pdf" | "excel"
 
 type Preset = "hoy" | "ayer" | "ultimos_7" | "este_mes" | "personalizado"
+
+const PRESETS: { value: Preset; label: string }[] = [
+  { value: "hoy", label: "Hoy" },
+  { value: "ayer", label: "Ayer" },
+  { value: "ultimos_7", label: "Últimos 7 días" },
+  { value: "este_mes", label: "Este mes" },
+  { value: "personalizado", label: "Personalizado" },
+]
 
 function aISO(fecha: Date): string {
   const y = fecha.getFullYear()
@@ -112,10 +114,8 @@ export function GenerarReporteModal({
 
       if (formato === "pdf") {
         generarPdfAsistencia({ datos, inicio, fin, nombreColegio })
-      } else if (formato === "excel") {
-        generarExcelAsistencia({ datos, inicio, fin })
       } else {
-        generarCsvAsistencia({ datos, inicio, fin })
+        generarExcelAsistencia({ datos, inicio, fin })
       }
 
       toast.success(
@@ -141,7 +141,7 @@ export function GenerarReporteModal({
         <DialogHeader>
           <DialogTitle>Generar reporte de asistencia</DialogTitle>
           <DialogDescription>
-            Descarga todos los registros del rango en PDF, Excel o CSV.
+            Descarga todos los registros del rango en PDF o Excel.
           </DialogDescription>
         </DialogHeader>
 
@@ -150,14 +150,13 @@ export function GenerarReporteModal({
             <p className="text-sm font-medium">Rango de fechas</p>
             <Select value={preset} onValueChange={cambiaPreset}>
               <SelectTrigger className="w-full">
-                <SelectValue />
+                {/* Sin el texto, el select mostraría el código ("ultimos_7"). */}
+                <SelectValue>{PRESETS.find((p) => p.value === preset)?.label}</SelectValue>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="hoy">Hoy</SelectItem>
-                <SelectItem value="ayer">Ayer</SelectItem>
-                <SelectItem value="ultimos_7">Últimos 7 días</SelectItem>
-                <SelectItem value="este_mes">Este mes</SelectItem>
-                <SelectItem value="personalizado">Personalizado</SelectItem>
+                {PRESETS.map((p) => (
+                  <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -197,18 +196,6 @@ export function GenerarReporteModal({
             disabled={ocupado}
           >
             Cancelar
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => descargar("csv")}
-            disabled={ocupado}
-          >
-            {generando === "csv" ? (
-              <Loader2 className="animate-spin" />
-            ) : (
-              <Table />
-            )}
-            CSV
           </Button>
           <Button
             variant="outline"

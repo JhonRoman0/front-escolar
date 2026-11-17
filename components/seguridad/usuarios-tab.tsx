@@ -377,7 +377,7 @@ export default function UsuariosTab() {
           open={reporteOpen}
           onOpenChange={setReporteOpen}
           titulo="Reporte de usuarios"
-          descripcion="Descarga el listado de usuarios del rango en PDF, Excel o CSV."
+          descripcion="Descarga el listado de usuarios del rango en PDF o Excel."
           presets={["todo", "ultimos_7", "este_mes", "personalizado"]}
           etiquetaTodo="Todos los usuarios"
           filtros={[

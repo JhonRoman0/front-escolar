@@ -38,7 +38,6 @@ export function useHorarios(filtros?: HorarioFiltros & { enabled?: boolean }) {
     queryFn: () => horarioApi.listar(rest),
     enabled,
     placeholderData: keepPreviousData,
-    staleTime: 1000 * 60 * 5,
   })
 }
 
@@ -52,7 +51,6 @@ export function useHorarioDocente(
     queryFn: () => horarioApi.porDocente(idDocente as number, filtros),
     enabled: !!idDocente,
     placeholderData: keepPreviousData,
-    staleTime: 1000 * 60 * 5,
   })
 }
 
@@ -62,7 +60,6 @@ export function useMiHorario(idAnio: number | null, enabled: boolean) {
     queryKey: [...KEYS.horarios, "mio", idAnio],
     queryFn: () => horarioApi.mio(idAnio),
     enabled,
-    staleTime: 1000 * 60 * 5,
   })
 }
 
@@ -72,7 +69,6 @@ export function useRecreosSeccion(idGradoSeccion: number | null) {
     queryKey: [...KEYS.horarios, "recreos", idGradoSeccion],
     queryFn: () => horarioApi.recreosDeSeccion(idGradoSeccion as number),
     enabled: idGradoSeccion != null,
-    staleTime: 1000 * 60 * 5,
   })
 }
 
@@ -86,7 +82,6 @@ export function useHorarioAlumno(
     queryFn: () => horarioApi.porAlumno(idAlumno as number, filtros),
     enabled: !!idAlumno,
     placeholderData: keepPreviousData,
-    staleTime: 1000 * 60 * 5,
   })
 }
 

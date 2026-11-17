@@ -4,14 +4,13 @@ import type {
   MatriculaReporteItem,
   UsuarioReporteItem,
 } from "@/lib/api/reportes"
-import { generarCsvTabla } from "./generar-csv"
 import { generarExcelTabla } from "./generar-excel"
 import { generarPdfTabla } from "./generar-pdf"
 import { edad, fechaCorta, type ColumnaReporte, type TablaReporte } from "./formato"
 
-export type FormatoReporte = "pdf" | "excel" | "csv"
+export type FormatoReporte = "pdf" | "excel"
 
-/** Datos del encabezado, comunes a los tres formatos. */
+/** Datos del encabezado, comunes a los formatos. */
 export interface ContextoReporte {
   inicio: string
   fin: string
@@ -143,6 +142,5 @@ export function tablaMatriculas(datos: MatriculaReporteItem[], contexto: Context
 
 export function descargarTabla(formato: FormatoReporte, tabla: TablaReporte): void {
   if (formato === "pdf") generarPdfTabla(tabla)
-  else if (formato === "excel") generarExcelTabla(tabla)
-  else generarCsvTabla(tabla)
+  else generarExcelTabla(tabla)
 }

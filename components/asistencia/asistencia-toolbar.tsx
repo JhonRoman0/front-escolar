@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input"
 import { BotonLimpiarFiltros } from "@/components/shared/boton-limpiar-filtros"
 import { BuscadorTabla } from "@/components/shared/buscador-tabla"
 import { FilterSelect } from "@/components/shared/filter-select"
-import { useGradosPorNivel, useNiveles, useSeccionesPorGrado } from "@/hooks/use-academico"
+import { useGradosPorNivel, useNiveles, useSeccionesPorGrado, useTurnos } from "@/hooks/use-academico"
 import { fechaHoyISO } from "@/lib/fechas"
 
 export type RangoFecha = "hoy" | "semana" | "mes"
@@ -42,6 +42,10 @@ interface AsistenciaToolbarProps {
   ubicacion: UbicacionFiltro
   onUbicacionChange: (value: UbicacionFiltro) => void
 
+  /** null: todos. En la vista de hoy empieza en el turno en curso. */
+  idTurno: number | null
+  onIdTurnoChange: (value: number | null) => void
+
   rango: RangoFecha
   onRangoChange: (value: RangoFecha) => void
 
@@ -67,6 +71,8 @@ export function AsistenciaToolbar({
   onIdAnioChange,
   ubicacion,
   onUbicacionChange,
+  idTurno,
+  onIdTurnoChange,
   rango,
   onRangoChange,
   fecha,
@@ -82,7 +88,9 @@ export function AsistenciaToolbar({
   const { data: gradosNivel = [] } = useGradosPorNivel(ubicacion.idNivel)
   // Solo los grados del año elegido.
   const grados = gradosNivel.filter((g) => idAnio == null || g.idAnio === idAnio)
-  const { data: secciones = [] } = useSeccionesPorGrado(ubicacion.idGrado)
+  const { data: seccionesGrado = [] } = useSeccionesPorGrado(ubicacion.idGrado)
+  const secciones = seccionesGrado.filter((s) => idTurno == null || s.idTurno === idTurno)
+  const { data: turnos = [] } = useTurnos()
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -128,6 +136,19 @@ export function AsistenciaToolbar({
           aria-label={rango === "semana" ? "Semana de" : "Mes de"}
         />
       )}
+      <FilterSelect
+        value={idTurno ? String(idTurno) : ""}
+        onValueChange={(v) => {
+          const nuevo = v ? Number(v) : null
+          onIdTurnoChange(nuevo)
+          // La sección elegida deja de valer si es de otro turno.
+          const sec = seccionesGrado.find((s) => s.idGradoSeccion === ubicacion.idGradoSeccion)
+          if (sec && nuevo != null && sec.idTurno !== nuevo) onUbicacionChange({ ...ubicacion, idGradoSeccion: null })
+        }}
+        options={turnos.filter((t) => t.accesoId == null || t.accesoId === 1).map((t) => ({ value: String(t.idTurno), label: t.nombre }))}
+        allLabel="Todos los turnos"
+        className="w-[170px]"
+      />
       {/* Dónde: cada nivel ya filtra. */}
       <FilterSelect
         value={ubicacion.idNivel ? String(ubicacion.idNivel) : ""}
@@ -147,7 +168,7 @@ export function AsistenciaToolbar({
       <FilterSelect
         value={ubicacion.idGradoSeccion ? String(ubicacion.idGradoSeccion) : ""}
         onValueChange={(v) => onUbicacionChange({ ...ubicacion, idGradoSeccion: v ? Number(v) : null })}
-        options={secciones.map((s) => ({ value: String(s.idGradoSeccion), label: `Sección ${s.nombre} (${s.turno})` }))}
+        options={secciones.map((s) => ({ value: String(s.idGradoSeccion), label: idTurno ? `Sección ${s.nombre}` : `Sección ${s.nombre} (${s.turno})` }))}
         allLabel="Todas las secciones"
         className="w-[190px]"
         disabled={!ubicacion.idGrado || secciones.length === 0}

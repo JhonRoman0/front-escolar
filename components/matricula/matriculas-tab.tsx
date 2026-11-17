@@ -319,7 +319,7 @@ export function MatriculasTab() {
             open={reporteOpen}
             onOpenChange={setReporteOpen}
             titulo="Reporte de matrícula"
-            descripcion="Descarga las matrículas del año en PDF, Excel o CSV."
+            descripcion="Descarga las matrículas del año en PDF o Excel."
             presets={["todo", "ultimos_7", "este_mes", "personalizado"]}
           etiquetaTodo="Todo el año escolar"
             filtros={[

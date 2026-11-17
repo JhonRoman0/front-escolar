@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, type ReactNode } from "react"
-import { FileSpreadsheet, FileText, Loader2, Table } from "lucide-react"
+import { FileSpreadsheet, FileText, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -24,7 +24,7 @@ import {
 import { useColegio } from "@/hooks/use-colegio"
 import { fechaHoyISO } from "@/lib/fechas"
 
-type Formato = "pdf" | "excel" | "csv"
+type Formato = "pdf" | "excel"
 
 export type Preset = "todo" | "hoy" | "ayer" | "ultimos_7" | "este_mes" | "personalizado"
 
@@ -280,18 +280,6 @@ function Contenido({
             disabled={ocupado}
           >
             Cancelar
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => descargar("csv")}
-            disabled={ocupado}
-          >
-            {generando === "csv" ? (
-              <Loader2 className="animate-spin" />
-            ) : (
-              <Table />
-            )}
-            CSV
           </Button>
           <Button
             variant="outline"

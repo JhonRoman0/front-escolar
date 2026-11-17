@@ -25,7 +25,6 @@ import { anioParaFiltro, estadoAnioTexto } from "@/lib/api/academico"
 import type { CeldaNotaFinal, DetalleNotaFinal, NotaFinalItem } from "@/lib/api/notas-finales"
 import { reportesApi } from "@/lib/api/reportes"
 import { ESCALAS, errorCalificacion, errorConclusion, periodoParaFiltro } from "@/lib/calificaciones"
-import { generarCsvNotas } from "@/lib/reportes/generar-csv"
 import { generarExcelNotas } from "@/lib/reportes/generar-excel"
 import { generarPdfNotas } from "@/lib/reportes/generar-pdf"
 import { BotonBoletas } from "./boton-boletas"
@@ -95,7 +94,7 @@ export default function NotasFinalesTab() {
   const [periodoReporte, setPeriodoReporte] = useState("")
 
   async function handleDescargarReporte(
-    formato: "pdf" | "excel" | "csv",
+    formato: "pdf" | "excel",
     inicio: string,
     fin: string,
     filtros: Record<string, string>
@@ -109,8 +108,7 @@ export default function NotasFinalesTab() {
       return
     }
     if (formato === "pdf") generarPdfNotas({ datos, inicio, fin })
-    else if (formato === "excel") generarExcelNotas({ datos, inicio, fin })
-    else generarCsvNotas({ datos, inicio, fin })
+    else generarExcelNotas({ datos, inicio, fin })
     toast.success(`Reporte ${formato.toUpperCase()} generado (${datos.length} registros)`)
   }
 
@@ -225,7 +223,7 @@ export default function NotasFinalesTab() {
           open={reporteOpen}
           onOpenChange={setReporteOpen}
           titulo="Reporte de notas"
-          descripcion="Descarga las notas finales del rango en PDF, Excel o CSV."
+          descripcion="Descarga las notas finales del rango en PDF o Excel."
           presets={["ultimos_7", "este_mes", "personalizado"]}
           filtros={[
             ...filtrosReporte.filtros,

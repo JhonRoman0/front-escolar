@@ -374,7 +374,7 @@ export default function DocentesTab() {
           open={reporteOpen}
           onOpenChange={setReporteOpen}
           titulo="Reporte de docentes"
-          descripcion="Descarga el listado de docentes del rango en PDF, Excel o CSV."
+          descripcion="Descarga el listado de docentes del rango en PDF o Excel."
           presets={["todo", "ultimos_7", "este_mes", "personalizado"]}
           etiquetaTodo="Todos los docentes"
           filtros={[

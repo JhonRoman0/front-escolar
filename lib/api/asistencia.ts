@@ -88,6 +88,7 @@ export interface MatrizSemanalResponse {
   alumno: string
   grado: string
   seccion: string
+  turno?: string | null
   /** null: día que aún no llega. */
   estados: (EstadoAsistencia | null)[]
   idGradoSeccion?: number | null
@@ -104,6 +105,7 @@ export interface ResumenMensualResponse {
   alumno: string
   grado: string
   seccion: string
+  turno?: string | null
   idMatricula: number
   diasAsistidos: number
   inasistencias: number

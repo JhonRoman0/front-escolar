@@ -9,7 +9,6 @@ export function useColegio() {
     queryKey: ["colegio", "actual"],
     queryFn: () => colegioApi.actual(),
     retry: reintentarSalvo404,
-    staleTime: 5 * 60 * 1000,
   })
 }
 

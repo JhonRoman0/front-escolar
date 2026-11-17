@@ -29,7 +29,6 @@ export function useCompetencias(idCurso?: number) {
     queryKey: [...KEYS.competencias, idCurso],
     queryFn: () => competenciasApi.listar(idCurso),
     enabled: !!idCurso,
-    staleTime: 1000 * 60 * 30,
   })
 }
 

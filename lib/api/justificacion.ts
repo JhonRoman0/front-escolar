@@ -4,18 +4,14 @@ import { crud } from "@/lib/api"
 export interface JustificacionResponse {
   idJustificacion: number
   motivo: string
-  documentoUrl: string | null
-  fechaJustificacion: string | null
+  /** Día en que se creó el motivo; lo pone el sistema. */
+  fechaRegistro: string | null
   accesoId: number | null
 }
 
-// ≡ JustificacionRequest (@Valid del back): motivo y fechaJustificacion
-// obligatorios; documentoUrl y accesoId opcionales. El back NO valida que la
-// fecha no sea futura → lo hace el schema zod del front.
+// ≡ JustificacionRequest: solo el motivo (obligatorio) y el estado (opcional).
 export interface JustificacionRequest {
   motivo: string
-  documentoUrl?: string | null
-  fechaJustificacion: string
   accesoId?: number | null
 }
 

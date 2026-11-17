@@ -8,7 +8,6 @@ export function useModulos(enabled = true) {
   return useQuery({
     queryKey: MODULOS_KEY,
     queryFn: modulosApi.listar,
-    staleTime: 1000 * 60 * 60,
     enabled,
   })
 }

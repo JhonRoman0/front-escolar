@@ -38,7 +38,7 @@ export function AsistenciaTablaHoy({
   onAnular,
 }: AsistenciaTablaHoyProps) {
   const mostrarAcciones = puedeJustificar || puedeAnular
-  const columnas = 5 + (mostrarAcciones ? 1 : 0)
+  const columnas = 7 + (mostrarAcciones ? 1 : 0)
 
   return (
     <div className="overflow-x-auto rounded-md border">
@@ -46,7 +46,9 @@ export function AsistenciaTablaHoy({
         <TableHeader>
           <TableRow>
             <TableHead>Alumno</TableHead>
-            <TableHead>Grado - Sección</TableHead>
+            <TableHead>Grado</TableHead>
+            <TableHead>Sección</TableHead>
+            <TableHead>Turno</TableHead>
             <TableHead>Hora entrada</TableHead>
             <TableHead>Marcado por</TableHead>
             <TableHead>Estado</TableHead>
@@ -71,9 +73,9 @@ export function AsistenciaTablaHoy({
             asistencias.map((a) => (
               <TableRow key={a.idAlumno}>
                 <TableCell className="font-medium">{a.alumno}</TableCell>
-                <TableCell className="text-sm text-muted-foreground">
-                  {a.grado} - Sección {a.seccion}
-                </TableCell>
+                <TableCell className="text-sm text-muted-foreground">{a.grado}</TableCell>
+                <TableCell className="text-sm text-muted-foreground">{a.seccion || "—"}</TableCell>
+                <TableCell className="text-sm text-muted-foreground">{a.turno ?? "—"}</TableCell>
                 <TableCell className="font-mono text-sm text-muted-foreground">
                   {formatearHora(a.horaEntrada)}
                 </TableCell>

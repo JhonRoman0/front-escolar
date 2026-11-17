@@ -33,6 +33,9 @@ export function AsistenciaTablaSemana({
         <TableHeader>
           <TableRow>
             <TableHead className="min-w-45">Estudiante</TableHead>
+            <TableHead>Grado</TableHead>
+            <TableHead>Sección</TableHead>
+            <TableHead>Turno</TableHead>
             {NOMBRES_DIAS.map((nombre, i) => (
               <TableHead key={nombre} className="text-center">
                 <div className="flex flex-col">
@@ -49,11 +52,11 @@ export function AsistenciaTablaSemana({
         </TableHeader>
         <TableBody>
           {cargando ? (
-            <FilasCargando columnas={6} />
+            <FilasCargando columnas={9} />
           ) : asistencias.length === 0 ? (
             <TableRow>
               <TableCell
-                colSpan={6}
+                colSpan={9}
                 className="h-24 text-center text-muted-foreground"
               >
                 No hay alumnos que coincidan con la búsqueda.
@@ -63,6 +66,9 @@ export function AsistenciaTablaSemana({
             asistencias.map((a) => (
               <TableRow key={a.idAlumno}>
                 <TableCell className="font-medium">{a.alumno}</TableCell>
+                <TableCell className="text-sm text-muted-foreground">{a.grado}</TableCell>
+                <TableCell className="text-sm text-muted-foreground">{a.seccion || "—"}</TableCell>
+                <TableCell className="text-sm text-muted-foreground">{a.turno ?? "—"}</TableCell>
                 {a.estados.slice(0, 5).map((estado, i) => (
                   <TableCell key={i} className="text-center">
                     {fechasDias[i] && esFechaFutura(fechasDias[i]) ? (

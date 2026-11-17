@@ -3,6 +3,7 @@ import {
   useMutation,
   useQuery,
 } from "@tanstack/react-query"
+import { SOLO_LECTURA } from "@/lib/query-client"
 
 import { useInvalidarMutacion } from "@/hooks/use-invalidar"
 import {
@@ -65,13 +66,14 @@ export function useOpcionesMatricula(idAnio: number | null, idAlumno?: number | 
 }
 
 export function useBuscarAlumnoInscripcion() {
-  return useMutation({ mutationFn: (dni: string) => matriculasApi.buscarAlumno(dni) })
+  return useMutation({ mutationFn: (dni: string) => matriculasApi.buscarAlumno(dni), meta: SOLO_LECTURA })
 }
 
 export function useBuscarApoderadoInscripcion() {
   return useMutation({
     mutationFn: ({ dni, idAlumno }: { dni: string; idAlumno?: number | null }) =>
       matriculasApi.buscarApoderado(dni, idAlumno),
+    meta: SOLO_LECTURA,
   })
 }
 

@@ -18,7 +18,6 @@ import {
 import {
   Field,
   FieldContent,
-  FieldDescription,
   FieldError,
   FieldLabel,
 } from "@/components/ui/field"
@@ -52,7 +51,7 @@ import {
   justificacionSchema,
   type JustificacionValues,
 } from "@/lib/schemas/asistencia"
-import { fechaHoyISO, formatearFecha } from "@/lib/fechas"
+import { formatearFecha } from "@/lib/fechas"
 
 export function JustificacionesTab() {
   const { data, isLoading, isError, refetch } = useJustificaciones()
@@ -67,7 +66,7 @@ export function JustificacionesTab() {
 
   // Los más recientes primero para revisar el catálogo con contexto.
   const ordenadas = [...(data ?? [])].sort((a, b) =>
-    (b.fechaJustificacion ?? "").localeCompare(a.fechaJustificacion ?? "")
+    (b.fechaRegistro ?? "").localeCompare(a.fechaRegistro ?? "")
   )
 
   async function handleEliminar(j: JustificacionResponse) {
@@ -100,42 +99,27 @@ export function JustificacionesTab() {
           <TableHeader>
             <TableRow>
               <TableHead>Motivo</TableHead>
-              <TableHead>Fecha</TableHead>
-              <TableHead>Documento</TableHead>
+              <TableHead>Fecha de registro</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <FilasCargando columnas={5} />
+              <FilasCargando columnas={4} />
             ) : isError ? (
               <MensajeSinDatos
-                columnas={5}
+                columnas={4}
                 mensaje="No se pudo cargar. Recarga la pantalla."
               />
             ) : !ordenadas.length ? (
-              <MensajeSinDatos columnas={5} mensaje="Aún no hay motivos de justificación." />
+              <MensajeSinDatos columnas={4} mensaje="Aún no hay motivos de justificación." />
             ) : (
               ordenadas.map((j) => (
                 <TableRow key={j.idJustificacion}>
                   <TableCell className="font-medium">{j.motivo}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">
-                    {formatearFecha(j.fechaJustificacion)}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {j.documentoUrl ? (
-                      <a
-                        href={j.documentoUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="underline underline-offset-2 hover:text-primary"
-                      >
-                        Ver documento
-                      </a>
-                    ) : (
-                      "—"
-                    )}
+                    {formatearFecha(j.fechaRegistro)}
                   </TableCell>
                   <TableCell>
                     <EstadoBadge accesoId={j.accesoId} />
@@ -195,9 +179,6 @@ function JustificacionDialog({
     resolver: zodResolver(justificacionSchema),
     defaultValues: {
       motivo: justificacion?.motivo ?? "",
-      documentoUrl: justificacion?.documentoUrl ?? "",
-      fechaJustificacion:
-        justificacion?.fechaJustificacion?.slice(0, 10) ?? fechaHoyISO(),
       accesoId: justificacion?.accesoId ?? 1,
     },
   })
@@ -242,41 +223,6 @@ function JustificacionDialog({
                 <FieldContent>
                   <Input placeholder="Cita médica" {...field} />
                   <FieldError errors={[form.formState.errors.motivo]} />
-                </FieldContent>
-              </Field>
-            )}
-          />
-          <Controller
-            control={form.control}
-            name="fechaJustificacion"
-            render={({ field }) => (
-              <Field>
-                <FieldLabel>Fecha de la justificación</FieldLabel>
-                <FieldContent>
-                  <Input type="date" max={fechaHoyISO()} {...field} />
-                  <FieldDescription>Día en que aplica el motivo.</FieldDescription>
-                  <FieldError errors={[form.formState.errors.fechaJustificacion]} />
-                </FieldContent>
-              </Field>
-            )}
-          />
-          <Controller
-            control={form.control}
-            name="documentoUrl"
-            render={({ field }) => (
-              <Field>
-                <FieldLabel>Documento (URL)</FieldLabel>
-                <FieldContent>
-                  <Input
-                    placeholder="https://… (opcional)"
-                    type="url"
-                    {...field}
-                    value={field.value ?? ""}
-                  />
-                  <FieldDescription>
-                    Enlace a sustento (constancia, certificado, etc.).
-                  </FieldDescription>
-                  <FieldError errors={[form.formState.errors.documentoUrl]} />
                 </FieldContent>
               </Field>
             )}

@@ -3,6 +3,7 @@ import {
   useMutation,
   useQuery,
 } from "@tanstack/react-query"
+import { SOLO_LECTURA } from "@/lib/query-client"
 
 import { useCrud } from "@/hooks/use-crud"
 import { useInvalidarMutacion } from "@/hooks/use-invalidar"
@@ -36,7 +37,6 @@ export function useAsistenciasHoy(params?: { page?: number; size?: number; fecha
     queryKey: [...KEYS.asistencias, "hoy", params],
     queryFn: () => asistenciasApi.hoy(params),
     placeholderData: keepPreviousData,
-    staleTime: 1000 * 30,
   })
 }
 
@@ -73,7 +73,6 @@ export function useEstadisticasAsistencia(rango: RangoEstadisticas, fecha: strin
     queryKey: [...KEYS.estadisticas, rango, fecha, idAnio],
     queryFn: () => asistenciasApi.estadisticas(rango, fecha, idAnio),
     enabled: idAnio != null,
-    staleTime: 1000 * 30,
   })
 }
 
@@ -91,7 +90,6 @@ export function useJustificaciones() {
   return useQuery({
     queryKey: KEYS.justificaciones,
     queryFn: justificacionesApi.listar,
-    staleTime: 1000 * 60 * 60,
   })
 }
 
@@ -100,7 +98,6 @@ export function useDiasFeriados() {
   return useQuery({
     queryKey: KEYS.feriados,
     queryFn: diasFeriadosApi.listar,
-    staleTime: 1000 * 60 * 30,
   })
 }
 
@@ -110,6 +107,7 @@ export function useDiasFeriados() {
 export function usePrevisualizarAsistencia() {
   return useMutation({
     mutationFn: (data: AsistenciaRequest) => asistenciasApi.previsualizar(data),
+    meta: SOLO_LECTURA,
   })
 }
 

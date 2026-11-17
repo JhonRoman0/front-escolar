@@ -16,9 +16,10 @@ import {
   useJustificarAsistencia,
 } from "@/hooks/use-asistencia"
 import { usePuede } from "@/hooks/use-permisos"
-import { useAniosEscolares } from "@/hooks/use-academico"
+import { useAniosEscolares, useTurnos } from "@/hooks/use-academico"
 import { anioParaFiltro } from "@/lib/api/academico"
 import { diasSemana, fechaHoyISO } from "@/lib/fechas"
+import { turnoActual } from "@/lib/turno-actual"
 import type { AsistenciaDiaResponse } from "@/lib/api/asistencia"
 
 import { AsistenciaKpiCards } from "./asistencia-kpi-cards"
@@ -49,6 +50,10 @@ export function RegistroTab() {
   const [busqueda, setBusqueda] = useState("")
   const [filtroEstado, setFiltroEstado] = useState<string | null>(null)
   const [ubicacion, setUbicacion] = useState<UbicacionFiltro>(SIN_UBICACION)
+  // Turno: undefined = automático (en Hoy, el turno en curso; en Semana/Mes, todos).
+  const { data: turnos = [] } = useTurnos()
+  const [turnoElegido, setTurnoElegido] = useState<number | null | undefined>(undefined)
+  const idTurno = turnoElegido !== undefined ? turnoElegido : rango === "hoy" ? turnoActual(turnos) : null
   const [pageHoy, setPageHoy] = useState(0)
   const [pageSemana, setPageSemana] = useState(0)
   const [pageMes, setPageMes] = useState(0)
@@ -65,20 +70,23 @@ export function RegistroTab() {
     idNivel: ubicacion.idNivel ?? undefined,
     idGrado: ubicacion.idGrado ?? undefined,
     idGradoSeccion: ubicacion.idGradoSeccion ?? undefined,
+    idTurno: idTurno ?? undefined,
   }
   const hayFiltros =
     idAnioElegido != null ||
+    turnoElegido !== undefined ||
     ubicacion.idNivel != null ||
     rango !== "hoy" ||
     fecha !== fechaHoyISO() ||
     filtroEstado != null ||
     busqueda.trim() !== ""
 
-  /** Vuelve todo a lo inicial: año vigente, todo el colegio, hoy. */
+  /** Vuelve todo a lo inicial: año vigente, todo el colegio, hoy con el turno en curso. */
   function limpiarFiltros() {
     filtrar(() => {
       setIdAnioElegido(null)
       setUbicacion(SIN_UBICACION)
+      setTurnoElegido(undefined)
       setRango("hoy")
       setFecha(fechaHoyISO())
       setFiltroEstado(null)
@@ -129,6 +137,8 @@ export function RegistroTab() {
 
   function cambiaRango(nuevo: RangoFecha) {
     setRango(nuevo)
+    // Hoy vuelve al turno en curso; Semana y Mes empiezan con todos.
+    setTurnoElegido(undefined)
     setPageHoy(0)
     setPageSemana(0)
     setPageMes(0)
@@ -220,6 +230,8 @@ export function RegistroTab() {
         })}
         ubicacion={ubicacion}
         onUbicacionChange={(v) => filtrar(() => setUbicacion(v))}
+        idTurno={idTurno}
+        onIdTurnoChange={(v) => filtrar(() => setTurnoElegido(v))}
         hayFiltros={hayFiltros}
         onLimpiar={limpiarFiltros}
         busqueda={busqueda}

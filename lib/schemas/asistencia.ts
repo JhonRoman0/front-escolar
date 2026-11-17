@@ -1,6 +1,5 @@
 import { z } from "zod"
 
-import { fechaHoyISO } from "@/lib/fechas"
 
 const accesoId = z.number().int().min(1).optional()
 const fecha = z
@@ -30,23 +29,7 @@ export const justificacionSchema = z
       .trim()
       .min(1, "El motivo es requerido")
       .max(100, "Máximo 100 caracteres"),
-    documentoUrl: z
-      .string()
-      .trim()
-      .max(200, "Máximo 200 caracteres")
-      .optional()
-      .or(z.literal("")),
-    fechaJustificacion: fecha,
     accesoId: accesoId.optional(),
-  })
-  .superRefine((data, ctx) => {
-    if (data.fechaJustificacion > fechaHoyISO()) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["fechaJustificacion"],
-        message: "La fecha no puede ser futura",
-      })
-    }
   })
 export type JustificacionValues = z.infer<typeof justificacionSchema>
 
@@ -61,7 +44,8 @@ export const diaFeriadoSchema = z.object({
     .trim()
     .min(1, "El motivo es requerido")
     .max(150, "Máximo 150 caracteres"),
-  idAnioEscolar: z.number().int().min(1).nullable().optional(),
+  // Cada feriado es de un año escolar; la fecha debe caer dentro de él.
+  idAnioEscolar: z.number({ error: "Elige el año escolar" }).int().min(1, "Elige el año escolar"),
   accesoId: accesoId.optional(),
 })
 export type DiaFeriadoValues = z.infer<typeof diaFeriadoSchema>
