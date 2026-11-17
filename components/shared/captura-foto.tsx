@@ -26,6 +26,11 @@ export function CapturaFoto({ foto, onChange }: { foto: File | null; onChange: (
 
   async function encender() {
     setError(null)
+    // El navegador solo da la cámara en HTTPS (o localhost).
+    if (!window.isSecureContext || !navigator.mediaDevices) {
+      setError("Hubo un error al acceser a la cámara")
+      return
+    }
     try {
       stream.current = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
       setActiva(true)

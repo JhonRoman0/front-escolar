@@ -36,6 +36,25 @@ const RESULTADO_MS = 3000
 
 type Resultado = { ok: true; asistencia: AsistenciaResponse } | { ok: false; mensaje: string }
 
+/** El navegador solo da la cámara en HTTPS (o localhost). */
+const SIN_HTTPS = "La cámara tuvo un error. Mientras tanto, busca al alumno por código, nombre o DNI."
+
+/**
+ * Apaga el lector sin romper la pantalla: stop() lanza un error inmediato (no
+ * una promesa rechazada) si la cámara nunca llegó a encender.
+ */
+function detener(scanner: Html5Qrcode) {
+  try {
+    scanner.stop().then(() => scanner.clear()).catch(() => {})
+  } catch {
+    try {
+      scanner.clear()
+    } catch {
+      /* nada que limpiar */
+    }
+  }
+}
+
 /** Tono corto: agudo si entró puntual, medio si tarde, grave si hubo error. */
 function sonar(tono: "puntual" | "tarde" | "error") {
   try {
@@ -133,9 +152,12 @@ export function RegistrarCamaraModal({ open, onOpenChange }: RegistrarCamaraModa
         setErrorCamara("No se pudo iniciar el lector de QR.")
         return
       }
+      if (!window.isSecureContext || !navigator.mediaDevices) {
+        setErrorCamara(SIN_HTTPS)
+        return
+      }
+      const scanner = new Html5Qrcode(QR_REGION_ID)
       try {
-        const scanner = new Html5Qrcode(QR_REGION_ID)
-        scannerRef.current = scanner
         await scanner.start(
           { facingMode: "environment" },
           { fps: 10, qrbox: { width: 250, height: 250 } },
@@ -144,8 +166,15 @@ export function RegistrarCamaraModal({ open, onOpenChange }: RegistrarCamaraModa
           },
           () => {}
         )
-        if (mounted) setEscaneando(true)
+        // Se cerró mientras se pedía el permiso: se apaga en vez de quedar encendida.
+        if (!mounted) {
+          detener(scanner)
+          return
+        }
+        scannerRef.current = scanner
+        setEscaneando(true)
       } catch {
+        detener(scanner)
         if (mounted) {
           setErrorCamara("No se pudo acceder a la cámara. Puedes buscar al alumno por código, nombre o DNI.")
         }
@@ -158,7 +187,7 @@ export function RegistrarCamaraModal({ open, onOpenChange }: RegistrarCamaraModa
       mounted = false
       const scanner = scannerRef.current
       if (scanner) {
-        scanner.stop().then(() => scanner.clear()).catch(() => {})
+        detener(scanner)
         scannerRef.current = null
       }
       setEscaneando(false)
