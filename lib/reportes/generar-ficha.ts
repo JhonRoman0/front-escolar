@@ -2,7 +2,7 @@ import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
 
 import { matriculasApi, type FichaMatricula } from "@/lib/api/matricula"
-import { portalApi, type ColegioResponse } from "@/lib/api/portal"
+import { colegioApi, type ColegioResponse } from "@/lib/api/colegio"
 import { edad, fechaCorta } from "./formato"
 import {
   bandaTitulo as titulo,
@@ -129,7 +129,7 @@ export function generarPdfFicha(
 export async function descargarFicha(idMatricula: number): Promise<void> {
   const [ficha, colegio] = await Promise.all([
     matriculasApi.ficha(idMatricula),
-    portalApi.colegio().catch(() => null),
+    colegioApi.actual().catch(() => null),
   ])
   const [logo, foto] = await Promise.all([
     logoColegio(colegio),

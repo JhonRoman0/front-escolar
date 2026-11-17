@@ -2,7 +2,7 @@ import jsPDF from "jspdf"
 import autoTable, { type RowInput } from "jspdf-autotable"
 
 import type { Boleta, AlumnoBoleta } from "@/lib/api/notas-finales"
-import type { ColegioResponse } from "@/lib/api/portal"
+import type { ColegioResponse } from "@/lib/api/colegio"
 import {
   bandaTitulo,
   camposPdf,
@@ -42,33 +42,37 @@ function paginaAlumno(doc: jsPDF, boleta: Boleta, alumno: AlumnoBoleta, colegio:
 
   // Una fila por área (franja) y debajo sus competencias con la nota de cada periodo.
   y = bandaTitulo(doc, "CALIFICACIONES", ultimaY(doc) + 4)
+  // En la boleta del último periodo con notas del año va la columna Final.
+  const columnas = boleta.periodos.length + (boleta.conFinal ? 1 : 0)
+  const final = (idCompetencia: number) => (boleta.conFinal ? [alumno.finales[idCompetencia] ?? "—"] : [])
   const cuerpo: RowInput[] = []
   for (const area of boleta.areas) {
     cuerpo.push([
       {
         content: area.transversal ? `${area.nombre} (competencia transversal)` : area.nombre,
-        colSpan: 1 + boleta.periodos.length,
+        colSpan: 1 + columnas,
         styles: { fillColor: [235, 238, 245], fontStyle: "bold" },
       },
     ])
     for (const c of area.competencias) {
       const notas = alumno.notas[c.idCompetencia] ?? {}
-      cuerpo.push([`${c.codigo}. ${c.nombre}`, ...boleta.periodos.map((p) => notas[p.numero] ?? "—")])
+      cuerpo.push([`${c.codigo}. ${c.nombre}`, ...boleta.periodos.map((p) => notas[p.numero] ?? "—"), ...final(c.idCompetencia)])
     }
   }
   const columnaActual = boleta.periodos.findIndex((p) => p.numero === boleta.periodo) + 1
   autoTable(doc, {
     startY: y,
     margin: { left: MARGEN, right: MARGEN },
-    head: [["Competencia", ...boleta.periodos.map((p) => columnaPeriodo(boleta, p.numero))]],
+    head: [["Competencia", ...boleta.periodos.map((p) => columnaPeriodo(boleta, p.numero)), ...(boleta.conFinal ? ["Final"] : [])]],
     body: cuerpo,
     styles: { fontSize: 7.5, cellPadding: 1.3, overflow: "linebreak" },
     headStyles: { fillColor: [235, 238, 245], textColor: 40, fontStyle: "bold" },
     columnStyles: Object.fromEntries(
-      boleta.periodos.map((_, i) => [i + 1, { cellWidth: 17, halign: "center" as const }])
+      Array.from({ length: columnas }, (_, i) => [i + 1, { cellWidth: 17, halign: "center" as const }])
     ),
     didParseCell: ({ section, column, cell }) => {
-      if (section === "body" && column.index === columnaActual && cell.raw !== undefined && typeof cell.raw !== "object") {
+      const destacada = column.index === columnaActual || (boleta.conFinal && column.index === columnas)
+      if (section === "body" && destacada && cell.raw !== undefined && typeof cell.raw !== "object") {
         cell.styles.fillColor = DESTACADO
         cell.styles.fontStyle = "bold"
       }
@@ -87,6 +91,15 @@ function paginaAlumno(doc: jsPDF, boleta: Boleta, alumno: AlumnoBoleta, colegio:
       .filter((c) => alumno.conclusiones[c.idCompetencia])
       .map((c) => [`${area.nombre} · ${c.codigo}`, alumno.conclusiones[c.idCompetencia]])
   )
+  // Con la nota del año, también sus conclusiones (solo hay en literal).
+  const conclusionesFinales = boleta.conFinal
+    ? boleta.areas.flatMap((area) =>
+        area.competencias
+          .filter((c) => alumno.conclusionesFinales[c.idCompetencia])
+          .map((c) => [`${area.nombre} · ${c.codigo} (año)`, alumno.conclusionesFinales[c.idCompetencia]])
+      )
+    : []
+  conclusiones.push(...conclusionesFinales)
   autoTable(doc, {
     startY: y,
     margin: { left: MARGEN, right: MARGEN },

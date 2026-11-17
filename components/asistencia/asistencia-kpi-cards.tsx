@@ -42,13 +42,16 @@ export function AsistenciaKpiCards({
       subtitulo: subtitulo(estadisticas?.tardanzas ?? 0),
     },
     {
-      label: "Inasistencias",
+      label: "Faltas",
       valor: estadisticas?.inasistencias ?? 0,
       icono: UserX,
       colorBg: "bg-rose-50 dark:bg-rose-950/40",
       colorText: "text-rose-700 dark:text-rose-300",
       colorAccent: "text-rose-600 dark:text-rose-400",
-      subtitulo: subtitulo(estadisticas?.inasistencias ?? 0),
+      // Los pendientes de hoy aún pueden llegar: no cuentan como falta.
+      subtitulo: (estadisticas?.pendientes ?? 0) > 0
+        ? `${estadisticas?.pendientes} pendientes hoy`
+        : subtitulo(estadisticas?.inasistencias ?? 0),
     },
     {
       label: "Justificadas",

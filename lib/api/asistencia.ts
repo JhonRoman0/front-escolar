@@ -1,12 +1,15 @@
 import { apiFetch, type Paginated } from "@/lib/api"
-import type { HijoHorario } from "@/lib/api/horario"
 
-// ≡ EstadoAsistencia (catálogo sembrado en BD, ver GET /asistencias/estados)
+// ≡ EstadoAsistencia (catálogo sembrado en BD, ver GET /asistencias/estados).
+// Sin marca: "Pendiente" hasta el límite de tardanza de su turno, luego
+// "Inasistencia" (falta); "Sin clases" en feriados, vacaciones o fines de semana.
 export type EstadoAsistencia =
   | "Puntual"
   | "Tardanza"
   | "Inasistencia"
   | "Justificada"
+  | "Pendiente"
+  | "Sin clases"
 
 // ── Registro por QR / código manual ──────────────────────────────────────
 
@@ -19,6 +22,8 @@ export interface AsistenciaRequest {
   codigoHash?: string
   /** Obligatorio cuando el estado calculado es "Justificada" (ingreso tardío). */
   idJustificacion?: number
+  /** Ingreso justificado: nombre de quien trajo al alumno (con la foto de evidencia). */
+  acompanante?: string
 }
 
 // ≡ AsistenciaResponse. En previsualizar idAsistencia viene null.
@@ -41,6 +46,8 @@ export interface AsistenciaResponse {
   justificacion: string | null
   idUsuarioRegistro: number | null
   usuarioRegistro: string | null
+  acompanante: string | null
+  urlEvidencia: string | null
 }
 
 // ── Tablas hoy / semana / mes ────────────────────────────────────────────
@@ -53,9 +60,15 @@ export interface AsistenciaDiaResponse {
   grado: string
   seccion: string
   idAsistencia: number | null
+  /** null: un día que aún no llega. */
   estado: EstadoAsistencia
   horaEntrada: string | null
   marcadoPor: string | null
+  codigo?: string | null
+  urlFoto?: string | null
+  justificacion?: string | null
+  acompanante?: string | null
+  urlEvidencia?: string | null
   // Enriquecido (6 filtros)
   idNivel?: number | null
   nivel?: string | null
@@ -75,7 +88,9 @@ export interface MatrizSemanalResponse {
   alumno: string
   grado: string
   seccion: string
-  estados: EstadoAsistencia[]
+  turno?: string | null
+  /** null: día que aún no llega. */
+  estados: (EstadoAsistencia | null)[]
   idGradoSeccion?: number | null
   idNivel?: number | null
   idGrado?: number | null
@@ -90,6 +105,7 @@ export interface ResumenMensualResponse {
   alumno: string
   grado: string
   seccion: string
+  turno?: string | null
   idMatricula: number
   diasAsistidos: number
   inasistencias: number
@@ -110,6 +126,8 @@ export interface EstadisticasResponse {
   tardanzas: number
   justificados: number
   inasistencias: number
+  /** Hoy, sin marcar y aún dentro del límite de tardanza. */
+  pendientes: number
   totalEsperado: number
   porcentajeAsistencia: number
 }
@@ -149,11 +167,12 @@ export const asistenciasApi = {
       body: JSON.stringify(data),
     })
   },
-  async confirmar(data: AsistenciaRequest): Promise<AsistenciaResponse> {
-    return apiFetch<AsistenciaResponse>("/asistencias/confirmar", {
-      method: "POST",
-      body: JSON.stringify(data),
-    })
+  /** foto: evidencia obligatoria del ingreso justificado. */
+  async confirmar(data: AsistenciaRequest, foto?: File | null): Promise<AsistenciaResponse> {
+    const body = new FormData()
+    body.append("datos", new Blob([JSON.stringify(data)], { type: "application/json" }))
+    if (foto) body.append("foto", foto)
+    return apiFetch<AsistenciaResponse>("/asistencias/confirmar", { method: "POST", body })
   },
   async hoy(params?: { page?: number; size?: number } & AsistenciaFiltros & { fecha?: string }): Promise<Paginated<AsistenciaDiaResponse>> {
     const query = new URLSearchParams()
@@ -210,9 +229,11 @@ export const asistenciasApi = {
   },
   async estadisticas(
     rango: RangoEstadisticas,
-    fecha: string
+    fecha: string,
+    idAnio?: number | null
   ): Promise<EstadisticasResponse> {
     const params = new URLSearchParams({ rango, fecha })
+    if (idAnio != null) params.set("idAnio", String(idAnio))
     return apiFetch<EstadisticasResponse>(
       `/asistencias/estadisticas?${params.toString()}`
     )
@@ -232,12 +253,12 @@ export const asistenciasApi = {
       body: JSON.stringify(data),
     })
   },
-  async eliminar(idAsistencia: number): Promise<void> {
-    return apiFetch<void>(`/asistencias/${idAsistencia}`, { method: "DELETE" })
-  },
-  /** GET /asistencias/hijos — Hijos del apoderado actual (RBAC) */
-  async hijos(): Promise<HijoHorario[]> {
-    return apiFetch<HijoHorario[]>("/asistencias/hijos")
+  /** Anula una marca del día; el motivo queda en el historial. */
+  async anular(idAsistencia: number, motivo: string): Promise<void> {
+    return apiFetch<void>(`/asistencias/${idAsistencia}/anulacion`, {
+      method: "POST",
+      body: JSON.stringify({ motivo }),
+    })
   },
   async reporteGeneral(
     params: { inicio: string; fin: string; page?: number; size?: number } & AsistenciaFiltros

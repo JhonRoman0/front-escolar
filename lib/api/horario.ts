@@ -27,16 +27,6 @@ export interface HorarioListItem {
   idTurno?: number | null
 }
 
-// ── Hijos del apoderado (reutiliza GET /asistencias/hijos) ──────────────
-
-export interface HijoHorario {
-  idAlumno: number
-  alumno: string
-  grado: string
-  seccion: string
-  idMatricula: number
-}
-
 export interface HorarioFiltros {
   page?: number
   size?: number
@@ -57,7 +47,37 @@ export interface HorarioFiltros {
 
 // ── API ──────────────────────────────────────────────────────────────────
 
+/** Franja de recreo para pintar en un horario. */
+export interface RecreoHorario {
+  idTurno: number
+  turno: string
+  /** 1=Lunes … 6=Sábado */
+  diaSemana: number
+  horaInicio: string
+  horaFin: string
+  grado: string
+}
+
+/** Horario de un docente: clases y, por turno, el recreo si dicta en un solo grado. */
+export interface MiHorario {
+  clases: HorarioListItem[]
+  recreos: RecreoHorario[]
+}
+
+/** "3ro B · Primaria": dónde es la clase (para el horario de un docente). */
+export function etiquetaSeccion(h: HorarioListItem): string {
+  return `${h.grado} ${h.seccion}${h.nivel ? ` · ${h.nivel}` : ""}`
+}
+
 export const horarioApi = {
+  /** GET /horarios/mio — Todas las clases del docente con sesión iniciada. Sin año: el vigente. */
+  async mio(idAnio?: number | null): Promise<MiHorario> {
+    return apiFetch<MiHorario>(`/horarios/mio${idAnio != null ? `?idAnio=${idAnio}` : ""}`)
+  },
+  /** GET /horarios/seccion/{id}/recreos — Recreos del grado y turno de la sección. */
+  async recreosDeSeccion(idGradoSeccion: number): Promise<RecreoHorario[]> {
+    return apiFetch<RecreoHorario[]>(`/horarios/seccion/${idGradoSeccion}/recreos`)
+  },
   /** GET /horarios — Admin: todos los horarios con filtros opcionales (ahora Page) */
   async listar(params?: HorarioFiltros): Promise<Paginated<HorarioListItem>> {
     const query = new URLSearchParams()

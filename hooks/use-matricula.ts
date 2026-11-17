@@ -3,6 +3,7 @@ import {
   useMutation,
   useQuery,
 } from "@tanstack/react-query"
+import { SOLO_LECTURA } from "@/lib/query-client"
 
 import { useInvalidarMutacion } from "@/hooks/use-invalidar"
 import {
@@ -27,6 +28,15 @@ export function useMatriculas(page: number, size = 10, idAcceso?: number, idAnio
       previousQuery?.queryKey[3] === (idAcceso ?? null) && previousQuery?.queryKey[4] === (idAnio ?? null)
         ? previousData
         : undefined,
+  })
+}
+
+/** Notas finales que le faltan en periodos cerrados: se avisa antes del cambio de sección. */
+export function usePendientesCambioSeccion(id: number, habilitado: boolean) {
+  return useQuery({
+    queryKey: [...KEYS.matriculas, "pendientes-cambio", id],
+    queryFn: () => matriculasApi.pendientesCambioSeccion(id),
+    enabled: habilitado,
   })
 }
 
@@ -56,13 +66,14 @@ export function useOpcionesMatricula(idAnio: number | null, idAlumno?: number | 
 }
 
 export function useBuscarAlumnoInscripcion() {
-  return useMutation({ mutationFn: (dni: string) => matriculasApi.buscarAlumno(dni) })
+  return useMutation({ mutationFn: (dni: string) => matriculasApi.buscarAlumno(dni), meta: SOLO_LECTURA })
 }
 
 export function useBuscarApoderadoInscripcion() {
   return useMutation({
     mutationFn: ({ dni, idAlumno }: { dni: string; idAlumno?: number | null }) =>
       matriculasApi.buscarApoderado(dni, idAlumno),
+    meta: SOLO_LECTURA,
   })
 }
 

@@ -200,6 +200,9 @@ export interface GradoOpcion {
 export interface MatriculaOpciones {
   bloqueo: string | null
   ultimoGrado: string | null
+  /** Según las notas del año anterior; null si no aplica (nuevo, grado que no repite, años sin notas del año). */
+  situacion: "PROMOVIDO" | "REPITE" | null
+  areasDesaprobadas: string[] | null
   grados: GradoOpcion[]
 }
 
@@ -266,6 +269,10 @@ export const matriculasApi = {
       method: "PUT",
       body: formulario(data, { comprobante }),
     })
+  },
+  /** "Área: Bimestre 1, Bimestre 2" por cada área con notas finales faltantes. */
+  async pendientesCambioSeccion(id: number): Promise<string[]> {
+    return apiFetch<string[]>(`/matriculas/${id}/cambio-seccion/pendientes`)
   },
   async cambioSeccion(
     id: number,

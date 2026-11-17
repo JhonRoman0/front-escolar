@@ -5,7 +5,7 @@ import { useValidarDniPersona } from "@/hooks/use-validar-dni-persona"
 
 import { useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
-import { FileDown, Loader2, Lock, Pencil, RotateCcw } from "lucide-react"
+import { FileDown, Loader2, Lock, Pencil } from "lucide-react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm } from "react-hook-form"
 
@@ -54,6 +54,7 @@ import { casillaTrasCambiarCorreo, CampoRestablecerContrasena } from "@/componen
 import { CamposNombres } from "@/components/shared/campos-nombres"
 import { TarjetaSeccion } from "@/components/shared/tarjeta-seccion"
 import { BuscadorTabla } from "@/components/shared/buscador-tabla"
+import { BotonLimpiarFiltros } from "@/components/shared/boton-limpiar-filtros"
 import { FilterSelect } from "@/components/shared/filter-select"
 import {
   useActualizarDocente,
@@ -240,17 +241,7 @@ export default function DocentesTab() {
             allLabel="Todos los niveles"
             className="w-[180px]"
           />
-          {hayFiltros && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="ml-auto text-muted-foreground"
-              onClick={limpiarFiltros}
-            >
-              <RotateCcw className="mr-1 size-3.5" />
-              Limpiar filtros
-            </Button>
-          )}
+          <BotonLimpiarFiltros visible={hayFiltros} onClick={limpiarFiltros} />
         </div>
 
         <div className="overflow-x-auto rounded-lg border">
@@ -383,7 +374,7 @@ export default function DocentesTab() {
           open={reporteOpen}
           onOpenChange={setReporteOpen}
           titulo="Reporte de docentes"
-          descripcion="Descarga el listado de docentes del rango en PDF, Excel o CSV."
+          descripcion="Descarga el listado de docentes del rango en PDF o Excel."
           presets={["todo", "ultimos_7", "este_mes", "personalizado"]}
           etiquetaTodo="Todos los docentes"
           filtros={[

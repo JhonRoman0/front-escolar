@@ -15,15 +15,12 @@ const KEYS = {
   dashboard: ["dashboard"] as const,
 }
 
-// Los totales casi nunca cambian en la sesión: staleTime alto.
-const STALE_TOTALES = 1000 * 60 * 5
 
 export function useKpiAlumnos(habilitado: boolean) {
   return useQuery({
     queryKey: [...KEYS.dashboard, "total-alumnos"],
     queryFn: totalAlumnos,
     enabled: habilitado,
-    staleTime: STALE_TOTALES,
   })
 }
 
@@ -32,7 +29,6 @@ export function useKpiDocentes(habilitado: boolean) {
     queryKey: [...KEYS.dashboard, "total-docentes"],
     queryFn: totalDocentes,
     enabled: habilitado,
-    staleTime: STALE_TOTALES,
   })
 }
 
@@ -41,7 +37,6 @@ export function useKpiUsuarios(habilitado: boolean) {
     queryKey: [...KEYS.dashboard, "total-usuarios"],
     queryFn: totalUsuarios,
     enabled: habilitado,
-    staleTime: STALE_TOTALES,
   })
 }
 
@@ -50,7 +45,6 @@ export function useKpiMatriculas(habilitado: boolean) {
     queryKey: [...KEYS.dashboard, "total-matriculas"],
     queryFn: totalMatriculas,
     enabled: habilitado,
-    staleTime: STALE_TOTALES,
   })
 }
 
@@ -59,7 +53,6 @@ export function useAnioEscolarActivo(habilitado: boolean) {
     queryKey: [...KEYS.dashboard, "anio-activo"],
     queryFn: anioEscolarActivo,
     enabled: habilitado,
-    staleTime: STALE_TOTALES,
   })
 }
 
@@ -69,7 +62,6 @@ export function useEstadisticasHoy(fecha: string, habilitado: boolean) {
     queryKey: [...KEYS.dashboard, "estadisticas-hoy", fecha],
     queryFn: () => estadisticasHoy(fecha),
     enabled: habilitado,
-    staleTime: 1000 * 30,
   })
 }
 
@@ -78,7 +70,6 @@ export function useTendenciaSemana(fecha: string, habilitado: boolean) {
     queryKey: [...KEYS.dashboard, "tendencia-semana", fecha],
     queryFn: () => tendenciaSemana(fecha),
     enabled: habilitado,
-    staleTime: 1000 * 60,
   })
 }
 
@@ -87,6 +78,5 @@ export function useDistribucionGrado(habilitado: boolean) {
     queryKey: [...KEYS.dashboard, "distribucion-grado"],
     queryFn: distribucionGrado,
     enabled: habilitado,
-    staleTime: STALE_TOTALES,
   })
 }

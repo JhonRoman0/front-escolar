@@ -19,6 +19,7 @@ import type { ApoderadoPasoValues } from "@/lib/schemas/matricula"
 
 import type { AlumnoPaso } from "./paso-alumno"
 import { CamposPago, erroresDePago, formatoSoles } from "./campos-pago"
+import { AvisoPromocion } from "./aviso-promocion"
 import { agruparGrados, grupoDe, SELECCION_VACIA, SelectorSeccion, seleccionInicial, type SeleccionSeccion } from "./selector-seccion"
 
 export interface DatosMatriculaPaso {
@@ -128,6 +129,7 @@ export function PasoMatricula({ alumno, apoderados, enviando, onAtras, onCrear }
           <AvisoError>No hay secciones con cupo disponible en {aniosMatricula.find((a) => a.idAnio === idAnio)?.anio}.</AvisoError>
         ) : opciones ? (
           <>
+            <AvisoPromocion opciones={opciones} />
             <SelectorSeccion
               grados={grados}
               value={seleccion}

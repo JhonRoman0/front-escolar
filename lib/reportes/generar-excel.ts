@@ -1,12 +1,11 @@
 import * as XLSX from "xlsx"
 
-import type { AutorizacionRegistroResponse } from "@/lib/api/evaluacion"
 import type {
   ReporteGeneralItem,
   NotaReporteItem,
 } from "@/lib/api/reportes"
 import { formatearHora } from "@/lib/fechas"
-import { fechaCorta, fechaHora, type TablaReporte } from "./formato"
+import { fechaCorta, type TablaReporte } from "./formato"
 
 // ── Asistencia general ───────────────────────────────────────────────────
 
@@ -39,34 +38,6 @@ export function generarExcelAsistencia({
 }
 
 // ── Auditoría de códigos de autorización ─────────────────────────────────
-
-export function generarExcelAutorizaciones({
-  datos,
-}: {
-  datos: AutorizacionRegistroResponse[]
-}): void {
-  const filas = datos.map((d) => ({
-    Código: d.codigo ?? "",
-    Emisor: d.emisor,
-    Destinatario: d.destinatario,
-    Asignado: fechaHora(d.fechaAsignacion),
-    Generado: fechaHora(d.fechaGeneracion),
-    Vence: fechaHora(d.fechaExpiracion),
-    Estado: d.estado,
-    Consumidor: d.consumidor ?? "",
-    Usado: fechaHora(d.fechaUso),
-  }))
-
-  const ws = XLSX.utils.json_to_sheet(filas)
-  ws["!cols"] = [{ wch: 12 }, { wch: 24 }, { wch: 24 }, { wch: 17 }, { wch: 17 }, { wch: 17 }, { wch: 10 }, { wch: 24 }, { wch: 17 }]
-
-  const wb = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(wb, ws, "Autorizaciones")
-  XLSX.writeFile(
-    wb,
-    `auditoria-autorizaciones-${new Date().toISOString().slice(0, 10)}.xlsx`
-  )
-}
 
 // ── Notas ────────────────────────────────────────────────────────────────
 

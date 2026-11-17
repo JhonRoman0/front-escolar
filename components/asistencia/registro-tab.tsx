@@ -1,7 +1,7 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
-import { QrCode, Keyboard, FileDown } from "lucide-react"
+import { useMemo, useState } from "react"
+import { QrCode, FileDown } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -11,47 +11,91 @@ import {
   useAsistenciaMes,
   useAsistenciaSemana,
   useAsistenciasHoy,
-  useEliminarAsistencia,
+  useAnularAsistencia,
   useEstadisticasAsistencia,
-  useEstadosAsistencia,
   useJustificarAsistencia,
 } from "@/hooks/use-asistencia"
 import { usePuede } from "@/hooks/use-permisos"
-import { useGrados } from "@/hooks/use-academico"
+import { useAniosEscolares, useTurnos } from "@/hooks/use-academico"
+import { anioParaFiltro } from "@/lib/api/academico"
 import { diasSemana, fechaHoyISO } from "@/lib/fechas"
+import { turnoActual } from "@/lib/turno-actual"
 import type { AsistenciaDiaResponse } from "@/lib/api/asistencia"
 
 import { AsistenciaKpiCards } from "./asistencia-kpi-cards"
-import { AsistenciaToolbar, type RangoFecha } from "./asistencia-toolbar"
+import { AsistenciaToolbar, SIN_UBICACION, type RangoFecha, type UbicacionFiltro } from "./asistencia-toolbar"
 import { AsistenciaTablaHoy } from "./asistencia-tabla-hoy"
 import { AsistenciaTablaSemana } from "./asistencia-tabla-semana"
 import { AsistenciaTablaMes } from "./asistencia-tabla-mes"
 import { JustificarAsistenciaDialog } from "./justificar-dialog"
 import { RegistrarCamaraModal } from "./registrar-camara-modal"
-import { RegistrarCodigoModal } from "./registrar-codigo-modal"
 import { GenerarReporteModal } from "@/components/reportes/generar-reporte-modal"
 
 const TAMANIO_PAGINA = 10
 
 export function RegistroTab() {
+  // Cada acción según los permisos; el back limita al docente a sus secciones.
   const puedeCrear = usePuede("ASISTENCIAS", "CREAR")
   const puedeJustificar = usePuede("ASISTENCIAS", "ACTUALIZAR")
-  const puedeEliminar = usePuede("ASISTENCIAS", "ELIMINAR")
+  const puedeAnular = usePuede("ASISTENCIAS", "ELIMINAR")
   const puedeExportar = usePuede("ASISTENCIAS", "IMPRIMIR_EXPORTAR")
 
-  // ── Filtros ──
+  // ── Filtros: todo es del año elegido (el vigente por defecto) ──
+  const { data: anios = [] } = useAniosEscolares()
+  const [idAnioElegido, setIdAnioElegido] = useState<number | null>(null)
+  const idAnio = idAnioElegido ?? anioParaFiltro(anios)?.idAnio ?? null
+  const opcionesAnio = [...anios].sort((a, b) => b.anio.localeCompare(a.anio)).map((a) => ({ value: String(a.idAnio), label: a.anio }))
   const [rango, setRango] = useState<RangoFecha>("hoy")
   const [fecha, setFecha] = useState(fechaHoyISO())
   const [busqueda, setBusqueda] = useState("")
   const [filtroEstado, setFiltroEstado] = useState<string | null>(null)
-  const [idGradoSeccionFiltro, setIdGradoSeccionFiltro] = useState<number | null>(null)
+  const [ubicacion, setUbicacion] = useState<UbicacionFiltro>(SIN_UBICACION)
+  // Turno: undefined = automático (en Hoy, el turno en curso; en Semana/Mes, todos).
+  const { data: turnos = [] } = useTurnos()
+  const [turnoElegido, setTurnoElegido] = useState<number | null | undefined>(undefined)
+  const idTurno = turnoElegido !== undefined ? turnoElegido : rango === "hoy" ? turnoActual(turnos) : null
   const [pageHoy, setPageHoy] = useState(0)
   const [pageSemana, setPageSemana] = useState(0)
   const [pageMes, setPageMes] = useState(0)
 
+  /** Cambiar un filtro vuelve a la primera página. */
+  function filtrar(cambio: () => void) {
+    cambio()
+    setPageHoy(0)
+    setPageSemana(0)
+    setPageMes(0)
+  }
+
+  const filtroUbicacion = {
+    idNivel: ubicacion.idNivel ?? undefined,
+    idGrado: ubicacion.idGrado ?? undefined,
+    idGradoSeccion: ubicacion.idGradoSeccion ?? undefined,
+    idTurno: idTurno ?? undefined,
+  }
+  const hayFiltros =
+    idAnioElegido != null ||
+    turnoElegido !== undefined ||
+    ubicacion.idNivel != null ||
+    rango !== "hoy" ||
+    fecha !== fechaHoyISO() ||
+    filtroEstado != null ||
+    busqueda.trim() !== ""
+
+  /** Vuelve todo a lo inicial: año vigente, todo el colegio, hoy con el turno en curso. */
+  function limpiarFiltros() {
+    filtrar(() => {
+      setIdAnioElegido(null)
+      setUbicacion(SIN_UBICACION)
+      setTurnoElegido(undefined)
+      setRango("hoy")
+      setFecha(fechaHoyISO())
+      setFiltroEstado(null)
+      setBusqueda("")
+    })
+  }
+
   // ── Modales de registro / acciones ──
   const [camaraOpen, setCamaraOpen] = useState(false)
-  const [codigoOpen, setCodigoOpen] = useState(false)
   const [reporteOpen, setReporteOpen] = useState(false)
   const [justificarTarget, setJustificarTarget] =
     useState<AsistenciaDiaResponse | null>(null)
@@ -60,7 +104,8 @@ export function RegistroTab() {
   const hoyQuery = useAsistenciasHoy({
     page: pageHoy,
     size: TAMANIO_PAGINA,
-    idGradoSeccion: idGradoSeccionFiltro ?? undefined,
+    ...filtroUbicacion,
+    idAnio: idAnio ?? undefined,
     estado: filtroEstado as never,
     search: busqueda || undefined,
   })
@@ -69,8 +114,8 @@ export function RegistroTab() {
     pageSemana,
     TAMANIO_PAGINA,
     {
-      idGradoSeccion: idGradoSeccionFiltro ?? undefined,
-      estado: filtroEstado as never,
+      ...filtroUbicacion,
+      idAnio: idAnio ?? undefined,
       search: busqueda || undefined,
     }
   )
@@ -79,32 +124,25 @@ export function RegistroTab() {
     pageMes,
     TAMANIO_PAGINA,
     {
-      idGradoSeccion: idGradoSeccionFiltro ?? undefined,
-      estado: filtroEstado as never,
+      ...filtroUbicacion,
+      idAnio: idAnio ?? undefined,
       search: busqueda || undefined,
     }
   )
-  const estadisticasQuery = useEstadisticasAsistencia(rango, fecha)
-  const estadosQuery = useEstadosAsistencia()
+  const estadisticasQuery = useEstadisticasAsistencia(rango, fecha, idAnio)
   const justificar = useJustificarAsistencia()
-  const eliminar = useEliminarAsistencia()
-  const { data: gradosCatalogo = [] } = useGrados()
+  const anular = useAnularAsistencia()
 
   const fechasDias = useMemo(() => diasSemana(fecha), [fecha])
 
   function cambiaRango(nuevo: RangoFecha) {
     setRango(nuevo)
+    // Hoy vuelve al turno en curso; Semana y Mes empiezan con todos.
+    setTurnoElegido(undefined)
     setPageHoy(0)
     setPageSemana(0)
     setPageMes(0)
   }
-
-  // Reset page cuando cambian filtros server
-  useEffect(() => {
-    setPageHoy(0)
-    setPageSemana(0)
-    setPageMes(0)
-  }, [idGradoSeccionFiltro, filtroEstado, busqueda])
 
   // Datos ya filtrados server-side
   const hoyFiltradas = hoyQuery.data?.content ?? []
@@ -146,14 +184,14 @@ export function RegistroTab() {
     }
   }
 
-  async function handleEliminar(a: AsistenciaDiaResponse) {
+  async function handleAnular(a: AsistenciaDiaResponse, motivo: string) {
     if (!a.idAsistencia) return
     try {
-      await eliminar.mutateAsync(a.idAsistencia)
-      toast.success(`Asistencia de ${a.alumno} eliminada`)
+      await anular.mutateAsync({ idAsistencia: a.idAsistencia, motivo })
+      toast.success(`Marca de ${a.alumno} anulada`)
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "No se pudo eliminar"
+        error instanceof Error ? error.message : "No se pudo anular"
       )
       throw error
     }
@@ -172,11 +210,7 @@ export function RegistroTab() {
           <>
             <Button onClick={() => setCamaraOpen(true)}>
               <QrCode />
-              Registrar con cámara
-            </Button>
-            <Button variant="outline" onClick={() => setCodigoOpen(true)}>
-              <Keyboard />
-              Registrar por código
+              Registrar asistencia
             </Button>
           </>
         )}
@@ -188,21 +222,26 @@ export function RegistroTab() {
       />
 
       <AsistenciaToolbar
+        anios={opcionesAnio}
+        idAnio={idAnio}
+        onIdAnioChange={(v) => filtrar(() => {
+          setIdAnioElegido(v)
+          setUbicacion(SIN_UBICACION)
+        })}
+        ubicacion={ubicacion}
+        onUbicacionChange={(v) => filtrar(() => setUbicacion(v))}
+        idTurno={idTurno}
+        onIdTurnoChange={(v) => filtrar(() => setTurnoElegido(v))}
+        hayFiltros={hayFiltros}
+        onLimpiar={limpiarFiltros}
         busqueda={busqueda}
-        onBusquedaChange={setBusqueda}
+        onBusquedaChange={(v) => filtrar(() => setBusqueda(v))}
         rango={rango}
         onRangoChange={cambiaRango}
         fecha={fecha}
-        onFechaChange={(v) => {
-          setFecha(v)
-          setPageSemana(0)
-          setPageMes(0)
-        }}
-        idGradoSeccionFiltro={idGradoSeccionFiltro}
-        onIdGradoSeccionChange={setIdGradoSeccionFiltro}
-        estadosDisponibles={estadosQuery.data ?? []}
+        onFechaChange={(v) => filtrar(() => setFecha(v))}
         filtroEstado={filtroEstado}
-        onFiltroEstadoChange={setFiltroEstado}
+        onFiltroEstadoChange={(v) => filtrar(() => setFiltroEstado(v))}
       />
 
       {errorTabla && (
@@ -220,9 +259,9 @@ export function RegistroTab() {
             asistencias={hoyFiltradas}
             cargando={cargandoTabla}
             puedeJustificar={puedeJustificar}
-            puedeEliminar={puedeEliminar}
+            puedeAnular={puedeAnular}
             onJustificar={setJustificarTarget}
-            onEliminar={handleEliminar}
+            onAnular={handleAnular}
           />
           <TablaPaginacion data={hoyQuery.data} onPage={setPageHoy} />
         </>
@@ -250,7 +289,6 @@ export function RegistroTab() {
       )}
 
       <RegistrarCamaraModal open={camaraOpen} onOpenChange={setCamaraOpen} />
-      <RegistrarCodigoModal open={codigoOpen} onOpenChange={setCodigoOpen} />
       <GenerarReporteModal open={reporteOpen} onOpenChange={setReporteOpen} />
 
       {/* key: remonta por alumno → la selección de motivo siempre inicia limpia */}

@@ -20,12 +20,13 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Textarea } from "@/components/ui/textarea"
 
 import { TarjetaSeccion } from "@/components/shared/tarjeta-seccion"
-import { useCrudMatriculas, useOpcionesMatricula } from "@/hooks/use-matricula"
+import { useCrudMatriculas, useOpcionesMatricula, usePendientesCambioSeccion } from "@/hooks/use-matricula"
 import { useMetodosPago } from "@/hooks/use-pagos"
 import { estadoAnioTexto } from "@/lib/api/academico"
 import { ANIO_CERRADO, ANIO_POR_COMENZAR, type MatriculaResponse } from "@/lib/api/matricula"
 
 import { CamposPago, erroresDePago, formatoSoles } from "./campos-pago"
+import { AvisoPromocion } from "./aviso-promocion"
 import { agruparGrados, grupoDe, SelectorSeccion, type SeleccionSeccion } from "./selector-seccion"
 
 /**
@@ -171,6 +172,7 @@ function EdicionPorComenzar({
             {opciones.ultimoGrado && (
               <p className="text-xs text-muted-foreground">Último grado: {opciones.ultimoGrado}</p>
             )}
+            <AvisoPromocion opciones={opciones} />
             <SelectorSeccion grados={grados} value={seleccion} onChange={setSeleccion} />
           </>
         ) : null}
@@ -242,6 +244,7 @@ function EdicionVigente({
   const [intentado, setIntentado] = useState(false)
   const cambiaSeccion = idGradoSeccion !== matricula.idGradoSeccion
   const enviando = crud.cambioSeccion.isPending || crud.editar.isPending
+  const pendientes = usePendientesCambioSeccion(matricula.idMatricula, cambiaSeccion)
 
   async function handleGuardar() {
     setIntentado(true)
@@ -304,6 +307,19 @@ function EdicionVigente({
               <FieldDescription className="text-xs">Solo secciones con aula y cupo.</FieldDescription>
             </FieldContent>
           </Field>
+          {cambiaSeccion && !!pendientes.data?.length && (
+            <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs sm:col-span-2">
+              <p className="font-medium">Le faltan notas finales en periodos ya cerrados:</p>
+              <ul className="mt-1 list-disc pl-4">
+                {pendientes.data.map((p) => (
+                  <li key={p}>{p}</li>
+                ))}
+              </ul>
+              <p className="mt-1 text-muted-foreground">
+                Si lo cambias ahora, su nuevo docente no podrá registrarlas: solo dirección.
+              </p>
+            </div>
+          )}
           {cambiaSeccion && (
             <Field>
               <FieldLabel>Motivo del cambio *</FieldLabel>

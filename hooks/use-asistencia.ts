@@ -3,6 +3,7 @@ import {
   useMutation,
   useQuery,
 } from "@tanstack/react-query"
+import { SOLO_LECTURA } from "@/lib/query-client"
 
 import { useCrud } from "@/hooks/use-crud"
 import { useInvalidarMutacion } from "@/hooks/use-invalidar"
@@ -36,7 +37,6 @@ export function useAsistenciasHoy(params?: { page?: number; size?: number; fecha
     queryKey: [...KEYS.asistencias, "hoy", params],
     queryFn: () => asistenciasApi.hoy(params),
     placeholderData: keepPreviousData,
-    staleTime: 1000 * 30,
   })
 }
 
@@ -68,11 +68,11 @@ export function useAsistenciaMes(
   })
 }
 
-export function useEstadisticasAsistencia(rango: RangoEstadisticas, fecha: string) {
+export function useEstadisticasAsistencia(rango: RangoEstadisticas, fecha: string, idAnio: number | null) {
   return useQuery({
-    queryKey: [...KEYS.estadisticas, rango, fecha],
-    queryFn: () => asistenciasApi.estadisticas(rango, fecha),
-    staleTime: 1000 * 30,
+    queryKey: [...KEYS.estadisticas, rango, fecha, idAnio],
+    queryFn: () => asistenciasApi.estadisticas(rango, fecha, idAnio),
+    enabled: idAnio != null,
   })
 }
 
@@ -90,7 +90,6 @@ export function useJustificaciones() {
   return useQuery({
     queryKey: KEYS.justificaciones,
     queryFn: justificacionesApi.listar,
-    staleTime: 1000 * 60 * 60,
   })
 }
 
@@ -99,7 +98,6 @@ export function useDiasFeriados() {
   return useQuery({
     queryKey: KEYS.feriados,
     queryFn: diasFeriadosApi.listar,
-    staleTime: 1000 * 60 * 30,
   })
 }
 
@@ -109,13 +107,14 @@ export function useDiasFeriados() {
 export function usePrevisualizarAsistencia() {
   return useMutation({
     mutationFn: (data: AsistenciaRequest) => asistenciasApi.previsualizar(data),
+    meta: SOLO_LECTURA,
   })
 }
 
 export function useConfirmarAsistencia() {
   const invalidar = useInvalidarMutacion(KEYS.asistencias, KEYS.estadisticas)
   return useMutation({
-    mutationFn: (data: AsistenciaRequest) => asistenciasApi.confirmar(data),
+    mutationFn: ({ data, foto }: { data: AsistenciaRequest; foto?: File | null }) => asistenciasApi.confirmar(data, foto),
     onSuccess: invalidar,
   })
 }
@@ -136,10 +135,11 @@ export function useJustificarAsistencia() {
 }
 
 // Eliminar un registro de asistencia (DELETE /asistencias/{id}).
-export function useEliminarAsistencia() {
+export function useAnularAsistencia() {
   const invalidar = useInvalidarMutacion(KEYS.asistencias, KEYS.estadisticas)
   return useMutation({
-    mutationFn: (idAsistencia: number) => asistenciasApi.eliminar(idAsistencia),
+    mutationFn: ({ idAsistencia, motivo }: { idAsistencia: number; motivo: string }) =>
+      asistenciasApi.anular(idAsistencia, motivo),
     onSuccess: invalidar,
   })
 }

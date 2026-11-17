@@ -26,7 +26,6 @@ const RUTAS_PUBLICAS = ["/login", "/sin-acceso"]
 function esRutaPublica(pathname: string) {
   return (
     RUTAS_PUBLICAS.includes(pathname) ||
-    pathname.startsWith("/portal") ||
     pathname === "/recuperar-contrasena" ||
     pathname.startsWith("/restablecer-contrasena")
   )

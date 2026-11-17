@@ -12,7 +12,7 @@ import { FilterSelect } from "@/components/shared/filter-select"
 import { CargandoTarjetas } from "@/components/shared/table-helpers"
 import type { PeriodoEvaluacion } from "@/lib/api/academico"
 import { notasFinalesApi } from "@/lib/api/notas-finales"
-import { portalApi } from "@/lib/api/portal"
+import { colegioApi } from "@/lib/api/colegio"
 import { generarPdfBoletas } from "@/lib/reportes/generar-boleta"
 import { logoColegio } from "@/lib/reportes/pdf-institucional"
 import type { SeccionExportable } from "./boton-exportar-siagie"
@@ -68,7 +68,7 @@ function Contenido({ seccion, periodo, onCerrar }: {
     if (!boleta) return
     setGenerando(true)
     try {
-      const colegio = await portalApi.colegio().catch(() => null)
+      const colegio = await colegioApi.actual().catch(() => null)
       generarPdfBoletas(boleta, colegio, await logoColegio(colegio), idMatricula ? Number(idMatricula) : null)
       toast.success(idMatricula ? "Boleta descargada" : `${boleta.alumnos.length} boletas descargadas`)
       onCerrar()

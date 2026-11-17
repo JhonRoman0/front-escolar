@@ -1,16 +1,16 @@
 "use client"
 
-import { useAuth } from "@/components/auth-provider"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 import { usePuedeLeer } from "@/hooks/use-permisos"
-import AutorizacionesTab from "./autorizaciones-tab"
 import EvaluacionesTab from "./evaluaciones-tab"
 import NotasFinalesTab from "./notas-finales-tab"
 
 export default function EvaluacionPage() {
-  const { esAdmin } = useAuth()
-  const puedeNotas = usePuedeLeer("NOTAS")
+  // Notas finales agrupa las de cada periodo y las del año: basta con leer una de ellas.
+  const puedeBimestrales = usePuedeLeer("NOTAS")
+  const puedeAnuales = usePuedeLeer("NOTAS_ANUALES")
+  const puedeNotas = puedeBimestrales || puedeAnuales
   const puedeEvaluaciones = usePuedeLeer("EVALUACIONES")
 
   return (
@@ -18,7 +18,7 @@ export default function EvaluacionPage() {
       <div className="space-y-1">
         <h1 className="text-[20px] font-bold tracking-tight text-foreground">Notas y evaluaciones</h1>
         <p className="text-[12px] font-medium leading-5 text-muted-foreground">
-          Evaluaciones de cada curso, notas finales del periodo y códigos de autorización.
+          Evaluaciones de cada curso y notas finales de cada periodo y del año.
         </p>
       </div>
 
@@ -26,9 +26,6 @@ export default function EvaluacionPage() {
         <TabsList variant="segmented" className="w-full justify-start overflow-x-auto">
           {puedeEvaluaciones && <TabsTrigger value="evaluaciones">Evaluaciones</TabsTrigger>}
           {puedeNotas && <TabsTrigger value="notas">Notas finales</TabsTrigger>}
-          {esAdmin && (
-            <TabsTrigger value="autorizaciones">Autorizaciones</TabsTrigger>
-          )}
         </TabsList>
 
         {puedeEvaluaciones && (
@@ -39,11 +36,6 @@ export default function EvaluacionPage() {
         {puedeNotas && (
           <TabsContent value="notas">
             <NotasFinalesTab />
-          </TabsContent>
-        )}
-        {esAdmin && (
-          <TabsContent value="autorizaciones">
-            <AutorizacionesTab />
           </TabsContent>
         )}
       </Tabs>

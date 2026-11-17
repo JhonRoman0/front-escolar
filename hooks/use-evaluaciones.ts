@@ -41,6 +41,14 @@ export function useRegistroAuxiliar(idAsignacion: number | null, periodo: number
   })
 }
 
+export function useResumenEvaluacion(idEvaluacion: number | null) {
+  return useQuery({
+    queryKey: [...KEY, "resumen", idEvaluacion],
+    queryFn: () => evaluacionesApi.resumen(idEvaluacion as number),
+    enabled: idEvaluacion != null,
+  })
+}
+
 export function useEvaluacionDetalle(idEvaluacion: number | null) {
   return useQuery({
     queryKey: [...KEY, "detalle", idEvaluacion],
@@ -50,7 +58,8 @@ export function useEvaluacionDetalle(idEvaluacion: number | null) {
 }
 
 export function useGuardarEvaluacion() {
-  const invalidar = useInvalidarMutacion(KEY)
+  // Con alumnos que no rinden también cambian notas: afecta la guía de notas finales.
+  const invalidar = useInvalidarMutacion(KEY, NOTAS_FINALES_KEY)
   return useMutation({
     mutationFn: ({ id, data }: { id?: number; data: EvaluacionRequest }) =>
       id ? evaluacionesApi.editar(id, data) : evaluacionesApi.crear(data),
@@ -68,20 +77,34 @@ export function useRegistrarNotasEvaluacion() {
 }
 
 export function useHistorialCalificaciones(idMatricula: number, idAsignacion: number, abierto: boolean) {
-  return useQuery({ queryKey: [...KEY, "historial", idMatricula, idAsignacion],
-    queryFn: () => evaluacionesApi.historial(idMatricula, idAsignacion), enabled: abierto })
+  return useQuery({
+    queryKey: [...KEY, "historial", idMatricula, idAsignacion],
+    queryFn: () => evaluacionesApi.historial(idMatricula, idAsignacion),
+    enabled: abierto,
+  })
 }
-export function useCandidatas(idNotaOrigen: number | null, idAsignacion: number) {
-  return useQuery({ queryKey: [...KEY, "candidatas", idNotaOrigen, idAsignacion],
-    queryFn: () => evaluacionesApi.candidatas(idNotaOrigen as number, idAsignacion), enabled: idNotaOrigen != null })
+
+/** Alumnos trasladados con notas utilizables; sin competencias no consulta. */
+export function useTraslados(idAsignacion: number, periodo: number, competencias: number[], idEvaluacion?: number) {
+  const ordenadas = [...competencias].sort((a, b) => a - b)
+  return useQuery({
+    queryKey: [...KEY, "traslados", idAsignacion, periodo, ordenadas, idEvaluacion ?? null],
+    queryFn: () => evaluacionesApi.traslados(idAsignacion, periodo, ordenadas, idEvaluacion),
+    enabled: ordenadas.length > 0,
+  })
 }
+
 export function useReconocerCalificacion() {
   const invalidar = useInvalidarMutacion(KEY, NOTAS_FINALES_KEY)
   return useMutation({ mutationFn: evaluacionesApi.reconocer, onSuccess: invalidar })
 }
+
 export function useAnularReconocimiento() {
   const invalidar = useInvalidarMutacion(KEY, NOTAS_FINALES_KEY)
-  return useMutation({ mutationFn: ({ id, motivo }: { id: number; motivo: string }) => evaluacionesApi.anular(id, motivo), onSuccess: invalidar })
+  return useMutation({
+    mutationFn: ({ id, motivo }: { id: number; motivo: string }) => evaluacionesApi.anular(id, motivo),
+    onSuccess: invalidar,
+  })
 }
 
 export function useEliminarEvaluacion() {

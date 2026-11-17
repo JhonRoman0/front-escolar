@@ -35,7 +35,9 @@ export function AsistenciaTablaMes({
         <TableHeader>
           <TableRow>
             <TableHead className="min-w-50">Estudiante</TableHead>
-            <TableHead>Grado - Sección</TableHead>
+            <TableHead>Grado</TableHead>
+            <TableHead>Sección</TableHead>
+            <TableHead>Turno</TableHead>
             <TableHead className="text-center">Días asistidos</TableHead>
             <TableHead className="text-center">Inasistencias</TableHead>
             <TableHead className="text-right">% Asistencia</TableHead>
@@ -43,11 +45,11 @@ export function AsistenciaTablaMes({
         </TableHeader>
         <TableBody>
           {cargando ? (
-            <FilasCargando columnas={5} />
+            <FilasCargando columnas={7} />
           ) : asistencias.length === 0 ? (
             <TableRow>
               <TableCell
-                colSpan={5}
+                colSpan={7}
                 className="h-24 text-center text-muted-foreground"
               >
                 No hay alumnos que coincidan con la búsqueda.
@@ -57,9 +59,9 @@ export function AsistenciaTablaMes({
             asistencias.map((a) => (
               <TableRow key={a.idAlumno}>
                 <TableCell className="font-medium">{a.alumno}</TableCell>
-                <TableCell className="text-sm text-muted-foreground">
-                  {a.grado} - Sección {a.seccion}
-                </TableCell>
+                <TableCell className="text-sm text-muted-foreground">{a.grado}</TableCell>
+                <TableCell className="text-sm text-muted-foreground">{a.seccion || "—"}</TableCell>
+                <TableCell className="text-sm text-muted-foreground">{a.turno ?? "—"}</TableCell>
                 <TableCell className="text-center font-mono">
                   {a.diasAsistidos}
                 </TableCell>

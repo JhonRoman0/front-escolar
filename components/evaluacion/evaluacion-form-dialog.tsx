@@ -1,8 +1,9 @@
 "use client"
 
+import { useState } from "react"
 import { toast } from "sonner"
 import { z } from "zod"
-import { Controller, useForm } from "react-hook-form"
+import { Controller, useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 
 import { Button } from "@/components/ui/button"
@@ -13,10 +14,12 @@ import { Input } from "@/components/ui/input"
 
 import { BotonGuardar } from "@/components/shared/boton-guardar"
 import { SelectorFecha } from "@/components/shared/selector-fecha"
-import { useGuardarEvaluacion } from "@/hooks/use-evaluaciones"
+import { useGuardarEvaluacion, useTraslados } from "@/hooks/use-evaluaciones"
+import { usePuede } from "@/hooks/use-permisos"
 import type { PeriodoEvaluacion } from "@/lib/api/academico"
-import { competenciaCompleta, type AvanceFinal, type CursoEvaluable, type EvaluacionResumen } from "@/lib/api/evaluaciones"
+import { competenciaCompleta, type AvanceFinal, type CursoEvaluable, type EvaluacionResumen, type Traslado } from "@/lib/api/evaluaciones"
 import { dateAIso, diaSemanaIso, formatearFecha, isoADate } from "@/lib/fechas"
+import { RINDE, SelectorNotaTraslado } from "./notas-traslado"
 
 const schema = z.object({
   nombre: z.string().trim().min(1, "El nombre es obligatorio").max(100, "Máximo 100 caracteres"),
@@ -93,6 +96,34 @@ function fechaInicial(curso: CursoEvaluable, periodo: PeriodoEvaluacion): string
   return ""
 }
 
+/** Alumnos trasladados con notas de otra sección en las competencias marcadas. */
+function Trasladados({ traslados, decisiones, onChange }: {
+  traslados: Traslado[]
+  decisiones: Record<number, string>
+  onChange: (idMatricula: number, valor: string) => void
+}) {
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border border-brand-info/20 bg-brand-subtle/60 p-3 dark:border-blue-800/50 dark:bg-blue-950/30">
+      <p className="text-sm font-medium">
+        {traslados.length} {traslados.length === 1 ? "alumno trae calificaciones" : "alumnos traen calificaciones"} de otra sección en estas competencias
+      </p>
+      <p className="text-xs text-muted-foreground">
+        Si no rinde esta evaluación, se usará la nota elegida. La nota original no cambia.
+      </p>
+      {traslados.map((t) => (
+        <div key={t.idMatricula} className="flex flex-col gap-1">
+          <span className="text-sm">{t.nombre}</span>
+          <SelectorNotaTraslado
+            traslado={t}
+            value={decisiones[t.idMatricula] ?? RINDE}
+            onChange={(v) => onChange(t.idMatricula, v)}
+          />
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function textoDias(dias: number[]): string {
   const nombres = dias.map((d) => `${NOMBRES_DIA[d - 1]}${d >= 6 ? "s" : ""}`)
   return nombres.length === 1 ? nombres[0] : `${nombres.slice(0, -1).join(", ")} y ${nombres.at(-1)}`
@@ -122,11 +153,25 @@ function Formulario({ curso, periodo, evaluacion, avance, onCerrar }: {
           : []),
     },
   })
+  // Solo se edita sin notas registradas: el botón de editar se bloquea antes de llegar aquí.
   const { errors } = form.formState
-  // Con notas, cambiar fecha o competencias movería notas ya puestas: solo el nombre.
-  const bloqueada = (evaluacion?.notasRegistradas ?? 0) > 0
+
+  // Decidir por los trasladados es poner notas: pide el permiso de registrarlas.
+  const puedeCalificar = usePuede("EVALUACIONES", "CREAR")
+  const marcadas = useWatch({ control: form.control, name: "competencias" })
+  const traslados = useTraslados(curso.idAsignacion, periodo.numero, puedeCalificar ? marcadas : [], evaluacion?.idEvaluacion)
+  const [decisiones, setDecisiones] = useState<Record<number, string>>({})
+
+  /** Solo de los alumnos y notas que siguen siendo válidos para las competencias actuales. */
+  function noRinden() {
+    return (traslados.data ?? []).flatMap((t) => {
+      const elegida = t.opciones.find((o) => String(o.idNotaOrigen) === decisiones[t.idMatricula])
+      return elegida ? [{ idMatricula: t.idMatricula, idNotaOrigen: elegida.idNotaOrigen }] : []
+    })
+  }
 
   const onSubmit = form.handleSubmit(async (valores) => {
+    const lista = noRinden()
     try {
       await guardar.mutateAsync({
         id: evaluacion?.idEvaluacion,
@@ -136,9 +181,11 @@ function Formulario({ curso, periodo, evaluacion, avance, onCerrar }: {
           nombre: valores.nombre.trim(),
           fecha: valores.fecha,
           competencias: valores.competencias,
+          noRinden: lista,
         },
       })
-      toast.success(evaluacion ? "Evaluación actualizada" : "Evaluación creada")
+      const usan = lista.length ? `: ${lista.length} ${lista.length === 1 ? "alumno usa" : "alumnos usan"} su nota anterior` : ""
+      toast.success(`${evaluacion ? "Evaluación actualizada" : "Evaluación creada"}${usan}`)
       onCerrar()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo guardar la evaluación")
@@ -153,11 +200,6 @@ function Formulario({ curso, periodo, evaluacion, avance, onCerrar }: {
           {periodo.nombre}
         </p>
       </div>
-      {bloqueada && (
-        <p className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs">
-          Ya tiene notas registradas: solo se puede cambiar el nombre.
-        </p>
-      )}
 
       <div className="flex flex-col gap-1.5">
         <label htmlFor="nombre-evaluacion" className="text-sm font-medium">Nombre *</label>
@@ -183,7 +225,6 @@ function Formulario({ curso, periodo, evaluacion, avance, onCerrar }: {
             max={periodo.fechaFin}
             diasSemana={diasHabilitados(curso)}
             fechasBloqueadas={curso.feriados}
-            deshabilitado={bloqueada}
             className="max-w-[240px]"
             error={errors.fecha}
             descripcion={
@@ -208,11 +249,11 @@ function Formulario({ curso, periodo, evaluacion, avance, onCerrar }: {
               {curso.competencias.map((c) => (
                 <label
                   key={c.idCompetencia}
-                  className={`flex items-start gap-2 text-sm ${bloqueada || cerrada(c.idCompetencia) ? "text-muted-foreground" : "cursor-pointer"}`}
+                  className={`flex items-start gap-2 text-sm ${cerrada(c.idCompetencia) ? "text-muted-foreground" : "cursor-pointer"}`}
                 >
                   <Checkbox
                     className="mt-0.5"
-                    disabled={bloqueada || cerrada(c.idCompetencia)}
+                    disabled={cerrada(c.idCompetencia)}
                     checked={field.value.includes(c.idCompetencia)}
                     onCheckedChange={(marcada) =>
                       field.onChange(
@@ -231,6 +272,14 @@ function Formulario({ curso, periodo, evaluacion, avance, onCerrar }: {
         />
         <FieldError errors={[errors.competencias]} />
       </div>
+
+      {!!traslados.data?.length && (
+        <Trasladados
+          traslados={traslados.data}
+          decisiones={decisiones}
+          onChange={(id, valor) => setDecisiones((actual) => ({ ...actual, [id]: valor }))}
+        />
+      )}
 
       <DialogFooter>
         <DialogTrigger render={<Button variant="outline" />}>Cancelar</DialogTrigger>

@@ -1,4 +1,4 @@
-/** Descarga un archivo ya generado (Excel, CSV…) con el nombre indicado. */
+/** Descarga un archivo ya generado (Excel, PDF…) con el nombre indicado. */
 export function descargarBlob(blob: Blob, nombre: string): void {
   const url = URL.createObjectURL(blob)
   const enlace = document.createElement("a")

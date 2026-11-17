@@ -2,11 +2,12 @@
 
 import { useState } from "react"
 import { toast } from "sonner"
-import { Baby, BookOpen, CalendarRange, GraduationCap, Info, Lock, School, Scale, Timer, type LucideIcon } from "lucide-react"
+import { Baby, BookOpen, CalendarRange, GraduationCap, Info, Lock, Pencil, School, Scale, Timer, TrendingUp, type LucideIcon } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
-import { Field, FieldContent, FieldDescription, FieldLabel } from "@/components/ui/field"
+import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 
 import { EditorPeriodos, ListaPeriodos } from "@/components/academico/editor-periodos"
 import { BotonGuardar } from "@/components/shared/boton-guardar"
@@ -37,6 +38,17 @@ const OPCIONES_DURACION = [
 
 const OPCIONES_ESCALA = ESCALAS.map((e) => ({ value: e.value, label: `${e.label} (${e.detalle})` }))
 const OPCIONES_TIPO = TIPOS_PERIODO.map((t) => ({ value: t.value, label: t.label }))
+
+// Nota mínima para aprobar un área: en literal no vale C (nadie desaprobaría); en vigesimal de 1 a 20.
+const MINIMAS: Record<EscalaCalificacion, { value: string; label: string }[]> = {
+  LITERAL: ["AD", "A", "B"].map((n) => ({ value: n, label: n })),
+  VIGESIMAL: Array.from({ length: 20 }, (_, i) => String(i + 1)).map((n) => ({ value: n, label: n })),
+}
+const MINIMA_POR_DEFECTO: Record<EscalaCalificacion, string> = { LITERAL: "B", VIGESIMAL: "11" }
+const OPCIONES_AREAS = Array.from({ length: 10 }, (_, i) => String(i + 1)).map((n) => ({
+  value: n,
+  label: `${n} ${n === "1" ? "área" : "áreas"}`,
+}))
 
 const ICONOS_NIVEL: Record<string, LucideIcon> = {
   inicial: Baby,
@@ -126,7 +138,7 @@ export function ConfiguracionAcademicaTab() {
             Aún no hay niveles registrados.
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+          <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-3">
             {data.map((config) => (
               <NivelCard
                 // Al guardar llega la respuesta nueva y la tarjeta arranca limpia.
@@ -134,6 +146,8 @@ export function ConfiguracionAcademicaTab() {
                   config.minutosHoraAcademica,
                   config.escala,
                   config.tipoPeriodo,
+                  config.notaMinima,
+                  config.areasParaRepetir,
                   config.periodos,
                 ])}`}
                 config={config}
@@ -167,34 +181,102 @@ function Aviso({ icono: Icono, titulo, texto }: { icono: LucideIcon; titulo: str
   )
 }
 
-function Seccion({ icono: Icono, titulo, valor, children }: {
-  icono: LucideIcon
-  titulo: string
-  valor?: string
-  children?: React.ReactNode
-}) {
+/** Una línea del resumen: ícono, etiqueta y valor. */
+function Dato({ icono: Icono, etiqueta, valor }: { icono: LucideIcon; etiqueta: string; valor: string }) {
   return (
-    <section className="flex flex-col gap-3">
-      <div className="flex items-center gap-3">
-        <span className="rounded-full bg-muted p-2">
-          <Icono className="size-4 text-muted-foreground" />
-        </span>
-        <div className="space-y-0.5">
-          <p className="text-xs text-muted-foreground">{titulo}</p>
-          {valor && <p className="text-sm font-semibold">{valor}</p>}
-        </div>
-      </div>
-      {children}
-    </section>
+    <div className="flex items-center gap-2 text-sm">
+      <Icono className="size-3.5 shrink-0 text-muted-foreground" />
+      <dt className="text-muted-foreground">{etiqueta}</dt>
+      <dd className="ml-auto text-right font-medium">{valor}</dd>
+    </div>
   )
 }
 
+/** Fila del formulario: etiqueta a la izquierda, control a la derecha. */
+function Fila({ etiqueta, ayuda, children }: { etiqueta: string; ayuda?: string; children: React.ReactNode }) {
+  return (
+    <div className="grid grid-cols-1 items-start gap-1.5 sm:grid-cols-[130px_1fr] sm:gap-3">
+      <span className="pt-2 text-sm font-medium">{etiqueta}</span>
+      <div className="flex flex-col gap-1">
+        {children}
+        {ayuda && <p className="text-xs text-muted-foreground">{ayuda}</p>}
+      </div>
+    </div>
+  )
+}
+
+/** Resumen del nivel; se edita en un diálogo. */
 function NivelCard({ config, anio, editable, editaHora }: {
   config: ConfiguracionAcademicaResponse
   anio: AnioEscolarResponse | null
   editable: boolean
-  /** La hora académica solo cambia con el año por comenzar. */
+  /** La hora académica y la promoción solo cambian con el año por comenzar. */
   editaHora: boolean
+}) {
+  const [abierto, setAbierto] = useState(false)
+  const Icono = ICONOS_NIVEL[claveIconoNivel(config.nivel)]
+  const tipo = TIPOS_PERIODO.find((t) => t.value === config.tipoPeriodo)?.label ?? ""
+  const areas = `${config.areasParaRepetir} ${config.areasParaRepetir === 1 ? "área" : "áreas"}`
+
+  return (
+    <div className="flex flex-col rounded-lg border">
+      <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
+        <div className="flex items-center gap-2">
+          <Icono className="size-4 text-muted-foreground" />
+          <span className="text-sm font-medium">{config.nivel}</span>
+        </div>
+        <Badge variant={config.origen === "CONFIGURADO" ? "success" : config.origen === "HEREDADO" ? "secondary" : "outline"}>
+          {config.origen === "CONFIGURADO"
+            ? `Configurado en ${config.anio}`
+            : config.origen === "HEREDADO"
+              ? `Heredado de ${config.anioOrigen}`
+              : "Valor por defecto"}
+        </Badge>
+      </div>
+
+      <dl className="flex flex-1 flex-col gap-2.5 p-4">
+        <Dato icono={Timer} etiqueta="Hora académica" valor={textoDuracion(config.minutosHoraAcademica)} />
+        <Dato icono={Scale} etiqueta="Escala" valor={textoEscala(config.escala)} />
+        {/* Siempre la fila, para que las tarjetas queden alineadas. */}
+        <Dato
+          icono={TrendingUp}
+          etiqueta="Promoción"
+          valor={config.conRepitencia ? `Mínima ${config.notaMinima} · repite con ${areas}` : "No aplica (no repite)"}
+        />
+        <Dato icono={CalendarRange} etiqueta="Periodos" valor={tipo} />
+        <ListaPeriodos periodos={config.periodos} />
+      </dl>
+
+      {editable && (
+        <div className="flex justify-end border-t px-4 py-2">
+          <Button type="button" variant="outline" size="sm" onClick={() => setAbierto(true)}>
+            <Pencil data-icon="inline-start" />
+            Editar
+          </Button>
+        </div>
+      )}
+
+      <Dialog open={abierto} onOpenChange={setAbierto}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>
+              {config.nivel} · {config.anio}
+            </DialogTitle>
+          </DialogHeader>
+          {abierto && (
+            <FormularioNivel config={config} anio={anio} editaHora={editaHora} onCerrar={() => setAbierto(false)} />
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
+
+function FormularioNivel({ config, anio, editaHora, onCerrar }: {
+  config: ConfiguracionAcademicaResponse
+  anio: AnioEscolarResponse | null
+  editaHora: boolean
+  onCerrar: () => void
 }) {
   const guardar = useGuardarConfiguracionAcademica()
   const minutosActual = config.minutosHoraAcademica == null ? LIBRE : String(config.minutosHoraAcademica)
@@ -206,8 +288,9 @@ function NivelCard({ config, anio, editable, editaHora }: {
   const [escala, setEscala] = useState(config.escala)
   const [tipo, setTipo] = useState(config.tipoPeriodo)
   const [periodos, setPeriodos] = useState(periodosActuales)
+  const [notaMinima, setNotaMinima] = useState(config.notaMinima)
+  const [areas, setAreas] = useState(String(config.areasParaRepetir))
 
-  const Icono = ICONOS_NIVEL[claveIconoNivel(config.nivel)]
   const conAsignaciones = config.asignaciones > 0
   // Heredado o por defecto todavía no está guardado: guardarlo lo fija para este año.
   const sinGuardar = config.origen !== "CONFIGURADO"
@@ -215,7 +298,15 @@ function NivelCard({ config, anio, editable, editaHora }: {
     minutos !== minutosActual ||
     escala !== config.escala ||
     tipo !== config.tipoPeriodo ||
+    notaMinima !== config.notaMinima ||
+    areas !== String(config.areasParaRepetir) ||
     JSON.stringify(periodos) !== JSON.stringify(periodosActuales)
+
+  // La mínima de otra escala no vale: vuelve a la de por defecto.
+  function cambiarEscala(nueva: EscalaCalificacion) {
+    setEscala(nueva)
+    setNotaMinima(nueva === config.escala ? config.notaMinima : MINIMA_POR_DEFECTO[nueva])
+  }
 
   function cambiarTipo(nuevo: TipoPeriodo) {
     setTipo(nuevo)
@@ -236,113 +327,96 @@ function NivelCard({ config, anio, editable, editaHora }: {
         minutosHoraAcademica: minutos === LIBRE ? null : Number(minutos),
         escala,
         tipoPeriodo: tipo,
+        // La promoción solo cambia con el año por comenzar.
+        notaMinima: editaHora && config.conRepitencia ? notaMinima : null,
+        areasParaRepetir: editaHora && config.conRepitencia ? Number(areas) : null,
         // Sin fechas no se tocan los periodos (salvo que cambie el tipo: el backend los borra).
         periodos: conFechas ? periodos : null,
       })
       toast.success(`Configuración de ${config.nivel} guardada`)
+      onCerrar()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Error al guardar")
     }
   }
 
   return (
-    <div className="flex flex-col rounded-lg border">
-      <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
-        <div className="flex items-center gap-2">
-          <Icono className="size-4 text-muted-foreground" />
-          <span className="text-sm font-medium">{config.nivel}</span>
-        </div>
-        <Badge variant={config.origen === "CONFIGURADO" ? "success" : config.origen === "HEREDADO" ? "secondary" : "outline"}>
-          {config.origen === "CONFIGURADO"
-            ? `Configurado en ${config.anio}`
-            : config.origen === "HEREDADO"
-              ? `Heredado de ${config.anioOrigen}`
-              : "Valor por defecto"}
-        </Badge>
-      </div>
-
-      <form onSubmit={onSubmit} className="flex flex-1 flex-col gap-5 p-4">
-        <Seccion icono={Timer} titulo="Hora académica" valor={textoDuracion(config.minutosHoraAcademica)}>
-          {editable && editaHora && (
-            <Field>
-              <FieldLabel>Duración</FieldLabel>
-              <FieldContent>
-                <FilterSelect
-                  value={minutos}
-                  onValueChange={(v) => v && setMinutos(v)}
-                  options={OPCIONES_DURACION}
-                  includeAll={false}
-                  className="w-full"
-                  disabled={conAsignaciones}
-                />
-                <FieldDescription className="text-xs">
-                  {conAsignaciones
-                    ? `Ya tiene ${config.asignaciones} ${config.asignaciones === 1 ? "asignación" : "asignaciones"}: sus horarios se armaron con esta duración.`
-                    : minutos === LIBRE
-                      ? "Las clases duran lo que se elija, en pasos de 5 minutos."
-                      : `Las clases duran bloques de ${minutos} minutos (${minutos}, ${Number(minutos) * 2}, ${Number(minutos) * 3}…).`}
-                </FieldDescription>
-              </FieldContent>
-            </Field>
-          )}
-        </Seccion>
-
-        <Seccion icono={Scale} titulo="Escala de calificación" valor={textoEscala(config.escala)}>
-          {editable && (
-            <Field>
-              <FieldContent>
-                <FilterSelect
-                  value={escala}
-                  onValueChange={(v) => v && setEscala(v as EscalaCalificacion)}
-                  options={OPCIONES_ESCALA}
-                  includeAll={false}
-                  className="w-full"
-                />
-                <FieldDescription className="text-xs">Solo se aplica a {config.nivel.toLowerCase()}.</FieldDescription>
-              </FieldContent>
-            </Field>
-          )}
-        </Seccion>
-
-        <Seccion
-          icono={CalendarRange}
-          titulo="Periodos de evaluación"
-          valor={TIPOS_PERIODO.find((t) => t.value === config.tipoPeriodo)?.label}
+    <form onSubmit={onSubmit} className="flex flex-col gap-4">
+      {editaHora && (
+        <Fila
+          etiqueta="Hora académica"
+          ayuda={
+            conAsignaciones
+              ? `Ya tiene ${config.asignaciones} ${config.asignaciones === 1 ? "asignación" : "asignaciones"}: no se puede cambiar.`
+              : undefined
+          }
         >
-          {editable ? (
-            <div className="flex flex-col gap-3">
-              <FilterSelect
-                value={tipo}
-                onValueChange={(v) => v && cambiarTipo(v as TipoPeriodo)}
-                options={OPCIONES_TIPO}
-                includeAll={false}
-                className="w-full"
-              />
-              {anio?.fechaInicio && anio?.fechaFin ? (
-                <EditorPeriodos
-                  tipo={tipo}
-                  value={periodos}
-                  onChange={setPeriodos}
-                  inicioAnio={anio.fechaInicio}
-                  finAnio={anio.fechaFin}
-                />
-              ) : (
-                <p className="text-xs text-muted-foreground">
-                  Define primero las fechas de inicio y fin del año escolar.
-                </p>
-              )}
-            </div>
-          ) : (
-            <ListaPeriodos periodos={config.periodos} />
-          )}
-        </Seccion>
+          <FilterSelect
+            value={minutos}
+            onValueChange={(v) => v && setMinutos(v)}
+            options={OPCIONES_DURACION}
+            includeAll={false}
+            className="w-full"
+            disabled={conAsignaciones}
+          />
+        </Fila>
+      )}
 
-        {editable && (
-          <div className="mt-auto flex items-center justify-end">
-            <BotonGuardar etiqueta="Guardar" enviando={guardar.isPending} size="sm" disabled={!cambio && !sinGuardar} />
+      <Fila etiqueta="Escala">
+        <FilterSelect
+          value={escala}
+          onValueChange={(v) => v && cambiarEscala(v as EscalaCalificacion)}
+          options={OPCIONES_ESCALA}
+          includeAll={false}
+          className="w-full"
+        />
+      </Fila>
+
+      {editaHora && config.conRepitencia && (
+        <Fila
+          etiqueta="Promoción"
+          ayuda="Un área se desaprueba si su promedio (vigesimal) o la mitad de sus competencias (literal) quedan bajo la mínima."
+        >
+          <div className="grid grid-cols-2 gap-2">
+            <FilterSelect
+              label="Mínima"
+              value={notaMinima}
+              onValueChange={(v) => v && setNotaMinima(v)}
+              options={MINIMAS[escala]}
+              includeAll={false}
+              className="w-full"
+            />
+            <FilterSelect
+              label="Repite con"
+              value={areas}
+              onValueChange={(v) => v && setAreas(v)}
+              options={OPCIONES_AREAS}
+              includeAll={false}
+              className="w-full"
+            />
           </div>
-        )}
-      </form>
-    </div>
+        </Fila>
+      )}
+
+      <Fila etiqueta="Periodos">
+        <FilterSelect
+          value={tipo}
+          onValueChange={(v) => v && cambiarTipo(v as TipoPeriodo)}
+          options={OPCIONES_TIPO}
+          includeAll={false}
+          className="w-full"
+        />
+      </Fila>
+      {anio?.fechaInicio && anio?.fechaFin ? (
+        <EditorPeriodos tipo={tipo} value={periodos} onChange={setPeriodos} inicioAnio={anio.fechaInicio} finAnio={anio.fechaFin} />
+      ) : (
+        <p className="text-xs text-muted-foreground">Define primero las fechas de inicio y fin del año escolar.</p>
+      )}
+
+      <DialogFooter>
+        <DialogTrigger render={<Button variant="outline" />}>Cancelar</DialogTrigger>
+        <BotonGuardar etiqueta="Guardar" enviando={guardar.isPending} disabled={!cambio && !sinGuardar} />
+      </DialogFooter>
+    </form>
   )
 }

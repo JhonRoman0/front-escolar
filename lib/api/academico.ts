@@ -838,6 +838,12 @@ export interface ConfiguracionAcademicaResponse {
   asignaciones: number
   escala: EscalaCalificacion
   tipoPeriodo: TipoPeriodo
+  /** Nota mínima para aprobar un área (B u 11 por defecto). */
+  notaMinima: string
+  /** Áreas desaprobadas con las que el alumno repite (4 por defecto). */
+  areasParaRepetir: number
+  /** Algún grado del nivel repite (Orden de grados); si no, la promoción no aplica. */
+  conRepitencia: boolean
   periodos: PeriodoEvaluacion[]
   editable: boolean
   motivoBloqueo: string | null
@@ -849,6 +855,9 @@ export interface ConfiguracionAcademicaRequest {
   minutosHoraAcademica: number | null
   escala: EscalaCalificacion
   tipoPeriodo: TipoPeriodo
+  /** null: se mantienen (solo cambian con el año por comenzar). */
+  notaMinima?: string | null
+  areasParaRepetir?: number | null
   /** null: se mantienen los guardados (o se borran si cambia el tipo). */
   periodos: { fechaInicio: string; fechaFin: string }[] | null
 }

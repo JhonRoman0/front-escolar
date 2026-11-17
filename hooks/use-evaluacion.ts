@@ -1,10 +1,8 @@
 import {
   keepPreviousData,
-  useMutation,
   useQuery,
 } from "@tanstack/react-query"
 
-import { useAuth } from "@/components/auth-provider"
 import { useAsignaciones } from "@/hooks/use-academico"
 import {
   competenciasApi,
@@ -31,7 +29,6 @@ export function useCompetencias(idCurso?: number) {
     queryKey: [...KEYS.competencias, idCurso],
     queryFn: () => competenciasApi.listar(idCurso),
     enabled: !!idCurso,
-    staleTime: 1000 * 60 * 30,
   })
 }
 
@@ -46,18 +43,3 @@ export function useNotasPorCompetencia(idCompetencia?: number, bimestre?: number
 
 // ── Mutaciones ───────────────────────────────────────────────────────────
 
-export function useGenerarAutorizacion() {
-  return useMutation({
-    mutationFn: ({ idUsuarioDestinatario }: { idUsuarioDestinatario: number }) =>
-      notasApi.generarAutorizacion(idUsuarioDestinatario),
-  })
-}
-
-export function useAutorizaciones() {
-  const { esAdmin } = useAuth()
-  return useQuery({
-    queryKey: [...KEYS.notas, "autorizaciones"],
-    queryFn: notasApi.listarAutorizaciones,
-    enabled: esAdmin,
-  })
-}

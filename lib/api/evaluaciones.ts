@@ -1,17 +1,62 @@
 import { apiFetch } from "@/lib/api"
 import type { EscalaCalificacion, PeriodoEvaluacion, TipoPeriodo } from "@/lib/api/academico"
 
-export interface Procedencia { idReconocimiento: number; seccion: string; evaluacion: string }
-export interface Candidata { idEvaluacion: number; nombre: string; bloqueo: string | null }
-export interface Reconocimiento {
-  idReconocimiento: number; idEvaluacionDestino: number; evaluacionDestino: string; seccionDestino: string
-  calificacion: string; estado: "ACTIVO" | "ANULADO"; usuario: string; fecha: string
-  motivoAnulacion: string | null; usuarioAnulacion: string | null; fechaAnulacion: string | null; puedeAnular: boolean; enSeccionActual: boolean
+/** De dónde viene una nota usada por un alumno trasladado. */
+export interface Procedencia {
+  idReconocimiento: number
+  seccion: string
+  evaluacion: string
 }
+
+/** Uso de una nota de otra sección en una evaluación (activo o anulado). */
+export interface Reconocimiento {
+  idReconocimiento: number
+  idEvaluacionDestino: number
+  evaluacionDestino: string
+  seccionDestino: string
+  calificacion: string
+  estado: "ACTIVO" | "ANULADO"
+  usuario: string
+  fecha: string
+  motivoAnulacion: string | null
+  usuarioAnulacion: string | null
+  fechaAnulacion: string | null
+  puedeAnular: boolean
+  enSeccionActual: boolean
+}
+
+/** Nota del alumno puesta en otra sección del mismo curso y año. */
 export interface NotaHistorica {
-  idNotaOrigen: number; seccion: string; curso: string; area: string | null; evaluacion: string
-  competencias: CompetenciaEvaluada[]; periodo: number; fecha: string; calificacion: string
-  bloqueo: string | null; reconocimientos: Reconocimiento[]
+  idNotaOrigen: number
+  seccion: string
+  curso: string
+  area: string | null
+  evaluacion: string
+  competencias: CompetenciaEvaluada[]
+  periodo: number
+  fecha: string
+  calificacion: string
+  /** Por qué ya no se puede usar; null si se puede. */
+  bloqueo: string | null
+  reconocimientos: Reconocimiento[]
+}
+
+/** Nota de otra sección que el alumno puede usar en vez de rendir la evaluación. */
+export interface OpcionTraslado {
+  idNotaOrigen: number
+  seccion: string
+  evaluacion: string
+  fecha: string
+  calificacion: string
+  competencias: CompetenciaEvaluada[]
+}
+
+/** Alumno trasladado con notas utilizables en la evaluación. */
+export interface Traslado {
+  idMatricula: number
+  codigo: string
+  nombre: string
+  opciones: OpcionTraslado[]
 }
 
 export interface CompetenciaEvaluada {
@@ -56,6 +101,21 @@ export interface EvaluacionResumen {
   editable: boolean
   /** Alumnos con nota final ya registrada: su nota en esta evaluación no cambia. */
   alumnosConNotaFinal: number
+}
+
+/** Ficha de solo lectura de una evaluación (acción VER_RESUMEN). */
+export interface FichaEvaluacion {
+  idEvaluacion: number
+  nombre: string
+  /** "Bimestre 1" */
+  periodo: string
+  fecha: string
+  /** Fecha y hora "2026-11-16T09:30:00". */
+  fechaCreacion: string
+  creadoPor: string
+  competencias: CompetenciaEvaluada[]
+  notasRegistradas: number
+  totalAlumnos: number
 }
 
 export interface AlumnoEvaluado {
@@ -119,14 +179,23 @@ export interface EvaluacionRequest {
   nombre: string
   fecha: string
   competencias: number[]
+  /** Trasladados que no rinden: usan esa nota de su sección anterior. */
+  noRinden?: { idMatricula: number; idNotaOrigen: number }[]
 }
 
 export const evaluacionesApi = {
   historial(idMatricula: number, idAsignacion: number): Promise<NotaHistorica[]> {
     return apiFetch(`/evaluaciones/historial-calificaciones?idMatricula=${idMatricula}&idAsignacion=${idAsignacion}`)
   },
-  candidatas(idNotaOrigen: number, idAsignacion: number): Promise<Candidata[]> {
-    return apiFetch(`/evaluaciones/reconocimientos/candidatas?idNotaOrigen=${idNotaOrigen}&idAsignacion=${idAsignacion}`)
+  /** Con idEvaluacion, solo los alumnos que aún no tienen nota en ella. */
+  traslados(idAsignacion: number, periodo: number, competencias: number[], idEvaluacion?: number): Promise<Traslado[]> {
+    const params = new URLSearchParams({
+      idAsignacion: String(idAsignacion),
+      periodo: String(periodo),
+      competencias: competencias.join(","),
+    })
+    if (idEvaluacion != null) params.set("idEvaluacion", String(idEvaluacion))
+    return apiFetch(`/evaluaciones/traslados?${params.toString()}`)
   },
   reconocer(data: { idNotaOrigen: number; idEvaluacionDestino: number; calificacionOrigen: string }) {
     return apiFetch<Reconocimiento>("/evaluaciones/reconocimientos", { method: "POST", body: JSON.stringify(data) })
@@ -145,6 +214,9 @@ export const evaluacionesApi = {
   },
   registro(idAsignacion: number, periodo: number): Promise<RegistroAuxiliar> {
     return apiFetch<RegistroAuxiliar>(`/evaluaciones/registro?idAsignacion=${idAsignacion}&periodo=${periodo}`)
+  },
+  resumen(idEvaluacion: number): Promise<FichaEvaluacion> {
+    return apiFetch<FichaEvaluacion>(`/evaluaciones/${idEvaluacion}/resumen`)
   },
   detalle(idEvaluacion: number): Promise<EvaluacionDetalle> {
     return apiFetch<EvaluacionDetalle>(`/evaluaciones/${idEvaluacion}`)

@@ -57,14 +57,16 @@ import {
   diaFeriadoSchema,
   type DiaFeriadoValues,
 } from "@/lib/schemas/asistencia"
-import { fechaHoyISO, formatearFecha } from "@/lib/fechas"
+import { formatearFecha } from "@/lib/fechas"
 
 export function FeriadosTab() {
   const { data, isLoading, isError, refetch } = useDiasFeriados()
   const crud = useCrudFeriados()
-  const puedeCrear = usePuede("ASISTENCIAS", "CREAR")
-  const puedeActualizar = usePuede("ASISTENCIAS", "ACTUALIZAR")
-  const puedeEliminar = usePuede("ASISTENCIAS", "ELIMINAR")
+  // Motivos y feriados: todo con "Gestionar motivos y feriados".
+  const puedeConfigurar = usePuede("ASISTENCIAS", "CONFIGURAR")
+  const puedeCrear = puedeConfigurar
+  const puedeActualizar = puedeConfigurar
+  const puedeEliminar = puedeConfigurar
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editando, setEditando] = useState<DiaFeriadoResponse | null>(null)
 
@@ -131,7 +133,7 @@ export function FeriadosTab() {
                     {f.motivo}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
-                    {f.anio ?? "Todos los años"}
+                    {f.anio ?? "—"}
                   </TableCell>
                   <TableCell>
                     <EstadoBadge accesoId={f.accesoId} />
@@ -194,9 +196,9 @@ function FeriadoDialog({
   const form = useForm<DiaFeriadoValues>({
     resolver: zodResolver(diaFeriadoSchema),
     defaultValues: {
-      fecha: feriado?.fecha ?? fechaHoyISO(),
+      fecha: feriado?.fecha ?? "",
       motivo: feriado?.motivo ?? "",
-      idAnioEscolar: feriado?.idAnioEscolar ?? null,
+      idAnioEscolar: feriado?.idAnioEscolar ?? undefined,
       accesoId: feriado?.accesoId ?? 1,
     },
   })
@@ -217,7 +219,16 @@ function FeriadoDialog({
     [existentes, fechaActual, anioActual, feriado]
   )
 
+  // La fecha solo se habilita con un año elegido y dentro de sus fechas.
+  const anioElegido = anios.find((a) => a.idAnio === anioActual)
+  const minFecha = anioElegido?.fechaInicio?.slice(0, 10)
+  const maxFecha = anioElegido?.fechaFin?.slice(0, 10)
+
   async function onSubmit(values: DiaFeriadoValues) {
+    if ((minFecha && values.fecha < minFecha) || (maxFecha && values.fecha > maxFecha)) {
+      form.setError("fecha", { message: "La fecha debe estar dentro del año escolar" })
+      return
+    }
     try {
       if (esEdicion && feriado) {
         await actualizar.mutateAsync({ id: feriado.idDiaFeriado, data: values })
@@ -248,19 +259,6 @@ function FeriadoDialog({
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Controller
               control={form.control}
-              name="fecha"
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel>Fecha</FieldLabel>
-                  <FieldContent>
-                    <Input type="date" {...field} />
-                    <FieldError errors={[form.formState.errors.fecha]} />
-                  </FieldContent>
-                </Field>
-              )}
-            />
-            <Controller
-              control={form.control}
               name="idAnioEscolar"
               render={({ field }) => (
                 <Field>
@@ -268,18 +266,25 @@ function FeriadoDialog({
                   <FieldContent>
                     <Select
                       value={field.value?.toString() ?? ""}
-                      onValueChange={(v) =>
-                        field.onChange(v === "" ? null : Number(v))
-                      }
+                      onValueChange={(v) => {
+                        const id = v ? Number(v) : undefined
+                        field.onChange(id)
+                        // Si la fecha elegida no es de este año, se borra.
+                        const anio = anios.find((a) => a.idAnio === id)
+                        const actual = form.getValues("fecha")
+                        const ini = anio?.fechaInicio?.slice(0, 10)
+                        const fin = anio?.fechaFin?.slice(0, 10)
+                        if (actual && ((ini && actual < ini) || (fin && actual > fin))) {
+                          form.setValue("fecha", "")
+                        }
+                      }}
                     >
                       <SelectTrigger className="w-full text-foreground">
-                        <SelectValue placeholder="Todos los años">
-                          {anios.find((a) => a.idAnio === field.value)?.anio ??
-                            "Todos los años"}
+                        <SelectValue placeholder="Elige el año">
+                          {anios.find((a) => a.idAnio === field.value)?.anio ?? "Elige el año"}
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Todos los años</SelectItem>
                         {anios
                           .filter((a) => a.accesoId === 1)
                           .map((a) => (
@@ -289,10 +294,27 @@ function FeriadoDialog({
                           ))}
                       </SelectContent>
                     </Select>
-                    <FieldDescription>
-                      Vacío aplica a todo el colegio; elige un año solo si el
-                      feriado pertenece a ese año escolar.
-                    </FieldDescription>
+                    <FieldError errors={[form.formState.errors.idAnioEscolar]} />
+                  </FieldContent>
+                </Field>
+              )}
+            />
+            <Controller
+              control={form.control}
+              name="fecha"
+              render={({ field }) => (
+                <Field>
+                  <FieldLabel>Fecha</FieldLabel>
+                  <FieldContent>
+                    <Input type="date" min={minFecha} max={maxFecha} disabled={!anioElegido} {...field} />
+                    {!anioElegido ? (
+                      <FieldDescription>Primero elige el año escolar.</FieldDescription>
+                    ) : minFecha && maxFecha ? (
+                      <FieldDescription>
+                        Del {formatearFecha(minFecha)} al {formatearFecha(maxFecha)}.
+                      </FieldDescription>
+                    ) : null}
+                    <FieldError errors={[form.formState.errors.fecha]} />
                   </FieldContent>
                 </Field>
               )}

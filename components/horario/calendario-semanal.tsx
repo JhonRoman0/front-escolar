@@ -3,7 +3,7 @@
 import { useMemo } from "react"
 import { BookOpen } from "lucide-react"
 
-import type { HorarioListItem } from "@/lib/api/horario"
+import { etiquetaSeccion, type HorarioListItem, type RecreoHorario } from "@/lib/api/horario"
 
 // ── Constantes ──────────────────────────────────────────────────────────
 
@@ -44,7 +44,7 @@ function minutosAHora(min: number): string {
 }
 
 function generarSlots(
-  horarios: HorarioListItem[],
+  horarios: { horaInicio: string; horaFin: string }[],
   horaEntrada?: string,
   horaSalida?: string
 ): string[] {
@@ -79,7 +79,8 @@ function generarSlots(
 // ── Bloque posicionado ──────────────────────────────────────────────────
 
 interface BloqueHorario {
-  horario: HorarioListItem
+  /** Una clase, o null si el bloque es un recreo. */
+  horario: HorarioListItem | null
   rowStart: number
   rowSpan: number
   color: (typeof COLORES)[number]
@@ -94,10 +95,17 @@ interface CalendarioSemanalProps {
   horaEntrada?: string
   /** Hora de salida del turno (ej: "12:30:00"). Define el fin de la grilla. */
   horaSalida?: string
+  /** docente: el horario de un docente; cada bloque dice la sección en vez del docente. */
+  vista?: "seccion" | "docente"
+  /** Franjas de recreo (gris). */
+  recreos?: RecreoHorario[]
 }
 
-export function CalendarioSemanal({ horarios, titulo, horaEntrada, horaSalida }: CalendarioSemanalProps) {
-  const slots = useMemo(() => generarSlots(horarios, horaEntrada, horaSalida), [horarios, horaEntrada, horaSalida])
+export function CalendarioSemanal({ horarios, titulo, horaEntrada, horaSalida, vista = "seccion", recreos = [] }: CalendarioSemanalProps) {
+  const slots = useMemo(
+    () => generarSlots([...horarios, ...recreos], horaEntrada, horaSalida),
+    [horarios, recreos, horaEntrada, horaSalida]
+  )
 
   const slotIndex = useMemo(() => {
     const map = new Map<string, number>()
@@ -125,8 +133,20 @@ export function CalendarioSemanal({ horarios, titulo, horaEntrada, horaSalida }:
       mapa.get(h.diaSemana)?.push({ horario: h, rowStart, rowSpan, color })
     }
 
+    // Recreos: solo donde no hay clase (si se cruzan, manda la clase).
+    for (const rc of recreos) {
+      if (rc.diaSemana > 5) continue
+      const iniMin = aMinutos(rc.horaInicio)
+      const rowStart = slotIndex.get(minutosAHora(Math.floor(iniMin / MINUTOS_POR_SLOT) * MINUTOS_POR_SLOT))
+      if (rowStart == null) continue
+      const rowSpan = Math.max(1, Math.round((aMinutos(rc.horaFin) - iniMin) / MINUTOS_POR_SLOT))
+      const delDia = mapa.get(rc.diaSemana) ?? []
+      const choca = delDia.some((b) => rowStart < b.rowStart + b.rowSpan && b.rowStart < rowStart + rowSpan)
+      if (!choca) delDia.push({ horario: null, rowStart, rowSpan, color: COLORES[0] })
+    }
+
     return mapa
-  }, [horarios, slotIndex])
+  }, [horarios, recreos, slotIndex])
 
   if (horarios.length === 0) {
     return (
@@ -171,6 +191,7 @@ export function CalendarioSemanal({ horarios, titulo, horaEntrada, horaSalida }:
                 slot={slot}
                 slotIdx={slotIdx}
                 bloquesPorDia={bloquesPorDia}
+                vista={vista}
               />
             )
           })}
@@ -186,9 +207,10 @@ interface FilaHorarioProps {
   slot: string
   slotIdx: number
   bloquesPorDia: Map<number, BloqueHorario[]>
+  vista: "seccion" | "docente"
 }
 
-function FilaHorario({ slot, slotIdx, bloquesPorDia }: FilaHorarioProps) {
+function FilaHorario({ slot, slotIdx, bloquesPorDia, vista }: FilaHorarioProps) {
   // Rastrear qué columnas ya están cubiertas por un rowSpan activo
   const columnasCubiertas = useMemo(() => {
     const cubiertas = new Set<number>()
@@ -220,7 +242,19 @@ function FilaHorario({ slot, slotIdx, bloquesPorDia }: FilaHorarioProps) {
         // ¿Hay un bloque que EMPIECE en esta fila?
         const bloque = bloquesPorDia.get(dia)?.find((b) => b.rowStart === slotIdx)
 
-        if (bloque) {
+        if (bloque && !bloque.horario) {
+          return (
+            <td
+              key={dia}
+              rowSpan={bloque.rowSpan}
+              className="border-b border-r bg-muted text-center text-[11px] font-medium uppercase tracking-wide text-muted-foreground"
+            >
+              Recreo
+            </td>
+          )
+        }
+
+        if (bloque?.horario) {
           return (
             <td
               key={dia}
@@ -232,10 +266,10 @@ function FilaHorario({ slot, slotIdx, bloquesPorDia }: FilaHorarioProps) {
                   {bloque.horario.curso}
                 </span>
                 <span className="truncate text-[10px] leading-tight opacity-80">
-                  {bloque.horario.docente}
+                  {vista === "docente" ? etiquetaSeccion(bloque.horario) : bloque.horario.docente}
                 </span>
                 <span className="truncate text-[9px] leading-tight opacity-60">
-                  {bloque.horario.aula}
+                  {vista === "docente" ? `${bloque.horario.aula} · ${bloque.horario.turno}` : bloque.horario.aula}
                 </span>
               </div>
             </td>

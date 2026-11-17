@@ -566,7 +566,7 @@ export function AlumnosTab() {
           open={reporteOpen}
           onOpenChange={setReporteOpen}
           titulo="Reporte de alumnos"
-          descripcion="Descarga el padrón de alumnos matriculados en el año en PDF, Excel o CSV."
+          descripcion="Descarga el padrón de alumnos matriculados en el año en PDF o Excel."
           presets={[]}
           filtros={filtrosReporte.filtros}
           onDescargar={handleDescargarReporte}

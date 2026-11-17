@@ -50,7 +50,6 @@ export function useRoles(soloActivos = false) {
   return useQuery({
     queryKey: [...KEYS.roles, soloActivos],
     queryFn: () => rolesApi.listar(soloActivos),
-    staleTime: 1000 * 60 * 30,
   })
 }
 
@@ -58,7 +57,6 @@ export function usePermisos() {
   return useQuery({
     queryKey: KEYS.permisos,
     queryFn: permisosApi.listar,
-    staleTime: 1000 * 60 * 30,
   })
 }
 
@@ -66,7 +64,6 @@ export function useAcciones() {
   return useQuery({
     queryKey: KEYS.acciones,
     queryFn: accionesApi.listar,
-    staleTime: 1000 * 60 * 30,
   })
 }
 
@@ -74,7 +71,6 @@ export function useRolesPermiso() {
   return useQuery({
     queryKey: KEYS.rolesPermiso,
     queryFn: rolesPermisoApi.listar,
-    staleTime: 1000 * 60 * 30,
   })
 }
 

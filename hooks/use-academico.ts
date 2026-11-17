@@ -62,7 +62,6 @@ export function useDocentes() {
     queryKey: KEYS.docentes,
     queryFn: docentesApi.listar,
     placeholderData: keepPreviousData,
-    staleTime: 1000 * 60 * 30,
   })
 }
 
@@ -70,7 +69,6 @@ export function useGradosAcademicos() {
   return useQuery({
     queryKey: KEYS.gradosAcademicos,
     queryFn: gradosAcademicosApi.listar,
-    staleTime: 1000 * 60 * 30,
   })
 }
 
@@ -78,7 +76,6 @@ export function useTiposContrato() {
   return useQuery({
     queryKey: KEYS.tiposContrato,
     queryFn: tiposContratoApi.listar,
-    staleTime: 1000 * 60 * 30,
   })
 }
 
@@ -97,7 +94,6 @@ export function useCursos(filtros?: { idAnio: number | null; idNivel: number | n
     queryKey: [...KEYS.cursos, filtros?.idAnio ?? null, filtros?.idNivel ?? null],
     queryFn: () => cursosApi.listar(filtros?.idAnio, filtros?.idNivel),
     enabled: !filtros || (!!filtros.idAnio && !!filtros.idNivel),
-    staleTime: 1000 * 60 * 30,
   })
 }
 
@@ -105,7 +101,6 @@ export function useTurnos() {
   return useQuery({
     queryKey: KEYS.turnos,
     queryFn: turnosApi.listar,
-    staleTime: 1000 * 60 * 30,
   })
 }
 
@@ -113,7 +108,6 @@ export function useGrados() {
   return useQuery({
     queryKey: KEYS.grados,
     queryFn: gradosApi.listar,
-    staleTime: 1000 * 60 * 30,
   })
 }
 
@@ -121,7 +115,6 @@ export function useAniosEscolares() {
   return useQuery({
     queryKey: KEYS.anios,
     queryFn: aniosEscolaresApi.listar,
-    staleTime: 1000 * 60 * 30,
   })
 }
 
@@ -147,7 +140,6 @@ export function useAulas() {
   return useQuery({
     queryKey: KEYS.aulas,
     queryFn: aulasApi.listar,
-    staleTime: 1000 * 60 * 30,
   })
 }
 
@@ -156,7 +148,6 @@ export function useAsignaciones() {
     queryKey: KEYS.asignaciones,
     queryFn: asignacionesApi.listar,
     placeholderData: keepPreviousData,
-    staleTime: 1000 * 60 * 30,
   })
 }
 
@@ -164,7 +155,6 @@ export function useNiveles() {
   return useQuery({
     queryKey: KEYS.niveles,
     queryFn: nivelesApi.listar,
-    staleTime: 1000 * 60 * 30,
   })
 }
 
@@ -173,7 +163,6 @@ export function useGradosPorNivel(idNivel: number | null) {
     queryKey: [...KEYS.grados, "nivel", idNivel],
     queryFn: () => gradosApi.porNivel(idNivel as number),
     enabled: !!idNivel,
-    staleTime: 1000 * 60 * 10,
   })
 }
 
@@ -183,7 +172,6 @@ export function useGradosDelAnio(idNivel: number | null, idAnio: number | null) 
     queryKey: [...KEYS.grados, "nivel", idNivel, "anio", idAnio],
     queryFn: () => gradosApi.porNivel(idNivel as number, idAnio),
     enabled: !!idNivel && !!idAnio,
-    staleTime: 1000 * 60 * 10,
   })
 }
 
@@ -192,7 +180,6 @@ export function useSeccionesPorGrado(idGrado: number | null) {
     queryKey: [...KEYS.secciones, idGrado],
     queryFn: () => gradoSeccionApi.porGrado(idGrado as number),
     enabled: !!idGrado,
-    staleTime: 1000 * 60 * 10,
   })
 }
 
@@ -285,7 +272,6 @@ export function useAsignacionesDocente(idDocente: number | null) {
     queryFn: () => asignacionesApi.porDocente(idDocente as number),
     enabled: !!idDocente,
     placeholderData: keepPreviousData,
-    staleTime: 1000 * 60 * 30,
   })
 }
 
@@ -294,7 +280,6 @@ export function useHorasDocente(idDocente: number | null) {
     queryKey: [...KEYS.asignaciones, "horas", idDocente],
     queryFn: () => asignacionesApi.horasDocente(idDocente as number),
     enabled: !!idDocente,
-    staleTime: 1000 * 60 * 30,
   })
 }
 
@@ -304,7 +289,6 @@ export function useSuspensiones() {
   return useQuery({
     queryKey: KEYS.suspensiones,
     queryFn: suspensionesApi.listar,
-    staleTime: 1000 * 60 * 30,
   })
 }
 
@@ -338,7 +322,6 @@ export function useCambiosDocente() {
   return useQuery({
     queryKey: KEYS.cambiosDocente,
     queryFn: cambiosDocenteApi.listar,
-    staleTime: 1000 * 60 * 30,
   })
 }
 
@@ -350,7 +333,6 @@ export function useRecreos(filtros: { idAnio: number | null; idNivel?: number | 
     queryKey: [...KEYS.recreos, filtros.idAnio, filtros.idNivel ?? null, filtros.idTurno ?? null],
     queryFn: () => recreosApi.listar(filtros),
     enabled: !!filtros.idAnio,
-    staleTime: 1000 * 60 * 10,
   })
 }
 
@@ -572,7 +554,6 @@ export function useConfiguracionAcademica(idAnio: number | null) {
     queryKey: [...KEY_CONFIGURACION, idAnio],
     queryFn: () => configuracionAcademicaApi.listar(idAnio as number),
     enabled: !!idAnio,
-    staleTime: 1000 * 60 * 10,
   })
 }
 
@@ -582,7 +563,6 @@ export function useHoraAcademica(idAnio: number | null, idNivel: number | null) 
     queryKey: [...KEY_CONFIGURACION, "hora", idAnio, idNivel],
     queryFn: () => configuracionAcademicaApi.horaAcademica(idAnio as number, idNivel as number),
     enabled: !!idAnio && !!idNivel,
-    staleTime: 1000 * 60 * 10,
   })
 }
 
