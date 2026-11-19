@@ -25,10 +25,12 @@ export function useAlumnos(page: number, size = 10, filtros?: AlumnosFiltros, en
     queryKey: [...KEYS.alumnos, page, size, filtros],
     queryFn: () => alumnosApi.listar(page, size, filtros),
     enabled,
-    placeholderData: (previousData, previousQuery) =>
-      enabled && (previousQuery?.queryKey[3] as AlumnosFiltros | undefined)?.idAnio === filtros?.idAnio
+    placeholderData: (previousData, previousQuery) => {
+      const anteriores = previousQuery?.queryKey[3] as AlumnosFiltros | undefined
+      return enabled && anteriores?.idAnio === filtros?.idAnio && (anteriores?.search ?? "") === (filtros?.search ?? "")
         ? previousData
-        : undefined,
+        : undefined
+    },
   })
 }
 

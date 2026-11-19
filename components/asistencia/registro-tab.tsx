@@ -254,7 +254,7 @@ export function RegistroTab() {
       )}
 
       {rango === "hoy" && (
-        <>
+        <div className="space-y-3">
           <AsistenciaTablaHoy
             asistencias={hoyFiltradas}
             cargando={cargandoTabla}
@@ -264,28 +264,28 @@ export function RegistroTab() {
             onAnular={handleAnular}
           />
           <TablaPaginacion data={hoyQuery.data} onPage={setPageHoy} />
-        </>
+        </div>
       )}
 
       {rango === "semana" && (
-        <>
+        <div className="space-y-3">
           <AsistenciaTablaSemana
             asistencias={semanaFiltradas}
             fechasDias={fechasDias}
             cargando={cargandoTabla}
           />
           <TablaPaginacion data={semanaQuery.data} onPage={setPageSemana} />
-        </>
+        </div>
       )}
 
       {rango === "mes" && (
-        <>
+        <div className="space-y-3">
           <AsistenciaTablaMes
             asistencias={mesFiltradas}
             cargando={cargandoTabla}
           />
           <TablaPaginacion data={mesQuery.data} onPage={setPageMes} />
-        </>
+        </div>
       )}
 
       <RegistrarCamaraModal open={camaraOpen} onOpenChange={setCamaraOpen} />

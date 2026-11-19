@@ -105,7 +105,7 @@ export const alumnosApi = {
     if (filtros?.idTurno) params.set("idTurno", String(filtros.idTurno))
     if (filtros?.idGradoSeccion) params.set("idGradoSeccion", String(filtros.idGradoSeccion))
     if (filtros?.idAnio) params.set("idAnio", String(filtros.idAnio))
-    // search es filtro client-side opcional; no se envía al back
+    if (filtros?.search) params.set("search", filtros.search)
     return apiFetch<Paginated<AlumnoResponse>>(`/alumnos?${params.toString()}`)
   },
   async porId(id: number): Promise<AlumnoResponse> {

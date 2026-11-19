@@ -364,7 +364,7 @@ export default function UsuariosTab() {
           </Button>
         )}
 
-        {!!data?.totalPages && data.totalPages > 1 && <TablaPaginacion data={data} onPage={setPage} />}
+        <TablaPaginacion data={data} onPage={setPage} />
 
         <UsuarioFormDialog
           key={`${editando ? `edit-${editando.idUsuario}` : "create"}-${dialogSeq}`}

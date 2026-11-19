@@ -40,6 +40,7 @@ import { ConfirmarEliminar } from "@/components/seguridad/confirmar-eliminar"
 import { BotonReintentar } from "@/components/shared/boton-reintentar"
 import { FilterSelect } from "@/components/shared/filter-select"
 import { HeaderSeccion } from "@/components/shared/header-seccion"
+import { TablaPaginacion } from "@/components/shared/paginacion-tabla"
 import { SelectorHora } from "@/components/shared/selector-hora"
 import { FilasCargando, MensajeSinDatos } from "@/components/shared/table-helpers"
 import { useFiltrosMalla } from "@/hooks/use-filtros-malla"
@@ -56,6 +57,7 @@ import {
   useRecreos,
   useTurnos,
 } from "@/hooks/use-academico"
+import type { Paginated } from "@/lib/api"
 import {
   ACCESO,
   DIAS_CLASE,
@@ -80,6 +82,8 @@ function formatoHorario(h: { diaSemana: number; horaInicio: string; horaFin: str
 }
 
 const HORARIO_VACIO = { idAula: 0, diaSemana: 1, horaInicio: "", horaFin: "" }
+
+const TAMANIO_PAGINA = 10
 
 const TIPO_AULA_EN_HORARIO: Record<TipoAula, string> = {
   SALON: "Salón de la sección",
@@ -126,6 +130,17 @@ export default function AsignacionesTab() {
   const puedeEliminar = usePuede("ASIGNACIONES", "ELIMINAR")
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editando, setEditando] = useState<AsignacionResponse | null>(null)
+  const [page, setPage] = useState(0)
+
+  function cambiarAnio(id: number) {
+    filtros.setIdAnio(id)
+    setPage(0)
+  }
+
+  function cambiarNivel(id: number) {
+    filtros.setIdNivel(id)
+    setPage(0)
+  }
 
   // Por comenzar: todo. Vigente: solo se crea lo que falta. Cerrado: nada.
   const editable = anio?.estado === ESTADO_ANIO.POR_COMENZAR
@@ -136,10 +151,30 @@ export default function AsignacionesTab() {
     [data, idAnio, idNivel]
   )
 
+  const totalRegistros = asignaciones.length
+  const totalPaginas = Math.ceil(totalRegistros / TAMANIO_PAGINA)
+  const pagina = Math.min(page, Math.max(0, totalPaginas - 1))
+  const fin = Math.min((pagina + 1) * TAMANIO_PAGINA, totalRegistros)
+  const asignacionesPaginadas = asignaciones.slice(pagina * TAMANIO_PAGINA, fin)
+  const datosPaginacion: Paginated<AsignacionResponse> = {
+    content: asignacionesPaginadas,
+    totalElements: totalRegistros,
+    totalPages: totalPaginas,
+    size: TAMANIO_PAGINA,
+    number: pagina,
+    numberOfElements: asignacionesPaginadas.length,
+    first: pagina === 0,
+    last: pagina >= totalPaginas - 1,
+    empty: totalRegistros === 0,
+  }
+
   async function handleEliminar(asignacion: AsignacionResponse) {
     try {
       await crud.eliminar.mutateAsync(asignacion.idAsignacion)
       toast.success(`Asignación de "${asignacion.curso}" (${asignacion.grado} ${asignacion.seccion}) eliminada`)
+      if (asignacionesPaginadas.length === 1 && pagina > 0) {
+        setPage((p) => p - 1)
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Error al eliminar")
       throw error
@@ -188,8 +223,8 @@ export default function AsignacionesTab() {
               niveles={filtros.niveles}
               idAnio={idAnio}
               idNivel={idNivel}
-              onAnio={filtros.setIdAnio}
-              onNivel={filtros.setIdNivel}
+              onAnio={cambiarAnio}
+              onNivel={cambiarNivel}
             />
           </div>
 
@@ -216,7 +251,7 @@ export default function AsignacionesTab() {
                     mensaje={`Aún no hay asignaciones de ${nivel?.nombre ?? "este nivel"} en el año ${anio?.anio ?? ""}.`}
                   />
                 ) : (
-                  asignaciones.map((asignacion) => (
+                  asignacionesPaginadas.map((asignacion) => (
                     <TableRow key={asignacion.idAsignacion}>
                       <TableCell className="font-medium">
                         {asignacion.grado} {asignacion.seccion}
@@ -265,6 +300,8 @@ export default function AsignacionesTab() {
           </div>
 
           {isError && <BotonReintentar refetch={refetch} />}
+
+          <TablaPaginacion data={data ? datosPaginacion : null} onPage={setPage} />
         </CardContent>
       </Card>
 
