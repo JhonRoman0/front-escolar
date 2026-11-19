@@ -95,6 +95,7 @@ import {
   type NivelResponse,
   type CursoVistaPreviaResponse,
 } from "@/lib/api/academico"
+import { coincideBusqueda, tokensBusqueda } from "@/lib/busqueda"
 import { subcursoSchema, type SubcursoValues } from "@/lib/schemas/academico"
 
 import { useFiltrosMalla } from "@/hooks/use-filtros-malla"
@@ -184,15 +185,13 @@ export function CursosTab() {
     puedeCrear && configurable && !isLoading && principales.length === 0 && origenesCopia.length > 0
 
   const filtrados = useMemo(() => {
-    const q = busquedaDebounced.trim().toLowerCase()
+    const tokens = tokensBusqueda(busquedaDebounced)
     return principales.filter((curso) => {
       if (filtroEstado && String(curso.accesoId) !== filtroEstado) return false
-      if (!q) return true
       const subcursos = subcursosPorArea.get(curso.idCurso) ?? []
-      return (
-        curso.codigo?.toLowerCase().includes(q) ||
-        curso.nombre.toLowerCase().includes(q) ||
-        subcursos.some((s) => s.nombre.toLowerCase().includes(q))
+      return coincideBusqueda(
+        [curso.codigo, curso.nombre, ...subcursos.map((s) => s.nombre)],
+        tokens
       )
     })
   }, [principales, subcursosPorArea, busquedaDebounced, filtroEstado])

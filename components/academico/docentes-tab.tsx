@@ -22,6 +22,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field"
+import { coincideBusqueda, tokensBusqueda } from "@/lib/busqueda"
 import { nacimientoMaximoAdulto } from "@/lib/edades"
 import { Input } from "@/components/ui/input"
 import {
@@ -135,20 +136,20 @@ export default function DocentesTab() {
     filtroNivel !== ""
 
   const docentesFiltrados = useMemo(() => {
-    const q = busquedaDebounced.trim().toLowerCase()
+    const tokens = tokensBusqueda(busquedaDebounced)
     return (data ?? []).filter((d) => {
       if (filtroEstado && String(d.accesoId) !== filtroEstado) return false
       if (filtroTipoContrato && String(d.tipoContratoId) !== filtroTipoContrato)
         return false
       if (filtroNivel && !d.niveles.some((n) => String(n.idNivel) === filtroNivel))
         return false
-      if (!q) return true
-      const nombreCompleto =
-        `${d.nombre} ${d.apellidoPat} ${d.apellidoMat}`.toLowerCase()
-      return (
-        nombreCompleto.includes(q) ||
-        d.codigo.toLowerCase().includes(q) ||
-        (d.documentoIdentidad ?? "").toLowerCase().includes(q)
+      return coincideBusqueda(
+        [
+          `${d.nombre} ${d.apellidoPat} ${d.apellidoMat}`,
+          d.codigo,
+          d.documentoIdentidad,
+        ],
+        tokens
       )
     })
   }, [
