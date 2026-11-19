@@ -86,9 +86,11 @@ export function AsistenciaToolbar({
 }: AsistenciaToolbarProps) {
   const { data: niveles = [] } = useNiveles()
   const { data: gradosNivel = [] } = useGradosPorNivel(ubicacion.idNivel)
-  // Solo los grados del año elegido.
-  const grados = gradosNivel.filter((g) => idAnio == null || g.idAnio === idAnio)
-  const { data: seccionesGrado = [] } = useSeccionesPorGrado(ubicacion.idGrado)
+  // Los grados son de todos los años: aparece el que tiene secciones en el año elegido.
+  const grados = gradosNivel.filter((g) => idAnio == null || g.secciones.some((s) => s.idAnio === idAnio))
+  const { data: seccionesGradoTodas = [] } = useSeccionesPorGrado(ubicacion.idGrado)
+  // Solo las secciones del año elegido (y del turno, si se eligió).
+  const seccionesGrado = seccionesGradoTodas.filter((s) => idAnio == null || s.idAnio === idAnio)
   const secciones = seccionesGrado.filter((s) => idTurno == null || s.idTurno === idTurno)
   const { data: turnos = [] } = useTurnos()
 

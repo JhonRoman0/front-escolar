@@ -37,6 +37,8 @@ export function useAsistenciasHoy(params?: { page?: number; size?: number; fecha
     queryKey: [...KEYS.asistencias, "hoy", params],
     queryFn: () => asistenciasApi.hoy(params),
     placeholderData: keepPreviousData,
+    // Pendiente pasa a Falta con la hora, sin que nadie guarde nada.
+    refetchInterval: 60_000,
   })
 }
 
@@ -73,6 +75,8 @@ export function useEstadisticasAsistencia(rango: RangoEstadisticas, fecha: strin
     queryKey: [...KEYS.estadisticas, rango, fecha, idAnio],
     queryFn: () => asistenciasApi.estadisticas(rango, fecha, idAnio),
     enabled: idAnio != null,
+    // Las tarjetas de hoy cuentan pendientes y faltas, que cambian con la hora.
+    refetchInterval: rango === "hoy" ? 60_000 : false,
   })
 }
 
