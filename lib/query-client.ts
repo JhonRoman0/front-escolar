@@ -1,15 +1,21 @@
 import { MutationCache, QueryClient } from "@tanstack/react-query"
 
+import { avisosConectados } from "@/lib/eventos"
+
 /** Mutaciones que solo consultan (buscar por DNI, previsualizar): no cambian datos. */
 export const SOLO_LECTURA = { soloLectura: true } as const
 
+/** Respaldo: aun sin avisos, nada se usa por más de este tiempo sin volver a pedirlo. */
+const VIGENCIA_MS = 5 * 60 * 1000
+
 /**
  * Caché del frontend. Al pasar de un módulo a otro no se recarga la página:
- * - toda consulta se vuelve a pedir al entrar a su pantalla (se ve lo guardado
- *   al instante y se actualiza en segundo plano), así se ven también los
- *   cambios de otras personas;
- * - al guardar cualquier cosa se marca TODO como desactualizado: un cambio en
- *   un módulo (p. ej. el horario de un turno) afecta a otros (la asistencia).
+ * - los cambios llegan por los avisos en vivo (EscuchaCambios): al recibirlos se
+ *   recarga lo afectado, así no hace falta volver a pedir todo al navegar;
+ * - al guardar algo aquí se marca TODO como desactualizado al momento (un cambio
+ *   en un módulo, p. ej. el horario de un turno, afecta a otros);
+ * - respaldo: lo que tenga más de 5 minutos se vuelve a pedir, y al volver a la
+ *   pestaña solo se consulta si la conexión de avisos está caída.
  */
 export function crearQueryClient() {
   const client: QueryClient = new QueryClient({
@@ -21,9 +27,9 @@ export function crearQueryClient() {
     }),
     defaultOptions: {
       queries: {
-        staleTime: 0,
+        staleTime: VIGENCIA_MS,
         refetchOnMount: true,
-        refetchOnWindowFocus: true,
+        refetchOnWindowFocus: () => !avisosConectados(),
         retry: 1,
       },
     },

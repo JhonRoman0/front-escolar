@@ -18,6 +18,7 @@ import {
 } from "@/lib/api"
 import { PermisosActualizadosModal } from "@/components/seguridad/permisos-actualizados-modal"
 import { CambiarContrasenaDialog } from "@/components/cuenta/cambiar-contrasena-dialog"
+import { EVENTO_REVISAR_PERMISOS } from "@/components/escucha-cambios"
 
 const RUTA_LOGIN = "/login"
 const INTERVALO_VERIFICACION_PERMISOS_MS = 30_000
@@ -137,11 +138,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       INTERVALO_VERIFICACION_PERMISOS_MS
     )
     window.addEventListener("focus", verificarPermisos)
+    // Un aviso en vivo de cambios en Accesos: se revisa al momento.
+    window.addEventListener(EVENTO_REVISAR_PERMISOS, verificarPermisos)
     return () => {
       cancelado = true
       window.clearTimeout(primerChequeo)
       window.clearInterval(intervalo)
       window.removeEventListener("focus", verificarPermisos)
+      window.removeEventListener(EVENTO_REVISAR_PERMISOS, verificarPermisos)
     }
   }, [usuario, cargando, permisosCambiados])
 

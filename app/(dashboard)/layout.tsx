@@ -8,6 +8,7 @@ import AppSidebar from "@/components/sidebar/app-sidebar"
 import SiteHeader from "@/components/sidebar/site-header"
 import MobileBottomBar from "@/components/mobile-nav/mobile-bottom-bar"
 import { useAuth } from "@/components/auth-provider"
+import { EscuchaCambios } from "@/components/escucha-cambios"
 import { useMenuItems } from "@/hooks/use-menu-items"
 import { RUTAS_MODULOS } from "@/lib/modulos"
 
@@ -45,6 +46,8 @@ export default function DashboardLayout({
 
   return (
     <div className="mr-2 flex flex-row">
+      {/* Avisos en vivo: lo que otro guarde se actualiza aquí sin recargar. */}
+      <EscuchaCambios />
       <SidebarProvider>
         {/* Sidebar solo en desktop */}
         <div className="hidden md:block">

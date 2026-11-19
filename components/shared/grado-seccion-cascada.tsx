@@ -47,11 +47,18 @@ export function GradoSeccionCascada({
   const [idNivel, setIdNivel] = useState<number | null>(defaultIdNivel)
   const [idGrado, setIdGrado] = useState<number | null>(defaultIdGrado)
 
+  // Los grados son comunes a todos los años; lo que es de cada año son sus
+  // secciones. Un grado aparece si tiene secciones en el año, y solo esas.
   const { data: todosGrados = [] } = useGradosPorNivel(idNivel)
   const grados = allowedAnios
-    ? todosGrados.filter((g) => allowedAnios.has(g.idAnio))
+    ? todosGrados.filter((g) =>
+        g.secciones.some((s) => allowedAnios.has(s.idAnio)) ||
+        (g.secciones.length === 0 && allowedAnios.has(g.idAnio)))
     : todosGrados
-  const { data: secciones = [] } = useSeccionesPorGrado(idGrado)
+  const { data: seccionesGrado = [] } = useSeccionesPorGrado(idGrado)
+  const secciones = allowedAnios
+    ? seccionesGrado.filter((s) => allowedAnios.has(s.idAnio))
+    : seccionesGrado
 
   useEffect(() => {
     if (value && secciones.length > 0) {
