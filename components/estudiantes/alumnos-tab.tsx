@@ -30,6 +30,7 @@ import { EstadoBadge } from "@/components/seguridad/estado-badge"
 import { BotonReintentar } from "@/components/shared/boton-reintentar"
 import { TablaPaginacion } from "@/components/shared/paginacion-tabla"
 import { FilasCargando, MensajeSinDatos } from "@/components/shared/table-helpers"
+import { useDebouncedValue } from "@/hooks/use-debounce"
 import { useAlumnos } from "@/hooks/use-estudiantes"
 import { useAniosEscolares, useGradosPorNivel, useNiveles, useSeccionesPorGrado, useTurnos } from "@/hooks/use-academico"
 import { anioParaFiltro, estadoAnioTexto } from "@/lib/api/academico"
@@ -46,6 +47,7 @@ import { BotonQuitarApoderado } from "./boton-quitar-apoderado"
 import { AlumnoQrModal } from "./alumno-qr-modal"
 
 const TAMANIO_PAGINA = 10
+const RETARDO_BUSQUEDA = 300
 
 const AVATAR_COLORS = ["bg-brand-info", "bg-[#16A34A]", "bg-[#8EA5E6]", "bg-[#FAA94B]", "bg-[#DC2626]", "bg-brand-subtle"]
 
@@ -62,6 +64,7 @@ function SinMatriculaBadge() {
 export function AlumnosTab() {
   const [page, setPage] = useState(0)
   const [busqueda, setBusqueda] = useState("")
+  const busquedaDebounced = useDebouncedValue(busqueda, RETARDO_BUSQUEDA)
   const [idNivel, setIdNivel] = useState<number | null>(null)
   const [idGrado, setIdGrado] = useState<number | null>(null)
   const [idSeccion, setIdSeccion] = useState<number | null>(null)
@@ -127,8 +130,9 @@ export function AlumnosTab() {
       idGrado: idGrado ?? undefined,
       idSeccion: idSeccion ?? undefined,
       idTurno: idTurno ?? undefined,
+      search: busquedaDebounced.trim() || undefined,
     }),
-    [idAnio, idNivel, idGrado, idSeccion, idTurno]
+    [idAnio, idNivel, idGrado, idSeccion, idTurno, busquedaDebounced]
   )
 
   const { data, isLoading, isError, refetch } = useAlumnos(page, TAMANIO_PAGINA, filtros, puedeConsultar)
@@ -172,15 +176,6 @@ export function AlumnosTab() {
   }
 
   const contenido = puedeConsultar ? data?.content : undefined
-  const alumnosFiltrados = useMemo(() => {
-    if (!contenido) return []
-    if (!busqueda.trim()) return contenido
-    const q = busqueda.trim().toLowerCase()
-    return contenido.filter((a) => {
-      const nombre = `${a.nombre} ${a.apellidoPat} ${a.apellidoMat}`.toLowerCase()
-      return nombre.includes(q) || a.codigo.toLowerCase().includes(q) || (a.documentoIdentidad ?? "").toLowerCase().includes(q)
-    })
-  }, [contenido, busqueda])
 
   async function handleDescargarReporte(
     formato: FormatoReporte,
@@ -351,10 +346,10 @@ export function AlumnosTab() {
                 <FilasCargando columnas={columnas} />
               ) : isError ? (
                 <MensajeSinDatos columnas={columnas} mensaje="No se pudo cargar. Recarga la pantalla." />
-              ) : !alumnosFiltrados.length ? (
-                <MensajeSinDatos columnas={columnas} mensaje={busqueda ? "Sin resultados para la búsqueda." : "Aún no hay alumnos."} />
+              ) : !contenido?.length ? (
+                <MensajeSinDatos columnas={columnas} mensaje={busquedaDebounced ? "Sin resultados para la búsqueda." : "Aún no hay alumnos."} />
               ) : (
-                alumnosFiltrados.map((alumno) => {
+                contenido.map((alumno) => {
                   const nombreCompleto = `${alumno.nombre} ${alumno.apellidoPat} ${alumno.apellidoMat}`.trim()
                   const iniciales = `${alumno.nombre[0] ?? ""}${alumno.apellidoPat[0] ?? ""}`.toUpperCase()
                   const bg = avatarColor(nombreCompleto)
@@ -538,7 +533,7 @@ export function AlumnosTab() {
         )}
 
         {errorAnios && <BotonReintentar refetch={reintentarAnios} />}
-        {puedeConsultar && !!data?.totalPages && data.totalPages > 1 && <TablaPaginacion data={data} onPage={setPage} />}
+        {puedeConsultar && <TablaPaginacion data={data} onPage={setPage} />}
 
         <AlumnoEditarDialog
           alumno={editando}

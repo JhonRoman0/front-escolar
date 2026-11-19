@@ -55,6 +55,7 @@ import { BotonReintentar } from "@/components/shared/boton-reintentar"
 import { BotonGuardar } from "@/components/shared/boton-guardar"
 import { FilterSelect } from "@/components/shared/filter-select"
 import { HeaderSeccion } from "@/components/shared/header-seccion"
+import { TablaPaginacion } from "@/components/shared/paginacion-tabla"
 import { SelectorFecha } from "@/components/shared/selector-fecha"
 import { useEliminarConToast } from "@/hooks/use-eliminar-toast"
 import { guardarConToast } from "@/hooks/guardar-con-toast"
@@ -81,6 +82,7 @@ import type {
   TurnoResponse,
 } from "@/lib/api/academico"
 import { ACCESO, anioParaFiltro, ESTADO_ANIO, estadoAnioTexto, horaCorta, TIPOS_AULA, type SeccionDelAula, type TipoAula } from "@/lib/api/academico"
+import type { Paginated } from "@/lib/api"
 import { cn } from "@/lib/utils"
 import { type TurnoFranja } from "@/lib/turnos"
 import { ConfiguracionAcademicaTab } from "./configuracion-academica-tab"
@@ -257,6 +259,8 @@ export { CursosTab } from "./cursos-tab"
 
 // ── Aulas ────────────────────────────────────────────────────────────────
 
+const TAMANIO_PAGINA = 10
+
 function AulasTab() {
   const { data, isLoading, isError, refetch } = useAulas()
   const crud = useCrudAulas()
@@ -265,6 +269,7 @@ function AulasTab() {
   const puedeEliminar = usePuede("AULAS", "ELIMINAR")
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editando, setEditando] = useState<AulaResponse | null>(null)
+  const [page, setPage] = useState(0)
   const { data: anios = [] } = useAniosEscolares()
   const [idAnioElegido, setIdAnioElegido] = useState<number | null>(null)
   const anioFiltro = anios.find((a) => a.idAnio === idAnioElegido) ?? anioParaFiltro(anios)
@@ -276,6 +281,23 @@ function AulasTab() {
     .filter((aula) => estadoFiltro === "" || String(aula.accesoId) === estadoFiltro)
     .filter((aula) => tipoFiltro === "" || aula.tipo === tipoFiltro)
     .sort((a, b) => b.idAula - a.idAula)
+
+  const totalRegistros = aulasFiltradas.length
+  const totalPaginas = Math.ceil(totalRegistros / TAMANIO_PAGINA)
+  const pagina = Math.min(page, Math.max(0, totalPaginas - 1))
+  const fin = Math.min((pagina + 1) * TAMANIO_PAGINA, totalRegistros)
+  const aulasPaginadas = aulasFiltradas.slice(pagina * TAMANIO_PAGINA, fin)
+  const datosPaginacion: Paginated<AulaResponse> = {
+    content: aulasPaginadas,
+    totalElements: totalRegistros,
+    totalPages: totalPaginas,
+    size: TAMANIO_PAGINA,
+    number: pagina,
+    numberOfElements: aulasPaginadas.length,
+    first: pagina === 0,
+    last: pagina >= totalPaginas - 1,
+    empty: totalRegistros === 0,
+  }
 
   // Los nombres ya registrados, sin incluir el que se está editando: el schema
   // dinámico del diálogo compara contra esta lista, así que un aula nunca choca
@@ -290,11 +312,22 @@ function AulasTab() {
 
   const eliminarConToast = useEliminarConToast()
 
-  function handleEliminar(aula: AulaResponse) {
-    return eliminarConToast(crud.eliminar.mutateAsync, {
-      id: aula.idAula,
-      mensaje: `Aula "${aula.nombre}" eliminada`,
-    })
+  async function handleEliminar(aula: AulaResponse) {
+    const ultimaFilaDeLaPagina = aulasPaginadas.length === 1 && pagina > 0
+    let eliminada = false
+    await eliminarConToast(
+      (id) =>
+        crud.eliminar.mutateAsync(id).then(() => {
+          eliminada = true
+        }),
+      {
+        id: aula.idAula,
+        mensaje: `Aula "${aula.nombre}" eliminada`,
+      }
+    )
+    if (eliminada && ultimaFilaDeLaPagina) {
+      setPage((p) => p - 1)
+    }
   }
 
   return (
@@ -317,7 +350,10 @@ function AulasTab() {
         <div className="flex flex-wrap items-center gap-3">
           <FilterSelect
             value={anioFiltro ? String(anioFiltro.idAnio) : ""}
-            onValueChange={(valor) => setIdAnioElegido(Number(valor))}
+            onValueChange={(valor) => {
+              setIdAnioElegido(Number(valor))
+              setPage(0)
+            }}
             options={[...anios]
               .sort((a, b) => b.anio.localeCompare(a.anio))
               .map((a) => ({ value: String(a.idAnio), label: `${a.anio} · ${estadoAnioTexto(a.estado)}` }))}
@@ -326,14 +362,20 @@ function AulasTab() {
           />
           <FilterSelect
             value={tipoFiltro}
-            onValueChange={setTipoFiltro}
+            onValueChange={(valor) => {
+              setTipoFiltro(valor)
+              setPage(0)
+            }}
             options={TIPOS_AULA.map((t) => ({ value: t.value, label: t.label }))}
             allLabel="Todos los tipos"
             className="w-[180px] max-w-full shrink-0"
           />
           <FilterSelect
             value={estadoFiltro}
-            onValueChange={setEstadoFiltro}
+            onValueChange={(valor) => {
+              setEstadoFiltro(valor)
+              setPage(0)
+            }}
             options={[
               { value: String(ACCESO.ACTIVO), label: "Activo" },
               { value: String(ACCESO.INACTIVO), label: "Inactivo" },
@@ -367,7 +409,7 @@ function AulasTab() {
                   mensaje="No hay aulas que coincidan con los filtros seleccionados."
                 />
               ) : (
-                aulasFiltradas.map((aula) => (
+                aulasPaginadas.map((aula) => (
                   <TableRow key={aula.idAula}>
                     <TableCell className="font-medium">{aula.nombre}</TableCell>
                     <TableCell className="text-center">
@@ -402,6 +444,7 @@ function AulasTab() {
           </Table>
         </div>
         {isError && <BotonReintentar refetch={refetch} />}
+        <TablaPaginacion data={data ? datosPaginacion : null} onPage={setPage} />
         <AulaDialog
           open={dialogOpen}
           onOpenChange={setDialogOpen}

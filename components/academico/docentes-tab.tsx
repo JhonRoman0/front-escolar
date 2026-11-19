@@ -22,6 +22,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field"
+import { coincideBusqueda, tokensBusqueda } from "@/lib/busqueda"
 import { nacimientoMaximoAdulto } from "@/lib/edades"
 import { Input } from "@/components/ui/input"
 import {
@@ -56,6 +57,7 @@ import { TarjetaSeccion } from "@/components/shared/tarjeta-seccion"
 import { BuscadorTabla } from "@/components/shared/buscador-tabla"
 import { BotonLimpiarFiltros } from "@/components/shared/boton-limpiar-filtros"
 import { FilterSelect } from "@/components/shared/filter-select"
+import { TablaPaginacion } from "@/components/shared/paginacion-tabla"
 import {
   useActualizarDocente,
   useDocentes,
@@ -68,6 +70,7 @@ import {
 } from "@/hooks/use-academico"
 import { useConsultarDni } from "@/hooks/use-reniec"
 import { useDebouncedValue } from "@/hooks/use-debounce"
+import type { Paginated } from "@/lib/api"
 import type {
   DocenteRequest,
   DocenteResponse,
@@ -78,6 +81,8 @@ import { usePuede } from "@/hooks/use-permisos"
 import { reportesApi } from "@/lib/api/reportes"
 import { descargarTabla, tablaDocentes, type FormatoReporte } from "@/lib/reportes/tablas"
 import { ReporteModal } from "@/components/reportes/reporte-modal"
+
+const TAMANIO_PAGINA = 10
 
 const ESTADO_OPCIONES = [
   { value: "1", label: "Activo" },
@@ -93,6 +98,7 @@ export default function DocentesTab() {
   const puedeEliminar = usePuede("DOCENTES", "ELIMINAR")
   const puedeExportar = usePuede("DOCENTES", "IMPRIMIR_EXPORTAR")
 
+  const [page, setPage] = useState(0)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editando, setEditando] = useState<DocenteResponse | null>(null)
   const [reporteOpen, setReporteOpen] = useState(false)
@@ -130,20 +136,20 @@ export default function DocentesTab() {
     filtroNivel !== ""
 
   const docentesFiltrados = useMemo(() => {
-    const q = busquedaDebounced.trim().toLowerCase()
+    const tokens = tokensBusqueda(busquedaDebounced)
     return (data ?? []).filter((d) => {
       if (filtroEstado && String(d.accesoId) !== filtroEstado) return false
       if (filtroTipoContrato && String(d.tipoContratoId) !== filtroTipoContrato)
         return false
       if (filtroNivel && !d.niveles.some((n) => String(n.idNivel) === filtroNivel))
         return false
-      if (!q) return true
-      const nombreCompleto =
-        `${d.nombre} ${d.apellidoPat} ${d.apellidoMat}`.toLowerCase()
-      return (
-        nombreCompleto.includes(q) ||
-        d.codigo.toLowerCase().includes(q) ||
-        (d.documentoIdentidad ?? "").toLowerCase().includes(q)
+      return coincideBusqueda(
+        [
+          `${d.nombre} ${d.apellidoPat} ${d.apellidoMat}`,
+          d.codigo,
+          d.documentoIdentidad,
+        ],
+        tokens
       )
     })
   }, [
@@ -154,11 +160,49 @@ export default function DocentesTab() {
     filtroNivel,
   ])
 
+  const totalRegistros = docentesFiltrados.length
+  const totalPaginas = Math.ceil(totalRegistros / TAMANIO_PAGINA)
+  const pagina = Math.min(page, Math.max(0, totalPaginas - 1))
+  const fin = Math.min((pagina + 1) * TAMANIO_PAGINA, totalRegistros)
+  const docentesPaginados = docentesFiltrados.slice(pagina * TAMANIO_PAGINA, fin)
+  const datosPaginacion: Paginated<DocenteResponse> = {
+    content: docentesPaginados,
+    totalElements: totalRegistros,
+    totalPages: totalPaginas,
+    size: TAMANIO_PAGINA,
+    number: pagina,
+    numberOfElements: docentesPaginados.length,
+    first: pagina === 0,
+    last: pagina >= totalPaginas - 1,
+    empty: totalRegistros === 0,
+  }
+
+  function cambiarBusqueda(valor: string) {
+    setBusqueda(valor)
+    setPage(0)
+  }
+
+  function cambiarEstado(valor: string) {
+    setFiltroEstado(valor)
+    setPage(0)
+  }
+
+  function cambiarTipoContrato(valor: string) {
+    setFiltroTipoContrato(valor)
+    setPage(0)
+  }
+
+  function cambiarNivel(valor: string) {
+    setFiltroNivel(valor)
+    setPage(0)
+  }
+
   function limpiarFiltros() {
     setBusqueda("")
     setFiltroEstado("")
     setFiltroTipoContrato("")
     setFiltroNivel("")
+    setPage(0)
   }
 
   async function handleDescargarReporte(
@@ -183,6 +227,9 @@ export default function DocentesTab() {
       toast.success(
         `Docente "${docente.nombre} ${docente.apellidoPat}" eliminado`
       )
+      if (docentesPaginados.length === 1 && pagina > 0) {
+        setPage((p) => p - 1)
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Error al eliminar")
     }
@@ -216,27 +263,27 @@ export default function DocentesTab() {
         <div className="flex flex-wrap items-center gap-2">
           <BuscadorTabla
             value={busqueda}
-            onValueChange={setBusqueda}
+            onValueChange={cambiarBusqueda}
             placeholder="Buscar por nombre, DNI o código..."
             className="min-w-[200px] flex-1 max-w-[358px]"
           />
           <FilterSelect
             value={filtroEstado}
-            onValueChange={setFiltroEstado}
+            onValueChange={cambiarEstado}
             options={ESTADO_OPCIONES}
             allLabel="Todos los estados"
             className="w-[180px]"
           />
           <FilterSelect
             value={filtroTipoContrato}
-            onValueChange={setFiltroTipoContrato}
+            onValueChange={cambiarTipoContrato}
             options={opcionesContrato}
             allLabel="Todos los contratos"
             className="w-[210px]"
           />
           <FilterSelect
             value={filtroNivel}
-            onValueChange={setFiltroNivel}
+            onValueChange={cambiarNivel}
             options={opcionesNivel}
             allLabel="Todos los niveles"
             className="w-[180px]"
@@ -272,7 +319,7 @@ export default function DocentesTab() {
                 }
               />
             ) : (
-              docentesFiltrados.map((docente) => {
+              docentesPaginados.map((docente) => {
                 const nombreCompleto = `${docente.nombre} ${docente.apellidoPat} ${docente.apellidoMat}`.trim()
                 const iniciales = `${docente.nombre[0] ?? ""}${docente.apellidoPat[0] ?? ""}`.toUpperCase()
                 return (
@@ -362,6 +409,8 @@ export default function DocentesTab() {
             Reintentar
           </Button>
         )}
+
+        <TablaPaginacion data={data ? datosPaginacion : null} onPage={setPage} />
 
         <DocenteFormDialog
           key={editando?.idDocente ?? "nuevo"}
