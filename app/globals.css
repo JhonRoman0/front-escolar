@@ -81,6 +81,7 @@
   --text-boton: 22px;
   --text-pequeno: 14px;
   --text-mini: 12px;
+  --text-micro: 11px;
 
   /* Tokens de rol para las superficies de acceso. Mismo criterio que la escala
      tipográfica: un token describe el papel que cumple algo en la pantalla, no el

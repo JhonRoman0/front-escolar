@@ -15,7 +15,8 @@ import { GradoSeccionCascada } from "@/components/shared/grado-seccion-cascada"
 import { useAniosEscolares, useDocenteDeUsuario, useDocentes, useGrados, useTurnos } from "@/hooks/use-academico"
 import { useHorarios, useMiHorario, useRecreosSeccion, useRolHorario } from "@/hooks/use-horario"
 import { anioParaFiltro } from "@/lib/api/academico"
-import { etiquetaSeccion, type HorarioListItem, type RecreoHorario } from "@/lib/api/horario"
+import { type HorarioListItem, type RecreoHorario } from "@/lib/api/horario"
+import { aMinutos } from "@/lib/horario"
 import { generarPdfHorario } from "@/lib/reportes/generar-pdf"
 
 /** mio: el horario del docente; colegio: el de cualquier sección. */
@@ -28,11 +29,7 @@ function comoLista(data: unknown): HorarioListItem[] {
 }
 
 function horasDe(horarios: HorarioListItem[]): number {
-  const minutos = horarios.reduce((total, h) => {
-    const [hi, mi] = h.horaInicio.split(":").map(Number)
-    const [hf, mf] = h.horaFin.split(":").map(Number)
-    return total + (hf * 60 + mf) - (hi * 60 + mi)
-  }, 0)
+  const minutos = horarios.reduce((total, h) => total + aMinutos(h.horaFin) - aMinutos(h.horaInicio), 0)
   return Math.round((minutos / 60) * 10) / 10
 }
 
@@ -127,6 +124,11 @@ function Horario({ esAdmin }: { esAdmin: boolean }) {
     const nombres = [...new Set(horarios.map((h) => h.turno))]
     return vista === "colegio" && nombres.length === 1 ? turnos.find((t) => t.nombre === nombres[0]) ?? null : null
   }, [horarios, turnos, vista])
+  const turnoPdf = useMemo(() => {
+    if (vista === "colegio") return turnoGrilla
+    const nombre = turnoActivo ?? turnosDocente[0] ?? null
+    return nombre ? turnos.find((t) => t.nombre === nombre) ?? null : null
+  }, [vista, turnoGrilla, turnoActivo, turnosDocente, turnos])
 
   const deAnio = anio ? ` · ${anio.anio}` : ""
   const tituloMio = (turno: string | null) =>
@@ -140,31 +142,28 @@ function Horario({ esAdmin }: { esAdmin: boolean }) {
   }, [grados, idGradoSeccion, deAnio])
 
   function descargarPdf() {
-    if (!todas.length) return
-    if (vista === "colegio") {
-      generarPdfHorario([{ titulo: tituloColegio, horarios: todas, recreos: todosRecreos }])
-      return
-    }
-    // Una página por turno; cada bloque dice la sección.
-    const turnosPdf = turnosDocente.length ? turnosDocente : [null]
-    generarPdfHorario(turnosPdf.map((t) => ({
-      titulo: tituloMio(turnosDocente.length > 1 ? t : null),
-      horarios: todas.filter((h) => t == null || h.turno === t).map((h) => ({ ...h, detalle: etiquetaSeccion(h) })),
-      recreos: todosRecreos.filter((r) => t == null || r.turno === t),
-    })))
+    if (!horarios.length) return
+    generarPdfHorario([{
+      titulo: vista === "mio" ? tituloMio(turnoActivo) : tituloColegio,
+      horarios,
+      recreos,
+      vista: vista === "mio" ? "docente" : "seccion",
+      horaEntrada: turnoPdf?.horaEntrada,
+      horaSalida: turnoPdf?.horaSalida,
+    }])
   }
 
   const opcionesAnio = [...anios].sort((a, b) => b.anio.localeCompare(a.anio)).map((a) => ({ value: String(a.idAnio), label: a.anio }))
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 pb-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2">
           <CalendarDays className="size-5 text-primary" />
           <h1 className="text-lg font-semibold">Horario Académico</h1>
         </div>
         {puedeDescargar && (
-          <Button variant="outline" size="sm" onClick={descargarPdf} disabled={!todas.length || query.isLoading}>
+          <Button variant="outline" size="sm" onClick={descargarPdf} disabled={!horarios.length || query.isLoading}>
             <Download data-icon="inline-start" />
             Descargar PDF
           </Button>
