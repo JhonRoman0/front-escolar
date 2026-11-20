@@ -34,6 +34,7 @@ import {
 
 import { BotonNuevo } from "@/components/shared/boton-nuevo"
 import { HeaderSeccion } from "@/components/shared/header-seccion"
+import { TablaPaginacion } from "@/components/shared/paginacion-tabla"
 import {
   AccionesFila,
   CampoAcceso,
@@ -46,12 +47,15 @@ import {
   useJustificaciones,
 } from "@/hooks/use-asistencia"
 import { usePuede } from "@/hooks/use-permisos"
+import type { Paginated } from "@/lib/api"
 import type { JustificacionResponse } from "@/lib/api/justificacion"
 import {
   justificacionSchema,
   type JustificacionValues,
 } from "@/lib/schemas/asistencia"
 import { formatearFecha } from "@/lib/fechas"
+
+const TAMANIO_PAGINA = 10
 
 export function JustificacionesTab() {
   const { data, isLoading, isError, refetch } = useJustificaciones()
@@ -63,16 +67,37 @@ export function JustificacionesTab() {
   const puedeEliminar = puedeConfigurar
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editando, setEditando] = useState<JustificacionResponse | null>(null)
+  const [page, setPage] = useState(0)
 
   // Los más recientes primero para revisar el catálogo con contexto.
   const ordenadas = [...(data ?? [])].sort((a, b) =>
     (b.fechaRegistro ?? "").localeCompare(a.fechaRegistro ?? "")
   )
 
+  const totalRegistros = ordenadas.length
+  const totalPaginas = Math.ceil(totalRegistros / TAMANIO_PAGINA)
+  const pagina = Math.min(page, Math.max(0, totalPaginas - 1))
+  const fin = Math.min((pagina + 1) * TAMANIO_PAGINA, totalRegistros)
+  const motivosPaginados = ordenadas.slice(pagina * TAMANIO_PAGINA, fin)
+  const datosPaginacion: Paginated<JustificacionResponse> = {
+    content: motivosPaginados,
+    totalElements: totalRegistros,
+    totalPages: totalPaginas,
+    size: TAMANIO_PAGINA,
+    number: pagina,
+    numberOfElements: motivosPaginados.length,
+    first: pagina === 0,
+    last: pagina >= totalPaginas - 1,
+    empty: totalRegistros === 0,
+  }
+
   async function handleEliminar(j: JustificacionResponse) {
     try {
       await crud.eliminar.mutateAsync(j.idJustificacion)
       toast.success(`Motivo "${j.motivo}" eliminado`)
+      if (motivosPaginados.length === 1 && pagina > 0) {
+        setPage((p) => p - 1)
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Error al eliminar")
     }
@@ -115,7 +140,7 @@ export function JustificacionesTab() {
             ) : !ordenadas.length ? (
               <MensajeSinDatos columnas={4} mensaje="Aún no hay motivos de justificación." />
             ) : (
-              ordenadas.map((j) => (
+              motivosPaginados.map((j) => (
                 <TableRow key={j.idJustificacion}>
                   <TableCell className="font-medium">{j.motivo}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">
@@ -148,6 +173,7 @@ export function JustificacionesTab() {
             Reintentar
           </Button>
         )}
+        <TablaPaginacion data={data ? datosPaginacion : null} onPage={setPage} />
         <JustificacionDialog
           key={editando?.idJustificacion ?? "nuevo"}
           open={dialogOpen}
