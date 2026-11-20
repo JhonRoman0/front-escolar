@@ -304,6 +304,7 @@ export default function EvaluacionesTab() {
             periodo={periodo}
             evaluacion={formulario?.evaluacion ?? null}
             avance={avance}
+            evaluaciones={evaluaciones}
           />
         )}
         <ResumenEvaluacionDialog idEvaluacion={idResumen} onOpenChange={(open) => !open && setIdResumen(null)} />
