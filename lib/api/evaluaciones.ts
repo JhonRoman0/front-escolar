@@ -148,6 +148,7 @@ export interface PorCompetencia {
 /** Registro auxiliar: notas de cada alumno en todas las evaluaciones del curso y periodo. */
 export interface RegistroAuxiliar {
   escala: EscalaCalificacion
+  notaMinima: string
   evaluaciones: EvaluacionResumen[]
   competencias: CompetenciaEvaluada[]
   alumnos: {
