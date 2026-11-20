@@ -11,11 +11,67 @@ import type {
 } from "@/lib/api/dashboard"
 import type { EstadisticasResponse } from "@/lib/api/asistencia"
 import { formatearFecha, formatearHora } from "@/lib/fechas"
+import {
+  MINUTOS_SLOT,
+  NOMBRES_DIAS,
+  aMinutos,
+  agruparRecreos,
+  camposTarjeta,
+  colorCurso,
+  diasHorarioVisibles,
+  esDiaVisible,
+  formatearRango,
+  limitesHorario,
+  minutosAHora,
+  seleccionarLineasTarjeta,
+  ticksHorario,
+  type BloqueTemporal,
+  type DatosClase,
+  type FranjaRecreo,
+  type LineaTarjeta,
+  type PesoTexto,
+} from "@/lib/horario"
 import { celdaTexto, contarEstados, fechaCorta, type TablaReporte } from "./formato"
+import { AZUL, GRIS, MARGEN } from "./pdf-institucional"
 
-// Paleta institucional (§6.1 de AGENTS.md): azul #004497 para encabezados.
-const AZUL: [number, number, number] = [0, 68, 151]
 const FILA_ALTERNA: [number, number, number] = [245, 247, 252]
+const TEXTO_CURSO_PDF: [number, number, number] = [30, 30, 30]
+const ALTO_LINEA_PDF = 2.3
+const SEPARACION_LINEAS_PDF = 0.15
+const PADDING_X_PDF = 1.6
+const PADDING_Y_PDF = 0.8
+const TAMANO_CURSO_PDF = 6.5
+const TAMANO_DETALLE_PDF = 5.5
+const TAMANO_CURSO_AMPLIO_PDF = 7
+const TAMANO_DETALLE_AMPLIO_PDF = 6.1
+const ALTO_LINEA_AMPLIA_PDF = 2.7
+const SEPARACION_LINEAS_AMPLIA_PDF = 0.2
+const UMBRAL_ALTO_TARJETA_AMPLIA_PDF = 14
+const TAMANO_HORA_PDF = 6.5
+const DESPLAZAMIENTO_HORA_PDF = 0.5
+const PADDING_DERECHA_HORA_PDF = 2
+const ESPACIO_MINIMO_DETALLE_PDF = 30
+
+interface EstiloTextoTarjetaPdf {
+  tamanoCurso: number
+  tamanoDetalle: number
+  alturaLinea: number
+  separacion: number
+}
+
+const ESTILO_TARJETA_COMPACTO_PDF: EstiloTextoTarjetaPdf = {
+  tamanoCurso: TAMANO_CURSO_PDF,
+  tamanoDetalle: TAMANO_DETALLE_PDF,
+  alturaLinea: ALTO_LINEA_PDF,
+  separacion: SEPARACION_LINEAS_PDF,
+}
+
+const ESTILO_TARJETA_AMPLIO_PDF: EstiloTextoTarjetaPdf = {
+  tamanoCurso: TAMANO_CURSO_AMPLIO_PDF,
+  tamanoDetalle: TAMANO_DETALLE_AMPLIO_PDF,
+  alturaLinea: ALTO_LINEA_AMPLIA_PDF,
+  separacion: SEPARACION_LINEAS_AMPLIA_PDF,
+}
 
 type Orientacion = "portrait" | "landscape"
 
@@ -275,97 +331,132 @@ export function generarPdfTabla(tabla: TablaReporte): void {
 
 // ── Horario Académico (grilla visual) ──────────────────────────────────
 
-// Colores RGB para el PDF (mismos que la paleta web)
-const COLORES_PDF: [number, number, number][] = [
-  [219, 234, 254],   // blue-100
-  [209, 250, 229],   // emerald-100
-  [254, 243, 199],   // amber-100
-  [254, 226, 226],   // rose-100
-  [237, 233, 254],   // violet-100
-  [207, 250, 254],   // cyan-100
-  [255, 237, 213],   // orange-100
-  [204, 251, 241],   // teal-100
-]
-
-function hashCursoPdf(nombre: string): number {
-  let hash = 0
-  for (let i = 0; i < nombre.length; i++) {
-    hash = ((hash << 5) - hash + nombre.charCodeAt(i)) | 0
-  }
-  return Math.abs(hash) % COLORES_PDF.length
-}
-
-function aMinutosPdf(hora: string): number {
-  const [h, m] = hora.split(":").map(Number)
-  return h * 60 + m
-}
-
-function minutosAHoraPdf(min: number): string {
-  const h = Math.floor(min / 60)
-  const m = min % 60
-  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`
-}
-
-interface HorarioPdfItem {
-  diaSemana: number
-  horaInicio: string
-  horaFin: string
-  curso: string
-  docente: string
-  aula: string
-  /** Segunda línea del bloque; si no viene, el docente. */
-  detalle?: string
-}
-
-interface RecreoPdfItem {
-  diaSemana: number
-  horaInicio: string
-  horaFin: string
-}
-
-/** Una página del PDF: un horario (por ejemplo, el de un turno) con sus recreos. */
 export interface PaginaHorarioPdf {
   titulo: string
-  horarios: HorarioPdfItem[]
-  recreos?: RecreoPdfItem[]
+  horarios: readonly DatosClase[]
+  recreos?: readonly BloqueTemporal[]
+  vista?: "seccion" | "docente"
+  horaEntrada?: string
+  horaSalida?: string
 }
 
-/** Un PDF con una página por horario (por turno, en el del docente). */
-export function generarPdfHorario(paginas: PaginaHorarioPdf[], nombreColegio = "Sistema Escolar"): void {
+interface GeometriaPdf {
+  pageW: number
+  pageH: number
+  colHoraW: number
+  colDiaW: number
+}
+
+interface CajaBloquePdf {
+  x: number
+  y: number
+  ancho: number
+  alto: number
+}
+
+interface BandaPdf {
+  desde: number
+  hasta: number
+}
+
+export function construirPdfHorario(paginas: readonly PaginaHorarioPdf[], nombreColegio = "Sistema Escolar"): jsPDF {
   const doc = nuevoDoc("landscape")
   paginas.forEach((pagina, i) => {
     if (i > 0) doc.addPage()
     dibujarHorario(doc, pagina, nombreColegio)
   })
-  doc.save(`horario-semanal-${new Date().toISOString().slice(0, 10)}.pdf`)
+  return doc
 }
 
-function dibujarHorario(doc: ReturnType<typeof nuevoDoc>, pagina: PaginaHorarioPdf, nombreColegio: string): void {
-  const { horarios, titulo } = pagina
-  const recreos = pagina.recreos ?? []
-  const MINUTOS_SLOT = 30
-  const NOMBRES = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"]
+export function generarPdfHorario(paginas: readonly PaginaHorarioPdf[], nombreColegio = "Sistema Escolar"): void {
+  construirPdfHorario(paginas, nombreColegio).save(`horario-semanal-${new Date().toISOString().slice(0, 10)}.pdf`)
+}
 
-  // Rango de horas: clases y recreos.
-  let minMin = Infinity
-  let maxMin = 0
-  for (const h of [...horarios, ...recreos]) {
-    const ini = aMinutosPdf(h.horaInicio)
-    const fin = aMinutosPdf(h.horaFin)
-    if (ini < minMin) minMin = ini
-    if (fin > maxMin) maxMin = fin
+function fuentePorPeso(peso: PesoTexto): "bold" | "normal" {
+  return peso === 700 ? "bold" : "normal"
+}
+
+function tamanoPorPeso(peso: PesoTexto, estilo: EstiloTextoTarjetaPdf = ESTILO_TARJETA_COMPACTO_PDF): number {
+  return peso === 700 ? estilo.tamanoCurso : estilo.tamanoDetalle
+}
+
+function medirLineasPdf(
+  doc: jsPDF,
+  texto: string,
+  ancho: number,
+  peso: PesoTexto,
+  estilo: EstiloTextoTarjetaPdf = ESTILO_TARJETA_COMPACTO_PDF,
+): string[] {
+  if (!texto) return []
+  doc.setFont("helvetica", fuentePorPeso(peso))
+  doc.setFontSize(tamanoPorPeso(peso, estilo))
+  return doc.splitTextToSize(texto, Math.max(1, ancho)) as string[]
+}
+
+function truncarTextoPdf(
+  doc: jsPDF,
+  texto: string,
+  ancho: number,
+  peso: PesoTexto,
+  estilo: EstiloTextoTarjetaPdf = ESTILO_TARJETA_COMPACTO_PDF,
+): string {
+  if (!texto) return texto
+  doc.setFont("helvetica", fuentePorPeso(peso))
+  doc.setFontSize(tamanoPorPeso(peso, estilo))
+  const anchoUtil = Math.max(1, ancho)
+  if (doc.getTextWidth(texto) <= anchoUtil) return texto
+
+  const elipsis = "…"
+  let resultado = ""
+  for (const caracter of Array.from(texto)) {
+    if (doc.getTextWidth(resultado + caracter + elipsis) > anchoUtil) break
+    resultado += caracter
   }
-  minMin = Math.floor(minMin / MINUTOS_SLOT) * MINUTOS_SLOT
+  return `${resultado}${elipsis}`
+}
 
-  const slots: number[] = []
-  for (let m = minMin; m < maxMin; m += MINUTOS_SLOT) slots.push(m)
+function dibujarLineasBloquePdf(
+  doc: jsPDF,
+  lineas: readonly LineaTarjeta[],
+  caja: CajaBloquePdf,
+  estilo: EstiloTextoTarjetaPdf,
+): void {
+  if (!lineas.length) return
 
-  // Dimensiones del PDF (landscape A4: 297 x 210 mm)
-  const MARGIN = 14
-  const COL_HORA_W = 22
-  const PAGE_W = 297
-  const COL_DIA_W = (PAGE_W - MARGIN * 2 - COL_HORA_W) / 5
-  const ROW_H = 14
+  const altoLineas = lineas.length * estilo.alturaLinea + Math.max(0, lineas.length - 1) * estilo.separacion
+  const x = caja.x + PADDING_X_PDF
+  let y = caja.y + Math.max(PADDING_Y_PDF, (caja.alto - altoLineas) / 2) + estilo.alturaLinea * 0.85
+
+  for (const linea of lineas) {
+    doc.setFont("helvetica", fuentePorPeso(linea.peso))
+    doc.setFontSize(tamanoPorPeso(linea.peso, estilo))
+    doc.setTextColor(...(linea.tipo === "curso" ? TEXTO_CURSO_PDF : GRIS))
+    doc.text(linea.texto, x, y)
+    y += estilo.alturaLinea + estilo.separacion
+  }
+}
+
+function dibujarHorario(doc: jsPDF, pagina: PaginaHorarioPdf, nombreColegio: string): void {
+  const { horarios, titulo, vista = "seccion" } = pagina
+  const recreos = pagina.recreos ?? []
+  const limites = limitesHorario(horarios, recreos, pagina.horaEntrada, pagina.horaSalida)
+  if (!limites) return
+
+  const diasVisibles = diasHorarioVisibles(horarios, recreos)
+  const geometria: GeometriaPdf = {
+    pageW: doc.internal.pageSize.getWidth(),
+    pageH: doc.internal.pageSize.getHeight(),
+    colHoraW: 22,
+    colDiaW: 0,
+  }
+  geometria.colDiaW = (geometria.pageW - MARGEN * 2 - geometria.colHoraW) / diasVisibles.length
+
+  const ordenados = [...horarios].sort((a, b) =>
+    a.diaSemana - b.diaSemana ||
+    aMinutos(a.horaInicio) - aMinutos(b.horaInicio) ||
+    a.curso.localeCompare(b.curso),
+  )
+  const franjas = agruparRecreos(recreos)
 
   let y = escribirEncabezado(doc, "Horario Semanal", [
     nombreColegio,
@@ -373,83 +464,234 @@ function dibujarHorario(doc: ReturnType<typeof nuevoDoc>, pagina: PaginaHorarioP
     `Generado: ${generarAhora()}`,
   ])
 
-  // Header de días
-  doc.setFontSize(8)
-  doc.setFont("helvetica", "bold")
-  for (let i = 0; i < 5; i++) {
-    const x = MARGIN + COL_HORA_W + i * COL_DIA_W
-    doc.setFillColor(...AZUL)
-    doc.rect(x, y, COL_DIA_W, 7, "F")
-    doc.setTextColor(255, 255, 255)
-    doc.text(NOMBRES[i], x + COL_DIA_W / 2, y + 5, { align: "center" })
+  const altoParaBanda = geometria.pageH - MARGEN - y - 7 - 12
+  const slotsPorBanda = Math.max(1, Math.floor(altoParaBanda / 5))
+  const pasoBanda = MINUTOS_SLOT * slotsPorBanda
+  const bandas: BandaPdf[] = []
+  for (let desde = limites.min; desde < limites.max; desde += pasoBanda) {
+    bandas.push({ desde, hasta: Math.min(limites.max, desde + pasoBanda) })
   }
-  doc.setFillColor(...AZUL)
-  doc.rect(MARGIN, y, COL_HORA_W, 7, "F")
-  doc.setTextColor(255, 255, 255)
-  doc.text("Hora", MARGIN + COL_HORA_W / 2, y + 5, { align: "center" })
-  y += 7
 
-  // Slots de tiempo
+  bandas.forEach((banda, idx) => {
+    if (idx > 0) {
+      doc.addPage()
+      y = escribirEncabezado(doc, "Horario Semanal", [
+        nombreColegio,
+        titulo,
+        `Continuación · ${formatearRango(banda.desde, banda.hasta)}`,
+      ])
+    }
+    y = dibujarBanda(doc, banda, limites, ordenados, vista, franjas, diasVisibles, y, geometria)
+  })
+
+  const espacioRestante = geometria.pageH - MARGEN - y
+  if (espacioRestante < ESPACIO_MINIMO_DETALLE_PDF) {
+    doc.addPage()
+    y = escribirEncabezado(doc, "Detalle del Horario", [nombreColegio, titulo])
+  } else {
+    doc.setFont("helvetica", "bold")
+    doc.setFontSize(9)
+    doc.setTextColor(...AZUL)
+    doc.text("Detalle del Horario", MARGEN, y)
+    doc.setTextColor(0)
+    y += 5
+  }
+
   doc.setFont("helvetica", "normal")
   doc.setFontSize(7)
-  for (const slotMin of slots) {
-    const slotY = y + (slotMin - minMin) / MINUTOS_SLOT * ROW_H
-    doc.setFillColor(245, 247, 252)
-    doc.rect(MARGIN, slotY, COL_HORA_W, ROW_H, "F")
-    doc.setDrawColor(200, 200, 200)
-    doc.rect(MARGIN, slotY, COL_HORA_W, ROW_H, "S")
-    doc.setTextColor(100, 100, 100)
-    doc.text(minutosAHoraPdf(slotMin), MARGIN + COL_HORA_W / 2, slotY + ROW_H / 2 + 1, { align: "center" })
-    for (let d = 0; d < 5; d++) {
-      const x = MARGIN + COL_HORA_W + d * COL_DIA_W
-      doc.setDrawColor(220, 220, 220)
-      doc.rect(x, slotY, COL_DIA_W, ROW_H, "S")
-    }
+  doc.setTextColor(...GRIS)
+  doc.text("La tabla complementa la grilla con sección y turno; la grilla muestra el detalle cuando el espacio lo permite.", MARGEN, y)
+  y += 4
+
+  const cuerpo: string[][] = ordenados.map((h) => {
+    const campos = camposTarjeta(h, vista)
+    return [
+      campos.dia,
+      campos.rango,
+      `${campos.curso}\n${campos.seccion}`,
+      campos.docente,
+      campos.aula,
+      campos.turno || "—",
+    ]
+  })
+
+  for (const franja of franjas) {
+    const desdeDia = Math.max(franja.desdeDia, 1)
+    const hastaDia = Math.min(franja.hastaDia, diasVisibles[diasVisibles.length - 1])
+    if (hastaDia < desdeDia) continue
+    const dia = desdeDia === hastaDia
+      ? NOMBRES_DIAS[desdeDia - 1]
+      : `${NOMBRES_DIAS[desdeDia - 1]}–${NOMBRES_DIAS[hastaDia - 1]}`
+    cuerpo.push([dia, franja.rango, "Recreo", "—", "—", "—"])
   }
 
-  /** Posición del bloque en la grilla; null si cae en fin de semana. */
-  function caja(h: { diaSemana: number; horaInicio: string; horaFin: string }) {
-    if (h.diaSemana > 5) return null
-    const iniMin = aMinutosPdf(h.horaInicio)
-    const finMin = aMinutosPdf(h.horaFin)
+  autoTable(doc, {
+    startY: y,
+    margin: { left: MARGEN, right: MARGEN },
+    head: [["Día", "Hora", "Curso / Sección", "Docente", "Aula", "Turno"]],
+    body: cuerpo,
+    theme: "grid",
+    styles: { fontSize: 7, cellPadding: 1.2, overflow: "linebreak", valign: "middle" },
+    headStyles: { fillColor: AZUL, textColor: 255, fontStyle: "bold", fontSize: 7 },
+    alternateRowStyles: { fillColor: FILA_ALTERNA },
+    columnStyles: {
+      0: { cellWidth: 24 },
+      1: { cellWidth: 24 },
+      2: { cellWidth: 82 },
+      3: { cellWidth: 68 },
+      4: { cellWidth: 30 },
+      5: { cellWidth: 32 },
+    },
+    rowPageBreak: "avoid",
+    showHead: "everyPage",
+  })
+}
+
+function dibujarBanda(
+  doc: jsPDF,
+  banda: BandaPdf,
+  limites: { min: number; max: number },
+  horarios: readonly DatosClase[],
+  vista: "seccion" | "docente",
+  franjas: readonly FranjaRecreo[],
+  diasVisibles: readonly number[],
+  yInicio: number,
+  geometria: GeometriaPdf,
+): number {
+  const { pageW, colHoraW, colDiaW } = geometria
+  const slots = (banda.hasta - banda.desde) / MINUTOS_SLOT
+  const altoDisponible = geometria.pageH - MARGEN - yInicio - 7 - 12
+  const rowH = Math.min(14, altoDisponible / slots)
+  const yGrid = yInicio + 7
+  const altoGrilla = slots * rowH
+  const xFin = pageW - MARGEN
+
+  doc.setFontSize(8)
+  doc.setFont("helvetica", "bold")
+  doc.setFillColor(...AZUL)
+  doc.rect(MARGEN, yInicio, colHoraW, 7, "F")
+  doc.setTextColor(255)
+  doc.text("Hora", MARGEN + colHoraW / 2, yInicio + 5, { align: "center" })
+  diasVisibles.forEach((dia, i) => {
+    const x = MARGEN + colHoraW + i * colDiaW
+    doc.setFillColor(...AZUL)
+    doc.rect(x, yInicio, colDiaW, 7, "F")
+    doc.setTextColor(255)
+    doc.text(NOMBRES_DIAS[dia - 1], x + colDiaW / 2, yInicio + 5, { align: "center" })
+  })
+
+  const posicionY = (min: number) => yGrid + ((min - banda.desde) / MINUTOS_SLOT) * rowH
+
+  const ticks = ticksHorario({ min: banda.desde, max: banda.hasta })
+  doc.setDrawColor(210, 210, 210)
+  for (const min of ticks.slice(0, -1)) {
+    const ly = posicionY(min)
+    doc.line(MARGEN + colHoraW, ly, xFin, ly)
+  }
+
+  doc.setFont("helvetica", "normal")
+  doc.setFontSize(TAMANO_HORA_PDF)
+  doc.setTextColor(...GRIS)
+  const xHora = MARGEN + colHoraW - PADDING_DERECHA_HORA_PDF
+  ticks.forEach((min, idx) => {
+    const primera = idx === 0
+    const ultima = idx === ticks.length - 1
+    const ly = posicionY(min)
+    const yTexto = primera ? ly + DESPLAZAMIENTO_HORA_PDF : ultima ? ly - DESPLAZAMIENTO_HORA_PDF : ly
+    const baseline = primera ? "top" : ultima ? "bottom" : "middle"
+    doc.text(minutosAHora(min), xHora, yTexto, { align: "right", baseline })
+  })
+
+  doc.setDrawColor(220, 220, 220)
+  doc.line(MARGEN, yGrid, MARGEN, yGrid + altoGrilla)
+  for (let d = 0; d <= diasVisibles.length; d++) {
+    const lx = MARGEN + colHoraW + d * colDiaW
+    doc.line(lx, yGrid, lx, yGrid + altoGrilla)
+  }
+  doc.line(MARGEN, yGrid + altoGrilla, xFin, yGrid + altoGrilla)
+
+  function caja(diaSemana: number, ini: number, fin: number) {
+    if (!esDiaVisible(diaSemana)) return null
+    const indiceDia = diasVisibles.indexOf(diaSemana)
+    if (indiceDia < 0) return null
+    const desde = Math.max(ini, banda.desde, limites.min)
+    const hasta = Math.min(fin, banda.hasta, limites.max)
+    if (hasta <= desde) return null
     return {
-      x: MARGIN + COL_HORA_W + (h.diaSemana - 1) * COL_DIA_W,
-      blockY: y + ((iniMin - minMin) / MINUTOS_SLOT) * ROW_H,
-      blockH: ((finMin - iniMin) / MINUTOS_SLOT) * ROW_H,
+      x: MARGEN + colHoraW + indiceDia * colDiaW,
+      y: posicionY(desde),
+      ancho: colDiaW,
+      alto: ((hasta - desde) / MINUTOS_SLOT) * rowH,
     }
   }
 
-  // Recreos: franja gris
-  for (const r of recreos) {
-    const c = caja(r)
-    if (!c) continue
-    doc.setFillColor(229, 231, 235)
-    doc.rect(c.x + 0.5, c.blockY + 0.5, COL_DIA_W - 1, c.blockH - 1, "F")
-    doc.setTextColor(90, 90, 90)
-    doc.setFont("helvetica", "bold")
-    doc.setFontSize(6.5)
-    doc.text("Recreo", c.x + COL_DIA_W / 2, c.blockY + c.blockH / 2 + 1, { align: "center" })
-  }
-
-  // Bloques de clases
   for (const h of horarios) {
-    const c = caja(h)
+    const c = caja(h.diaSemana, aMinutos(h.horaInicio), aMinutos(h.horaFin))
     if (!c) continue
-    const color = COLORES_PDF[hashCursoPdf(h.curso)]
+    const color = colorCurso(h.curso).rgb
+    const radio = Math.min(1.5, Math.max(0.2, c.alto / 3))
     doc.setFillColor(...color)
-    doc.roundedRect(c.x + 0.5, c.blockY + 0.5, COL_DIA_W - 1, c.blockH - 1, 2, 2, "F")
-    doc.setDrawColor(color[0] - 30, color[1] - 30, color[2] - 30)
-    doc.roundedRect(c.x + 0.5, c.blockY + 0.5, COL_DIA_W - 1, c.blockH - 1, 2, 2, "S")
+    doc.roundedRect(c.x + 0.5, c.y + 0.5, c.ancho - 1, Math.max(1, c.alto - 1), radio, radio, "F")
+    doc.setDrawColor(Math.max(0, color[0] - 30), Math.max(0, color[1] - 30), Math.max(0, color[2] - 30))
+    doc.roundedRect(c.x + 0.5, c.y + 0.5, c.ancho - 1, Math.max(1, c.alto - 1), radio, radio, "S")
 
-    doc.setTextColor(30, 30, 30)
-    doc.setFont("helvetica", "bold")
-    doc.setFontSize(7)
-    doc.text(h.curso, c.x + 3, c.blockY + 4)
-    doc.setFont("helvetica", "normal")
-    doc.setFontSize(6)
-    doc.text(h.detalle ?? h.docente, c.x + 3, c.blockY + 8)
-    doc.setTextColor(100, 100, 100)
-    doc.setFontSize(5.5)
-    doc.text(h.aula, c.x + 3, c.blockY + 11)
+    const anchoContenido = Math.max(1, c.ancho - PADDING_X_PDF * 2)
+    const altoContenido = Math.max(ALTO_LINEA_PDF, c.alto - PADDING_Y_PDF * 2)
+    const estilo = altoContenido >= UMBRAL_ALTO_TARJETA_AMPLIA_PDF
+      ? ESTILO_TARJETA_AMPLIO_PDF
+      : ESTILO_TARJETA_COMPACTO_PDF
+    const lineas = seleccionarLineasTarjeta(camposTarjeta(h, vista), {
+      ancho: anchoContenido,
+      alto: altoContenido,
+      alturaLinea: estilo.alturaLinea,
+      separacionLineas: estilo.separacion,
+      medirLineas: (texto, ancho, peso) => medirLineasPdf(doc, texto, ancho, peso, estilo),
+      truncarTexto: (texto, ancho, peso) => truncarTextoPdf(doc, texto, ancho, peso, estilo),
+    })
+    dibujarLineasBloquePdf(doc, lineas, c, estilo)
   }
+
+  for (const franja of franjas) {
+    const desdeDia = Math.max(franja.desdeDia, 1)
+    const hastaDia = Math.min(franja.hastaDia, diasVisibles[diasVisibles.length - 1])
+    if (hastaDia < desdeDia) continue
+    const c = caja(desdeDia, franja.inicio, franja.fin)
+    if (!c) continue
+    const desdeIndice = diasVisibles.indexOf(desdeDia)
+    const hastaIndice = diasVisibles.indexOf(hastaDia)
+    if (desdeIndice < 0 || hastaIndice < desdeIndice) continue
+    const ancho = (hastaIndice - desdeIndice + 1) * colDiaW
+    doc.setFillColor(229, 231, 235)
+    doc.rect(c.x + 0.5, c.y + 0.5, ancho - 1, Math.max(1, c.alto - 1), "F")
+    if (c.alto >= 4.5) {
+      const anchoContenido = Math.max(1, ancho - PADDING_X_PDF * 2)
+      const maxLineas = Math.max(1, Math.floor((c.alto - PADDING_Y_PDF * 2) / ALTO_LINEA_PDF))
+      const lineasRango = medirLineasPdf(doc, franja.rango, anchoContenido, 400)
+
+      if (c.alto >= 7 && lineasRango.length > 0 && 1 + lineasRango.length <= maxLineas) {
+        const totalLineas = 1 + lineasRango.length
+        const altoTexto = totalLineas * ALTO_LINEA_PDF + (totalLineas - 1) * SEPARACION_LINEAS_PDF
+        let yLinea = c.y + Math.max(PADDING_Y_PDF, (c.alto - altoTexto) / 2) + ALTO_LINEA_PDF * 0.85
+        doc.setFont("helvetica", "bold")
+        doc.setFontSize(5.8)
+        doc.setTextColor(90, 90, 90)
+        doc.text("Recreo", c.x + ancho / 2, yLinea, { align: "center" })
+        yLinea += ALTO_LINEA_PDF + SEPARACION_LINEAS_PDF
+        doc.setFont("helvetica", "normal")
+        doc.setFontSize(TAMANO_DETALLE_PDF)
+        doc.setTextColor(...GRIS)
+        for (const linea of lineasRango) {
+          doc.text(linea, c.x + ancho / 2, yLinea, { align: "center" })
+          yLinea += ALTO_LINEA_PDF + SEPARACION_LINEAS_PDF
+        }
+      } else {
+        doc.setFont("helvetica", "bold")
+        doc.setFontSize(6)
+        doc.setTextColor(90, 90, 90)
+        doc.text("Recreo", c.x + ancho / 2, c.y + c.alto / 2 + 1, { align: "center" })
+      }
+    }
+  }
+
+  return yGrid + altoGrilla + 4
 }

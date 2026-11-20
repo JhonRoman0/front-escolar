@@ -10,17 +10,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { aMinutos, minutosAHora } from "@/lib/horario"
 
 const PASO_MINUTOS = 5
-
-function aMinutos(hora: string): number {
-  const [h, m] = hora.split(":").map(Number)
-  return h * 60 + m
-}
-
-function aHora(minutos: number): string {
-  return `${String(Math.floor(minutos / 60)).padStart(2, "0")}:${String(minutos % 60).padStart(2, "0")}`
-}
 
 /**
  * Hora "HH:mm" elegida de una lista que solo va de `min` a `max` (el horario
@@ -61,10 +53,10 @@ export function SelectorHora({
     const lista: string[] = []
     if (porBloques) {
       if (!bloquesDesde) return []
-      for (let m = aMinutos(bloquesDesde) + minutosBloque; m <= aMinutos(max); m += minutosBloque) lista.push(aHora(m))
+      for (let m = aMinutos(bloquesDesde) + minutosBloque; m <= aMinutos(max); m += minutosBloque) lista.push(minutosAHora(m))
       return lista
     }
-    for (let m = aMinutos(min); m <= aMinutos(max); m += PASO_MINUTOS) lista.push(aHora(m))
+    for (let m = aMinutos(min); m <= aMinutos(max); m += PASO_MINUTOS) lista.push(minutosAHora(m))
     return lista
   }, [min, max, porBloques, bloquesDesde, minutosBloque])
 

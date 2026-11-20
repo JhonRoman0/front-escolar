@@ -1,4 +1,7 @@
 import { apiFetch, type Paginated } from "@/lib/api"
+import { etiquetaSeccion } from "@/lib/horario"
+
+export { etiquetaSeccion }
 
 // ── Tipos (espejo de HorarioPlanoResponse del back) ──────────────────────────
 
@@ -62,11 +65,6 @@ export interface RecreoHorario {
 export interface MiHorario {
   clases: HorarioListItem[]
   recreos: RecreoHorario[]
-}
-
-/** "3ro B · Primaria": dónde es la clase (para el horario de un docente). */
-export function etiquetaSeccion(h: HorarioListItem): string {
-  return `${h.grado} ${h.seccion}${h.nivel ? ` · ${h.nivel}` : ""}`
 }
 
 export const horarioApi = {
