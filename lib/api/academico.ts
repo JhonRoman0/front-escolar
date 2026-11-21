@@ -408,6 +408,10 @@ export interface AulaResponse {
   /** Secciones de las que es salón, de todos los años. */
   secciones: SeccionDelAula[]
   accesoId: number | null
+  tieneAsignacionesVigentes?: boolean
+  seccionesVigentes?: SeccionDelAula[]
+  horariosVigentesPorAnio?: Record<string, number>
+  ocupacionActual?: number | null
 }
 
 interface AulaRequest {

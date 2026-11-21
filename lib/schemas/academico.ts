@@ -383,7 +383,10 @@ export type AulaValues = z.infer<typeof aulaSchemaBase>
 // está editando. Se compara sin mayúsculas ni minúsculas porque así también
 // las compara MySQL, de lo contrario el UNIQUE de la tabla rechazaría el
 // guardado pasada la validación.
-export function crearAulaSchema(nombresEnUso: string[]) {
+export function crearAulaSchema(
+  nombresEnUso: string[],
+  opciones: { capacidadActual?: number | null; ocupacionActual?: number | null } = {}
+) {
   const usados = new Set(nombresEnUso.map((nombre) => normalizarNombreAula(nombre)))
   return aulaSchemaBase.superRefine((valores, ctx) => {
     if (usados.has(normalizarNombreAula(valores.nombre))) {
@@ -393,6 +396,23 @@ export function crearAulaSchema(nombresEnUso: string[]) {
         message: "Ya existe un aula con ese nombre",
       })
     }
+    const intentaReducir = opciones.capacidadActual != null && valores.capacidad < opciones.capacidadActual
+    if (!intentaReducir) return
+    if (typeof opciones.ocupacionActual === "number") {
+      if (valores.capacidad < opciones.ocupacionActual) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["capacidad"],
+          message: `La capacidad no puede bajar de ${opciones.ocupacionActual}: el aula tiene ${opciones.ocupacionActual} alumnos matriculados.`,
+        })
+      }
+      return
+    }
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["capacidad"],
+      message: "No se pudo verificar la ocupación actual del aula. Reintenta antes de reducir la capacidad.",
+    })
   })
 }
 

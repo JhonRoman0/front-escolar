@@ -69,6 +69,7 @@ import {
 } from "@/components/shared/table-helpers"
 import {
   useAniosEscolares,
+  useAula,
   useAulas,
   useCambiarEstadoAnioEscolar,
   useCrudAniosEscolares,
@@ -1292,6 +1293,29 @@ function parsearCapacidad(valor: string): number | undefined {
   return Math.min(CAPACIDAD_MAX, Math.trunc(numero))
 }
 
+function mensajeInactivacion(aula: AulaResponse | null | undefined, detalle?: AulaResponse) {
+  const secciones = detalle?.seccionesVigentes ?? []
+  const horarios = detalle?.horariosVigentesPorAnio ?? {}
+  const partes: string[] = []
+  if (secciones.length) {
+    partes.push(
+      secciones.length === 1
+        ? `es el salón de ${secciones[0].nivel} ${secciones[0].grado} ${secciones[0].seccion} (${secciones[0].turno}, ${secciones[0].anio})`
+        : `es el salón de ${secciones.length} secciones vigentes`
+    )
+  }
+  const totalClases = Object.values(horarios).reduce((total, cantidad) => total + cantidad, 0)
+  if (totalClases) {
+    const porAnio = Object.entries(horarios)
+      .sort(([anioA], [anioB]) => anioB.localeCompare(anioA))
+      .map(([anio, cantidad]) => `${anio}: ${cantidad}`)
+      .join(", ")
+    partes.push(`tiene ${totalClases} ${totalClases === 1 ? "clase programada" : "clases programadas"} (${porAnio})`)
+  }
+  if (!partes.length) partes.push("tiene asignaciones vigentes")
+  return `No se puede inactivar «${aula?.nombre ?? "el aula"}» porque ${partes.join(" y ")}. Cambia el salón en Secciones o quita esas clases en Horarios antes de inactivarla.`
+}
+
 function AulaDialog({
   open,
   onOpenChange,
@@ -1308,6 +1332,7 @@ function AulaDialog({
   actualizar: ReturnType<typeof useCrudAulas>["actualizar"]
 }) {
   const esEdicion = !!aula
+  const { data: detalle, isError: errorDetalle, refetch } = useAula(aula ? aula.idAula : null)
   // Primitivos y no el objeto: un refetch de React Query devuelve una referencia
   // nueva y con el objeto en las deps el reset se dispararía mientras se escribe.
   const nombre = aula?.nombre ?? ""
@@ -1316,9 +1341,19 @@ function AulaDialog({
   // Un salón que ya es de una sección no cambia de tipo (el backend lo rechaza).
   const tipoBloqueado = !!aula && aula.tipo === "SALON" && aula.secciones.length > 0
   const accesoId = aula?.accesoId ?? ACCESO.ACTIVO
+  const detalleVerificado = !!detalle && typeof detalle.tieneAsignacionesVigentes === "boolean"
+  const inactivacionBloqueada = !!detalle && detalle.tieneAsignacionesVigentes === true
+  const estadoDeshabilitado = esEdicion && !detalleVerificado
+  const mensajeErrorDetalle = "No se pudo verificar el uso actual del aula. Reintenta antes de cambiar su estado."
+  const ocupacionActual = detalle?.ocupacionActual
+  const ocupacionVerificada = typeof ocupacionActual === "number"
+  const detalleInactivacion = mensajeInactivacion(aula, detalle)
   // La lista de nombres llega filtrada desde AulasTab; el schema se rearma
   // cuando cambia, por lo que crear y editar comparan contra lo que corresponde.
-  const schema = useMemo(() => crearAulaSchema(nombresEnUso), [nombresEnUso])
+  const schema = useMemo(
+    () => crearAulaSchema(nombresEnUso, { capacidadActual: aula?.capacidad, ocupacionActual }),
+    [nombresEnUso, aula?.capacidad, ocupacionActual]
+  )
   const form = useForm<AulaValues>({
     resolver: zodResolver(schema),
     // Con onChange el duplicado y el resto de reglas se avisan mientras se
@@ -1335,6 +1370,15 @@ function AulaDialog({
   )
 
   async function onSubmit(values: AulaValues) {
+    const intentaInactivar = esEdicion && values.accesoId === ACCESO.INACTIVO && aula?.accesoId !== ACCESO.INACTIVO
+    if (intentaInactivar && !detalleVerificado) {
+      toast.error(errorDetalle ? mensajeErrorDetalle : "Aún se está verificando el uso del aula. Espera antes de inactivarla.")
+      return
+    }
+    if (inactivacionBloqueada && values.accesoId === ACCESO.INACTIVO) {
+      toast.error(detalleInactivacion)
+      return
+    }
     await guardarConToast(async () => {
       if (esEdicion && aula) await actualizar.mutateAsync({ id: aula.idAula, data: values })
       else await crear.mutateAsync(values)
@@ -1345,12 +1389,37 @@ function AulaDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader><DialogTitle className="text-lg font-semibold tracking-tight">{esEdicion ? "Editar aula" : "Nueva aula"}</DialogTitle></DialogHeader>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5" noValidate>
-          <FieldGroup>
+      <DialogContent className="flex max-h-[90dvh] flex-col overflow-hidden sm:max-w-md">
+        <DialogHeader className="shrink-0"><DialogTitle className="text-lg font-semibold tracking-tight">{esEdicion ? "Editar aula" : "Nueva aula"}</DialogTitle></DialogHeader>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="flex min-h-0 flex-1 flex-col gap-4" noValidate>
+          <div className="min-h-0 flex-1 overflow-y-auto py-1 pr-1">
+            <FieldGroup className="gap-4">
             <Controller control={form.control} name="nombre" render={({ field }) => (<Field><FieldLabel>Nombre del aula</FieldLabel><FieldContent><Input placeholder="Aula 101" autoFocus maxLength={LIMITE_NOMBRE_AULA} {...field} onChange={(e) => field.onChange(sanitizarNombreAula(e.target.value))} /><FieldError errors={[form.formState.errors.nombre]} /></FieldContent></Field>)} />
-            <Controller control={form.control} name="capacidad" render={({ field }) => (<Field><FieldLabel>Capacidad</FieldLabel><FieldContent><Input type="number" min={String(CAPACIDAD_MIN)} max={String(CAPACIDAD_MAX)} placeholder="30" value={field.value ?? ""} onChange={(e) => field.onChange(parsearCapacidad(e.target.value))} /><FieldDescription className="text-xs">Obligatorio. Entre {CAPACIDAD_MIN} y {CAPACIDAD_MAX} asientos.</FieldDescription><FieldError errors={[form.formState.errors.capacidad]} /></FieldContent></Field>)} />
+            <Controller
+              control={form.control}
+              name="capacidad"
+              render={({ field }) => (
+                <Field>
+                  <FieldLabel>Capacidad</FieldLabel>
+                  <FieldContent>
+                    <Input type="number" min={String(CAPACIDAD_MIN)} max={String(CAPACIDAD_MAX)} placeholder="30" value={field.value ?? ""} onChange={(e) => field.onChange(parsearCapacidad(e.target.value))} />
+                    <FieldDescription className="text-xs">Obligatorio. Entre {CAPACIDAD_MIN} y {CAPACIDAD_MAX} asientos.</FieldDescription>
+                    {esEdicion && ocupacionVerificada && (
+                      <FieldDescription className="text-xs">
+                        Ocupación actual: {ocupacionActual} {ocupacionActual === 1 ? "alumno matriculado" : "alumnos matriculados"}. No se puede bajar de {ocupacionActual}.
+                      </FieldDescription>
+                    )}
+                    {esEdicion && !ocupacionVerificada && detalle && (
+                      <div className="mt-1 flex flex-wrap items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-amber-950 dark:text-amber-200">
+                        <span>No se pudo verificar la ocupación actual del aula.</span>
+                        <BotonReintentar refetch={refetch} />
+                      </div>
+                    )}
+                    <FieldError errors={[form.formState.errors.capacidad]} />
+                  </FieldContent>
+                </Field>
+              )}
+            />
             <Controller
               control={form.control}
               name="tipo"
@@ -1380,7 +1449,12 @@ function AulaDialog({
                           <p className="text-xs text-muted-foreground">
                             {aula.nombre} es el salón de {aula.secciones.length === 1 ? "esta sección" : "estas secciones"}. Para cambiar su tipo, primero asígnales otro salón en Secciones.
                           </p>
-                          <SeccionesDelSalon secciones={aula.secciones} conAnio />
+                          <details className="group text-xs text-muted-foreground">
+                            <summary className="w-fit cursor-pointer font-medium">
+                              Ver {aula.secciones.length === 1 ? "la sección asignada" : `las ${aula.secciones.length} secciones asignadas`}
+                            </summary>
+                            <SeccionesDelSalon secciones={aula.secciones} conAnio className="mt-1 gap-x-2 gap-y-1" />
+                          </details>
                         </div>
                       </div>
                     )}
@@ -1388,9 +1462,55 @@ function AulaDialog({
                 </Field>
               )}
             />
-            {esEdicion && <Controller control={form.control} name="accesoId" render={({ field }) => (<Field><FieldLabel>Estado</FieldLabel><FieldContent><CampoAcceso value={field.value} onChange={field.onChange} /></FieldContent></Field>)} />}
-          </FieldGroup>
-          <DialogFooter><DialogTrigger render={<Button variant="outline" />}>Cancelar</DialogTrigger><BotonGuardar etiqueta={esEdicion ? "Guardar cambios" : "Crear aula"} enviando={crear.isPending || actualizar.isPending} /></DialogFooter>
+            {esEdicion && (
+              <Controller
+                control={form.control}
+                name="accesoId"
+                render={({ field }) => (
+                  <Field>
+                    <FieldLabel>Estado</FieldLabel>
+                    <FieldContent>
+                      <CampoAcceso
+                        value={field.value}
+                        onChange={field.onChange}
+                        disabled={estadoDeshabilitado}
+                        deshabilitarInactivo={inactivacionBloqueada}
+                      />
+                      {estadoDeshabilitado && !errorDetalle && (
+                        <FieldDescription className="text-xs">
+                          Cargando el uso actual del aula…
+                        </FieldDescription>
+                      )}
+                      {errorDetalle && (
+                        <div className="mt-1 flex flex-wrap items-center gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive">
+                          <span>{mensajeErrorDetalle}</span>
+                          <BotonReintentar refetch={refetch} />
+                        </div>
+                      )}
+                      {inactivacionBloqueada && (
+                        <div className="mt-1 flex gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-amber-950 dark:text-amber-200">
+                          <TriangleAlert className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                          <div className="space-y-1">
+                            <p className="font-medium">No se puede inactivar este aula</p>
+                            <p className="text-muted-foreground">{detalleInactivacion}</p>
+                            {(detalle?.seccionesVigentes?.length ?? 0) > 0 && (
+                              <SeccionesDelSalon
+                                secciones={detalle?.seccionesVigentes ?? []}
+                                conAnio
+                                className="gap-x-2 gap-y-1"
+                              />
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </FieldContent>
+                  </Field>
+                )}
+              />
+            )}
+            </FieldGroup>
+          </div>
+          <DialogFooter className="shrink-0"><DialogTrigger render={<Button variant="outline" />}>Cancelar</DialogTrigger><BotonGuardar etiqueta={esEdicion ? "Guardar cambios" : "Crear aula"} enviando={crear.isPending || actualizar.isPending} /></DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

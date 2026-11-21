@@ -86,6 +86,13 @@ export function NotasDeEvaluacion({
           )
         })}
       </div>
+      {!notasVisibles.length && filtro !== "todos" && (
+        <p className="text-[12px] text-muted-foreground">
+          {filtro === "aprobados"
+            ? "No hay estudiantes aprobados en esta evaluación"
+            : "No hay estudiantes desaprobados en esta evaluación"}
+        </p>
+      )}
     </div>
   )
 }

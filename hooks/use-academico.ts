@@ -143,6 +143,14 @@ export function useAulas() {
   })
 }
 
+export function useAula(id: number | null) {
+  return useQuery({
+    queryKey: [...KEYS.aulas, id],
+    queryFn: () => aulasApi.porId(id as number),
+    enabled: id !== null,
+  })
+}
+
 export function useAsignaciones() {
   return useQuery({
     queryKey: KEYS.asignaciones,
