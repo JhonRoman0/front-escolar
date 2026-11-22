@@ -71,6 +71,23 @@ export function errorCalificacion(escala: EscalaCalificacion, valor: string): st
   return /^\d{1,2}$/.test(texto) && Number(texto) <= 20 ? null : "Debe ser de 0 a 20"
 }
 
+export function esNotaDesaprobada(
+  escala: EscalaCalificacion,
+  nota: string | null | undefined,
+  minima: string | null | undefined
+): boolean {
+  const texto = nota?.trim().toUpperCase()
+  if (!texto || errorCalificacion(escala, texto)) return false
+  const minimaTexto = minima?.trim().toUpperCase()
+  if (!minimaTexto || errorCalificacion(escala, minimaTexto)) return false
+  if (escala === "LITERAL") {
+    if (minimaTexto === "C") return false
+    return (LITERALES as readonly string[]).indexOf(texto) > (LITERALES as readonly string[]).indexOf(minimaTexto)
+  }
+  if (Number(minimaTexto) === 0) return false
+  return Number(texto) < Number(minimaTexto)
+}
+
 /** El periodo abierto hoy; si no hay, el último que ya empezó; si tampoco, el primero. */
 export function periodoParaFiltro<T extends { numero: number; estado: EstadoPeriodo }>(periodos: T[]): T | undefined {
   return (

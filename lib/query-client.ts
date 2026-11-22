@@ -1,6 +1,11 @@
 import { MutationCache, QueryClient } from "@tanstack/react-query"
 
 import { avisosConectados } from "@/lib/eventos"
+import { ApiError } from "@/lib/api"
+import {
+  esCodigoBloqueoSesion,
+  sesionBloqueada,
+} from "@/lib/sesion-bloqueada"
 
 /** Mutaciones que solo consultan (buscar por DNI, previsualizar): no cambian datos. */
 export const SOLO_LECTURA = { soloLectura: true } as const
@@ -29,8 +34,11 @@ export function crearQueryClient() {
       queries: {
         staleTime: VIGENCIA_MS,
         refetchOnMount: true,
-        refetchOnWindowFocus: () => !avisosConectados(),
-        retry: 1,
+        refetchOnWindowFocus: () => !sesionBloqueada() && !avisosConectados(),
+        retry: (failureCount, error) =>
+          !sesionBloqueada() &&
+          !(error instanceof ApiError && esCodigoBloqueoSesion(error.body?.codigo)) &&
+          failureCount < 1,
       },
     },
   })

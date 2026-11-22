@@ -20,14 +20,22 @@ import { cn } from "@/lib/utils"
 interface CampoAccesoProps {
   value?: number
   onChange: (value: number) => void
+  disabled?: boolean
+  deshabilitarInactivo?: boolean
 }
 
-export function CampoAcceso({ value, onChange }: CampoAccesoProps) {
+export function CampoAcceso({
+  value,
+  onChange,
+  disabled = false,
+  deshabilitarInactivo = false,
+}: CampoAccesoProps) {
   const label = value === ACCESO.ACTIVO ? "Activo" : "Inactivo"
   return (
     <Select
       value={String(value ?? ACCESO.ACTIVO)}
       onValueChange={(v) => onChange(Number(v))}
+      disabled={disabled}
     >
       <SelectTrigger className="w-full">
         <SelectValue>{label}</SelectValue>
@@ -38,7 +46,7 @@ export function CampoAcceso({ value, onChange }: CampoAccesoProps) {
             alineado con el valor. */}
         <SelectGroup>
           <SelectItem value={String(ACCESO.ACTIVO)}>Activo</SelectItem>
-          <SelectItem value={String(ACCESO.INACTIVO)}>Inactivo</SelectItem>
+          <SelectItem value={String(ACCESO.INACTIVO)} disabled={deshabilitarInactivo}>Inactivo</SelectItem>
         </SelectGroup>
       </SelectContent>
     </Select>

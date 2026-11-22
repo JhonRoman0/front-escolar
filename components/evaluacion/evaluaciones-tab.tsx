@@ -2,7 +2,7 @@
 
 import { Fragment, useState } from "react"
 import { toast } from "sonner"
-import { ChevronDown, ClipboardPen, Eye, Pencil, Plus } from "lucide-react"
+import { ChevronDown, ClipboardPen, Eye, FileDown, Pencil, Plus } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -16,12 +16,15 @@ import { FilterSelect } from "@/components/shared/filter-select"
 import { HeaderSeccion } from "@/components/shared/header-seccion"
 import { FilasCargando, MensajeSinDatos } from "@/components/shared/table-helpers"
 import { useAniosEscolares } from "@/hooks/use-academico"
+import { useColegio } from "@/hooks/use-colegio"
 import { useAvanceFinales, useCursosEvaluables, useEliminarEvaluacion, useEvaluaciones } from "@/hooks/use-evaluaciones"
 import { usePuede } from "@/hooks/use-permisos"
 import { anioParaFiltro, estadoAnioTexto } from "@/lib/api/academico"
-import { competenciaCompleta, type CursoEvaluable, type EvaluacionResumen } from "@/lib/api/evaluaciones"
+import { competenciaCompleta, evaluacionesApi, type CursoEvaluable, type EvaluacionResumen } from "@/lib/api/evaluaciones"
 import { ESCALAS, periodoParaFiltro } from "@/lib/calificaciones"
 import { formatearFecha } from "@/lib/fechas"
+import { generarPdfEvaluacion } from "@/lib/reportes/generar-evaluacion"
+import { logoColegio } from "@/lib/reportes/pdf-institucional"
 import { EvaluacionFormDialog } from "./evaluacion-form-dialog"
 import { FiltrosCurso, useFiltrosCurso } from "./filtros-curso"
 import { NotasEvaluacionDialog } from "./notas-evaluacion-dialog"
@@ -37,6 +40,7 @@ function nombreCurso(c: CursoEvaluable) {
 
 export default function EvaluacionesTab() {
   const { data: anios = [] } = useAniosEscolares()
+  const { data: colegio } = useColegio()
   const [idAnioElegido, setIdAnioElegido] = useState<number | null>(null)
   const idAnio = idAnioElegido ?? anioParaFiltro(anios)?.idAnio ?? null
   const { data: cursos = [], isLoading: cargandoCursos } = useCursosEvaluables(idAnio)
@@ -66,7 +70,9 @@ export default function EvaluacionesTab() {
   const puedeEditar = usePuede("EVALUACIONES", "ACTUALIZAR")
   const puedeEliminar = usePuede("EVALUACIONES", "ELIMINAR")
   const puedeVerResumen = usePuede("EVALUACIONES", "VER_RESUMEN")
+  const puedeExportar = usePuede("EVALUACIONES", "IMPRIMIR_EXPORTAR")
   const [idResumen, setIdResumen] = useState<number | null>(null)
+  const [idExportando, setIdExportando] = useState<number | null>(null)
 
   const [formulario, setFormulario] = useState<{ evaluacion: EvaluacionResumen | null } | null>(null)
   const [idCalificando, setIdCalificando] = useState<number | null>(null)
@@ -80,6 +86,23 @@ export default function EvaluacionesTab() {
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo eliminar la evaluación")
       throw error
+    }
+  }
+
+  async function handleExportar(evaluacion: EvaluacionResumen) {
+    if (!curso) return
+    setIdExportando(evaluacion.idEvaluacion)
+    try {
+      const [detalle, logo] = await Promise.all([
+        evaluacionesApi.detalle(evaluacion.idEvaluacion),
+        logoColegio(colegio ?? null),
+      ])
+      generarPdfEvaluacion(detalle, curso, colegio ?? null, logo)
+      toast.success(`PDF de "${evaluacion.nombre}" descargado`)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo generar el PDF")
+    } finally {
+      setIdExportando(null)
     }
   }
 
@@ -233,6 +256,21 @@ export default function EvaluacionesTab() {
                               <Eye />
                             </Button>
                           )}
+                          {puedeExportar && (
+                            <Button
+                              variant="outline"
+                              size="icon-sm"
+                              aria-label={`Exportar ${e.nombre} en PDF`}
+                              title={idExportando === e.idEvaluacion ? "Generando PDF…" : "Exportar PDF"}
+                              disabled={idExportando === e.idEvaluacion}
+                              onClick={(ev) => {
+                                ev.stopPropagation()
+                                void handleExportar(e)
+                              }}
+                            >
+                              <FileDown />
+                            </Button>
+                          )}
                           <Button
                             variant="outline"
                             size="icon-sm"
@@ -304,6 +342,7 @@ export default function EvaluacionesTab() {
             periodo={periodo}
             evaluacion={formulario?.evaluacion ?? null}
             avance={avance}
+            evaluaciones={evaluaciones}
           />
         )}
         <ResumenEvaluacionDialog idEvaluacion={idResumen} onOpenChange={(open) => !open && setIdResumen(null)} />

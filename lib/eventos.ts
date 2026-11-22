@@ -1,4 +1,9 @@
 import { ApiError, apiFetch } from "@/lib/api"
+import {
+  EVENTO_SESION_BLOQUEADA,
+  sesionBloqueada,
+} from "@/lib/sesion-bloqueada"
+import { esEstadoVigenciaBloqueante } from "@/lib/vigencia"
 
 /**
  * Avisos en vivo del servidor (Server-Sent Events): cuando alguien guarda algo,
@@ -75,7 +80,11 @@ export function escucharCambios(oyente: OyenteCambios): () => void {
     temporizador = window.setTimeout(async () => {
       if (detenido) return
       try {
-        await apiFetch("/auth/me")
+        const sesion = await apiFetch<{ estadoVigencia?: string | null }>("/auth/me")
+        if (sesionBloqueada() || esEstadoVigenciaBloqueante(sesion?.estadoVigencia)) {
+          detenido = true
+          return
+        }
         abrir()
       } catch (error) {
         if (error instanceof ApiError && error.status === 401) {
@@ -87,12 +96,18 @@ export function escucharCambios(oyente: OyenteCambios): () => void {
     }, ahora)
   }
 
-  abrir()
-  return () => {
+  function detener() {
     detenido = true
     window.clearTimeout(temporizador)
     fuente?.close()
     fuente = null
     conectado = false
+  }
+
+  window.addEventListener(EVENTO_SESION_BLOQUEADA, detener)
+  abrir()
+  return () => {
+    window.removeEventListener(EVENTO_SESION_BLOQUEADA, detener)
+    detener()
   }
 }

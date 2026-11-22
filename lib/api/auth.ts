@@ -30,6 +30,9 @@ export interface UsuarioResponse {
   nombreRol: string | null
   roles: RolResponse[]
   debeCambiarContrasena?: boolean
+  fechaInicioVigencia?: string | null
+  fechaFinVigencia?: string | null
+  estadoVigencia?: string | null
 }
 
 export interface PermisoAccionResponse {

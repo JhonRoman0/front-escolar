@@ -29,6 +29,9 @@ const schema = z.object({
 
 type Valores = z.infer<typeof schema>
 
+const MAX_EVALUACIONES_POR_DIA = 2
+const MENSAJE_FECHA_LLENA = "Ya hay 2 evaluaciones en esta fecha para este curso y sección. Elige otra fecha."
+
 /** Crear o editar una evaluación: nombre, fecha dentro del periodo y competencias que afecta. */
 export function EvaluacionFormDialog({
   open,
@@ -37,6 +40,7 @@ export function EvaluacionFormDialog({
   periodo,
   evaluacion,
   avance,
+  evaluaciones,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -46,6 +50,7 @@ export function EvaluacionFormDialog({
   evaluacion: EvaluacionResumen | null
   /** Notas finales ya registradas por competencia en el periodo. */
   avance: AvanceFinal[]
+  evaluaciones: EvaluacionResumen[]
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -54,7 +59,7 @@ export function EvaluacionFormDialog({
           <DialogTitle>{evaluacion ? "Editar evaluación" : "Nueva evaluación"}</DialogTitle>
         </DialogHeader>
         {open && (
-          <Formulario curso={curso} periodo={periodo} evaluacion={evaluacion} avance={avance} onCerrar={() => onOpenChange(false)} />
+          <Formulario curso={curso} periodo={periodo} evaluacion={evaluacion} avance={avance} evaluaciones={evaluaciones} onCerrar={() => onOpenChange(false)} />
         )}
       </DialogContent>
     </Dialog>
@@ -129,11 +134,12 @@ function textoDias(dias: number[]): string {
   return nombres.length === 1 ? nombres[0] : `${nombres.slice(0, -1).join(", ")} y ${nombres.at(-1)}`
 }
 
-function Formulario({ curso, periodo, evaluacion, avance, onCerrar }: {
+function Formulario({ curso, periodo, evaluacion, avance, evaluaciones, onCerrar }: {
   curso: CursoEvaluable
   periodo: PeriodoEvaluacion
   evaluacion: EvaluacionResumen | null
   avance: AvanceFinal[]
+  evaluaciones: EvaluacionResumen[]
   onCerrar: () => void
 }) {
   const avancePor = new Map(avance.map((a) => [a.idCompetencia, a]))
@@ -159,6 +165,10 @@ function Formulario({ curso, periodo, evaluacion, avance, onCerrar }: {
   // Decidir por los trasladados es poner notas: pide el permiso de registrarlas.
   const puedeCalificar = usePuede("EVALUACIONES", "CREAR")
   const marcadas = useWatch({ control: form.control, name: "competencias" })
+  const fecha = useWatch({ control: form.control, name: "fecha" })
+  const fechaLlena = evaluaciones.filter(
+    (e) => e.fecha === fecha && e.idEvaluacion !== evaluacion?.idEvaluacion
+  ).length >= MAX_EVALUACIONES_POR_DIA
   const traslados = useTraslados(curso.idAsignacion, periodo.numero, puedeCalificar ? marcadas : [], evaluacion?.idEvaluacion)
   const [decisiones, setDecisiones] = useState<Record<number, string>>({})
 
@@ -171,6 +181,7 @@ function Formulario({ curso, periodo, evaluacion, avance, onCerrar }: {
   }
 
   const onSubmit = form.handleSubmit(async (valores) => {
+    if (fechaLlena) return
     const lista = noRinden()
     try {
       await guardar.mutateAsync({
@@ -226,7 +237,7 @@ function Formulario({ curso, periodo, evaluacion, avance, onCerrar }: {
             diasSemana={diasHabilitados(curso)}
             fechasBloqueadas={curso.feriados}
             className="max-w-[240px]"
-            error={errors.fecha}
+            error={fechaLlena ? { message: MENSAJE_FECHA_LLENA } : errors.fecha}
             descripcion={
               curso.diasClase.length
                 ? `Este curso se dicta los ${textoDias(curso.diasClase)}`
@@ -283,7 +294,7 @@ function Formulario({ curso, periodo, evaluacion, avance, onCerrar }: {
 
       <DialogFooter>
         <DialogTrigger render={<Button variant="outline" />}>Cancelar</DialogTrigger>
-        <BotonGuardar etiqueta={evaluacion ? "Guardar cambios" : "Crear evaluación"} enviando={guardar.isPending} />
+        <BotonGuardar etiqueta={evaluacion ? "Guardar cambios" : "Crear evaluación"} enviando={guardar.isPending} disabled={fechaLlena} />
       </DialogFooter>
     </form>
   )
