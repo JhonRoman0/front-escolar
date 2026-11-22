@@ -1,4 +1,32 @@
 import type { PermisosRolResponse } from "@/lib/api/auth"
+import {
+  esCodigoBloqueoSesion,
+  marcarSesionBloqueada,
+  sesionBloqueada,
+} from "@/lib/sesion-bloqueada"
+import {
+  CODIGOS_VIGENCIA,
+  codigoVigenciaAEstado,
+  esCodigoSesionObsoleta,
+} from "@/lib/vigencia"
+
+const RUTAS_PUBLICAS_BLOQUEO = new Set([
+  "/auth/login",
+  "/auth/logout",
+  "/auth/forgot-password",
+  "/auth/verify-reset-code",
+  "/auth/reset-password",
+])
+const RUTAS_AUTORIZADAS_VIGENCIA = new Set([
+  ...RUTAS_PUBLICAS_BLOQUEO,
+  "/auth/me",
+])
+const RUTAS_AUTORIZADAS_CAMBIO_CONTRASENA = new Set([
+  ...RUTAS_PUBLICAS_BLOQUEO,
+  "/auth/me",
+  "/auth/change-password",
+  "/auth/permisos",
+])
 
 const ES_ADMIN_KEY = "escolar_es_admin"
 const PERMISOS_KEY = "escolar_permisos"
@@ -161,6 +189,23 @@ export async function apiFetch<T>(
     throw new Error("NEXT_PUBLIC_API_URL no está definida en .env")
   }
 
+  const bloqueo = sesionBloqueada()
+  if (bloqueo) {
+    const permitidas = esCodigoSesionObsoleta(bloqueo.codigo)
+      ? RUTAS_PUBLICAS_BLOQUEO
+      : bloqueo.codigo === CODIGOS_VIGENCIA.CAMBIO_CONTRASENA
+        ? RUTAS_AUTORIZADAS_CAMBIO_CONTRASENA
+        : RUTAS_AUTORIZADAS_VIGENCIA
+    if (!permitidas.has(endpoint.split("?")[0])) {
+      throw new ApiError(bloqueo.mensaje, 403, {
+        codigo: bloqueo.codigo,
+        estado: bloqueo.estado,
+        fechaInicio: bloqueo.fechaInicio,
+        fechaFin: bloqueo.fechaFin,
+      })
+    }
+  }
+
   const isFormData = options.body instanceof FormData
 
   const response = await fetch(`${API_URL}${endpoint}`, {
@@ -202,6 +247,16 @@ export async function apiFetch<T>(
     } else {
       const text = await response.text()
       if (text) message = text
+    }
+    const codigo = typeof body?.codigo === "string" ? body.codigo : undefined
+    if (codigo && esCodigoBloqueoSesion(codigo)) {
+      marcarSesionBloqueada({
+        codigo,
+        mensaje: message,
+        estado: codigoVigenciaAEstado(codigo),
+        fechaInicio: typeof body?.fechaInicio === "string" ? body.fechaInicio : null,
+        fechaFin: typeof body?.fechaFin === "string" ? body.fechaFin : null,
+      })
     }
     throw new ApiError(message, response.status, body)
   }

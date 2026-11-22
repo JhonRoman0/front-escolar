@@ -4,9 +4,11 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import { useRouter, usePathname } from "next/navigation"
 import { Loader2 } from "lucide-react"
 import { useQueryClient } from "@tanstack/react-query"
+import { toast } from "sonner"
 
 import { authApi, type LoginRequest, type LoginResponse, type PermisosRolResponse, type UsuarioResponse } from "@/lib/api/auth"
 import {
+  ApiError,
   canonizarPermisos,
   cerrarSesionLocal,
   getEsAdmin,
@@ -18,7 +20,27 @@ import {
 } from "@/lib/api"
 import { PermisosActualizadosModal } from "@/components/seguridad/permisos-actualizados-modal"
 import { CambiarContrasenaDialog } from "@/components/cuenta/cambiar-contrasena-dialog"
+import { VigenciaVencidaModal } from "@/components/seguridad/vigencia-vencida-modal"
 import { EVENTO_REVISAR_PERMISOS } from "@/components/escucha-cambios"
+import {
+  EVENTO_SESION_BLOQUEADA,
+  limpiarSesionBloqueada,
+  marcarSesionBloqueada,
+  sesionBloqueada,
+  type DetalleSesionBloqueada,
+} from "@/lib/sesion-bloqueada"
+import {
+  CODIGOS_VIGENCIA,
+  MENSAJE_NO_DISPONIBLE,
+  codigoVigenciaAEstado,
+  esCodigoBloqueoSesion,
+  esCodigoBloqueoVigencia,
+  esCodigoSesionObsoleta,
+  esEstadoVigenciaBloqueante,
+  esEstadoVigenciaValido,
+  estadoACodigoVigencia,
+  mensajeEstadoVigencia,
+} from "@/lib/vigencia"
 
 const RUTA_LOGIN = "/login"
 const INTERVALO_VERIFICACION_PERMISOS_MS = 30_000
@@ -50,12 +72,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [esAdmin, setEsAdminState] = useState(false)
   const [cargando, setCargando] = useState(true)
   const [permisosCambiados, setPermisosCambiados] = useState(false)
+  const [detalleBloqueo, setDetalleBloqueo] =
+    useState<DetalleSesionBloqueada | null>(() => sesionBloqueada())
   const router = useRouter()
   const pathname = usePathname()
   const queryClient = useQueryClient()
 
+  const bloqueo = detalleBloqueo ?? sesionBloqueada()
+  const estadoDelUsuario = usuario?.estadoVigencia
+  const estadoDeclarado = bloqueo
+    ? esEstadoVigenciaValido(bloqueo.estado)
+      ? bloqueo.estado
+      : codigoVigenciaAEstado(bloqueo.codigo)
+    : esEstadoVigenciaValido(estadoDelUsuario)
+      ? estadoDelUsuario
+      : undefined
+  const vigenciaInvalida =
+    esCodigoBloqueoVigencia(bloqueo?.codigo) ||
+    esEstadoVigenciaBloqueante(estadoDeclarado) ||
+    esEstadoVigenciaBloqueante(estadoDelUsuario)
+
   useEffect(() => {
     let cancelado = false
+
+    function alBloquear(event: Event) {
+      const detalle = (event as CustomEvent<DetalleSesionBloqueada>).detail
+      if (!detalle) return
+      if (esCodigoSesionObsoleta(detalle.codigo)) {
+        toast.error(detalle.mensaje)
+        limpiarSesionBloqueada()
+        cerrarSesionLocal()
+        window.location.replace(RUTA_LOGIN)
+        return
+      }
+      setDetalleBloqueo(detalle)
+      const estado = esEstadoVigenciaValido(detalle.estado)
+        ? detalle.estado
+        : codigoVigenciaAEstado(detalle.codigo)
+      if (estado) {
+        setUsuario((actual) =>
+          actual ? { ...actual, estadoVigencia: estado } : actual
+        )
+      }
+    }
+
+    window.addEventListener(EVENTO_SESION_BLOQUEADA, alBloquear)
 
     async function verificarSesion() {
       setEsAdminState(getEsAdmin())
@@ -65,6 +126,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const usuario = await authApi.meSesion()
         if (!cancelado) {
           setUsuario(usuario)
+          if (esEstadoVigenciaBloqueante(usuario.estadoVigencia)) {
+            marcarSesionBloqueada({
+              codigo: estadoACodigoVigencia(usuario.estadoVigencia),
+              mensaje: mensajeEstadoVigencia(usuario.estadoVigencia),
+              estado: usuario.estadoVigencia,
+            })
+          }
           // Refrescar nombreRol en permisos desde /auth/me
           const permisosActuales = getPermisos<PermisosRolResponse>()
           if (permisosActuales && usuario.nombreRol) {
@@ -77,11 +145,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setPermisosHash(canonizarPermisos(permisosActuales))
           }
         }
-      } catch {
-        if (!cancelado) {
-          cerrarSesionLocal()
-          setUsuario(null)
+      } catch (error) {
+        if (cancelado) return
+        if (error instanceof ApiError && error.status === 403 && esCodigoBloqueoSesion(error.body?.codigo)) {
+          const codigo = String(error.body?.codigo)
+          if (esCodigoSesionObsoleta(codigo)) {
+            toast.error(error.message)
+            limpiarSesionBloqueada()
+            cerrarSesionLocal()
+            window.location.replace(RUTA_LOGIN)
+            return
+          }
+          marcarSesionBloqueada({
+            codigo,
+            mensaje: error.message,
+            estado: esEstadoVigenciaValido(error.body?.estado) ? error.body?.estado : undefined,
+            fechaInicio: typeof error.body?.fechaInicio === "string" ? error.body.fechaInicio : null,
+            fechaFin: typeof error.body?.fechaFin === "string" ? error.body.fechaFin : null,
+          })
+          return
         }
+        cerrarSesionLocal()
+        setUsuario(null)
       } finally {
         if (!cancelado) setCargando(false)
       }
@@ -90,11 +175,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     verificarSesion()
     return () => {
       cancelado = true
+      window.removeEventListener(EVENTO_SESION_BLOQUEADA, alBloquear)
     }
   }, [])
 
   useEffect(() => {
-    if (cargando) return
+    if (vigenciaInvalida || cargando) return
 
     const enLogin = pathname === RUTA_LOGIN
     const enPublica = esRutaPublica(pathname)
@@ -107,13 +193,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (usuario && enLogin) {
       router.replace("/")
     }
-  }, [usuario, cargando, pathname, router])
+  }, [usuario, cargando, pathname, router, vigenciaInvalida])
 
   // Detecta cambios de permisos en la sesión activa: consulta los permisos
   // actuales (recalculados en vivo en el backend) y los compara con el snapshot
   // guardado al iniciar sesión. Si difieren, fuerza el cierre de sesión.
   useEffect(() => {
-    if (cargando || !usuario || permisosCambiados) return
+    if (cargando || vigenciaInvalida || !usuario || permisosCambiados) return
     let cancelado = false
 
     async function verificarPermisos() {
@@ -147,10 +233,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       window.removeEventListener("focus", verificarPermisos)
       window.removeEventListener(EVENTO_REVISAR_PERMISOS, verificarPermisos)
     }
-  }, [usuario, cargando, permisosCambiados])
+  }, [usuario, cargando, permisosCambiados, vigenciaInvalida])
 
   async function login(data: LoginRequest): Promise<LoginResponse> {
     const resp = await authApi.login(data)
+    limpiarSesionBloqueada()
+    setDetalleBloqueo(null)
     setEsAdmin(resp.esAdmin)
     setPermisos(resp.permisos)
     setPermisosHash(canonizarPermisos(resp.permisos))
@@ -163,6 +251,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   function logout() {
+    limpiarSesionBloqueada()
+    setDetalleBloqueo(null)
     void authApi.logout().catch(() => {})
     cerrarSesionLocal()
     setUsuario(null)
@@ -180,12 +270,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     )
   }
 
+  if (vigenciaInvalida) {
+    const detalleModal = bloqueo ?? {
+      codigo: estadoDeclarado
+        ? estadoACodigoVigencia(estadoDeclarado)
+        : CODIGOS_VIGENCIA.NO_DISPONIBLE,
+      mensaje: estadoDeclarado
+        ? mensajeEstadoVigencia(estadoDeclarado)
+        : MENSAJE_NO_DISPONIBLE,
+      estado: estadoDeclarado,
+    }
+    return (
+      <AuthContext.Provider value={{ usuario, permisos, esAdmin, cargando, permisosCambiados, login, logout }}>
+        <VigenciaVencidaModal
+          detalle={detalleModal}
+          usuario={usuario}
+          onCerrarSesion={logout}
+        />
+      </AuthContext.Provider>
+    )
+  }
+
   // El sistema queda difuminado detrás del modal. Sus consultas fallan con 403
   // mientras tanto, por eso se recargan al completar el cambio.
   const cambioPendiente = !!usuario?.debeCambiarContrasena && !esRutaPublica(pathname)
 
   function onContrasenaCambiada() {
+    limpiarSesionBloqueada()
+    setDetalleBloqueo(null)
     setUsuario((u) => (u ? { ...u, debeCambiarContrasena: false } : u))
+    void authApi
+      .meSesion()
+      .then(setUsuario)
+      .catch(() => {})
     void queryClient.invalidateQueries()
   }
 

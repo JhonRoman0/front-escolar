@@ -11,6 +11,7 @@ import { Controller, useForm, useWatch } from "react-hook-form"
 
 import { ApiError } from "@/lib/api"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Dialog,
   DialogContent,
@@ -49,9 +50,10 @@ import { useConsultarDni } from "@/hooks/use-reniec"
 import { usuariosApi, type UsuarioResponse, type UsuarioRequest } from "@/lib/api/seguridad"
 import {
   crearUsuarioSchema,
-  type UsuarioValues,
+  type UsuarioFormValues,
 } from "@/lib/schemas/seguridad"
 import { REGEX_DNI } from "@/lib/schemas/comun"
+import { TEXTO_SIN_FIN, inicioVigenciaPorDefecto } from "@/lib/vigencia"
 import { BloqueFoto } from "@/components/shared/bloque-foto"
 import { CampoChip } from "@/components/shared/campo-chip"
 import { casillaTrasCambiarCorreo, CampoRestablecerContrasena } from "@/components/shared/campo-restablecer-contrasena"
@@ -127,7 +129,7 @@ export default function UsuarioFormDialog({
   )
   const [reactivacion, setReactivacion] = useState<ReactivacionPendiente | null>(null)
 
-  const form = useForm<UsuarioValues>({
+  const form = useForm<UsuarioFormValues>({
     /*
      * El resolver se arma en cada render desde el estado del formulario (rol
      * DOCENTE marcado y si el usuario ya tiene docente activo): así los datos
@@ -152,6 +154,10 @@ export default function UsuarioFormDialog({
       gmail: usuario?.gmail ?? "",
       celular: usuario?.celular ?? "",
       fechaNaci: usuario?.fechaNaci ?? "",
+      fechaInicioVigencia:
+        usuario?.fechaInicioVigencia ?? inicioVigenciaPorDefecto(),
+      fechaFinVigencia: usuario?.fechaFinVigencia ?? "",
+      vigenciaIndefinida: usuario ? usuario.fechaFinVigencia == null : false,
       accesoId: usuario?.accesoId ?? 1,
       rolIds: usuario?.roles.map((r) => r.idRol) ?? [],
       restablecerContrasena: false,
@@ -163,6 +169,10 @@ export default function UsuarioFormDialog({
   })
 
   const rolIds = useWatch({ control: form.control, name: "rolIds" })
+  const vigenciaIndefinida = useWatch({
+    control: form.control,
+    name: "vigenciaIndefinida",
+  })
   const seleccionaDocente =
     !!rolDocente && rolIds.includes(rolDocente.idRol)
   // Al editar un usuario que ya es docente activo, sus datos se gestionan en la
@@ -171,7 +181,7 @@ export default function UsuarioFormDialog({
     seleccionaDocente && (esEdicion ? !docenteActivo : true)
   const mostrarDatosDocente = seleccionaDocente && exigeDocente
 
-  function buildRequest(values: UsuarioValues): UsuarioRequest {
+  function buildRequest(values: UsuarioFormValues): UsuarioRequest {
     const data: UsuarioRequest = {
       nombre: values.nombre,
       apellidoPat: values.apellidoPat,
@@ -180,6 +190,12 @@ export default function UsuarioFormDialog({
       gmail: values.gmail || null,
       celular: values.celular || null,
       fechaNaci: values.fechaNaci,
+      fechaInicioVigencia:
+        values.fechaInicioVigencia ?? inicioVigenciaPorDefecto(),
+      fechaFinVigencia:
+        values.vigenciaIndefinida || !values.fechaFinVigencia
+          ? null
+          : values.fechaFinVigencia,
       rolIds: values.rolIds,
     }
     if (esEdicion) {
@@ -264,7 +280,7 @@ export default function UsuarioFormDialog({
     })
   }
 
-  async function onSubmit(values: UsuarioValues) {
+  async function onSubmit(values: UsuarioFormValues) {
     if (!await comprobacionDni.comprobar(values.documentoIdentidad, !!usuario && usuario.accesoId !== ACCESO.ACTIVO && values.accesoId === ACCESO.ACTIVO)) return
     const guardando = toast.loading(
       esEdicion ? "Guardando usuario..." : "Creando usuario..."
@@ -530,6 +546,79 @@ export default function UsuarioFormDialog({
                 </FieldSet>
               </TarjetaSeccion>
             </div>
+
+            <TarjetaSeccion>
+              <FieldSet>
+                <FieldLegend>Vigencia</FieldLegend>
+                <FieldDescription className="text-xs">
+                  La vigencia es independiente del Estado Activo o Inactivo: define cuándo el usuario puede ingresar.
+                </FieldDescription>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <Controller
+                    control={form.control}
+                    name="fechaInicioVigencia"
+                    render={({ field }) => (
+                      <Field>
+                        <FieldLabel>Fecha de inicio de vigencia *</FieldLabel>
+                        <FieldContent>
+                          <Input type="date" {...field} />
+                          <FieldError errors={[form.formState.errors.fechaInicioVigencia]} />
+                        </FieldContent>
+                      </Field>
+                    )}
+                  />
+                  <Controller
+                    control={form.control}
+                    name="fechaFinVigencia"
+                    render={({ field }) => (
+                      <Field>
+                        <FieldLabel>Fecha de fin de vigencia</FieldLabel>
+                        <FieldContent>
+                          <Input
+                            type="date"
+                            disabled={vigenciaIndefinida}
+                            {...field}
+                            value={field.value ?? ""}
+                            onChange={(event) => {
+                              if (event.target.value) {
+                                form.setValue("vigenciaIndefinida", false)
+                              }
+                              field.onChange(event)
+                            }}
+                          />
+                          <FieldError errors={[form.formState.errors.fechaFinVigencia]} />
+                        </FieldContent>
+                      </Field>
+                    )}
+                  />
+                  <Controller
+                    control={form.control}
+                    name="vigenciaIndefinida"
+                    render={({ field }) => (
+                      <Field className="sm:col-span-2">
+                        <FieldLabel className="cursor-pointer font-normal">
+                          <span className="flex items-center gap-2">
+                            <Checkbox
+                              checked={!!field.value}
+                              onCheckedChange={(checked) => {
+                                field.onChange(checked)
+                                if (checked) {
+                                  form.setValue("fechaFinVigencia", "", {
+                                    shouldValidate: true,
+                                  })
+                                }
+                              }}
+                            />
+                            {TEXTO_SIN_FIN}
+                          </span>
+                        </FieldLabel>
+                        <FieldError errors={[form.formState.errors.vigenciaIndefinida]} />
+                      </Field>
+                    )}
+                  />
+                </div>
+              </FieldSet>
+            </TarjetaSeccion>
 
             <TarjetaSeccion>
             <FieldSet>

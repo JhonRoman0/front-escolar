@@ -24,11 +24,14 @@ import { useEliminarUsuario, useDesbloquearUsuario, useUsuarios, useRoles } from
 import { useDebouncedValue } from "@/hooks/use-debounce"
 import { usePuede } from "@/hooks/use-permisos"
 import type { UsuarioResponse } from "@/lib/api/seguridad"
+import { formatearFecha } from "@/lib/fechas"
+import { TEXTO_SIN_FIN } from "@/lib/vigencia"
 import { reportesApi } from "@/lib/api/reportes"
 import { descargarTabla, tablaUsuarios, type FormatoReporte } from "@/lib/reportes/tablas"
 import { ReporteModal } from "@/components/reportes/reporte-modal"
 import { ConfirmarEliminar } from "./confirmar-eliminar"
 import { EstadoBadge } from "./estado-badge"
+import { VigenciaBadge } from "./vigencia-badge"
 import { FilasCargando, MensajeSinDatos } from "./shared"
 import UsuarioFormDialog from "./usuario-form-dialog"
 import { COLOR_ROL_ADMIN, COLOR_ROL_FALLBACK, esRolAdmin } from "@/lib/roles"
@@ -233,18 +236,19 @@ export default function UsuariosTab() {
               <TableHead className="text-center">Roles</TableHead>
               <TableHead>Correo</TableHead>
               <TableHead className="text-center">Estado</TableHead>
+              <TableHead className="text-center">Vigencia</TableHead>
               <TableHead className="text-center">Bloqueado</TableHead>
               <TableHead className="text-center">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <FilasCargando columnas={7} />
+              <FilasCargando columnas={8} />
             ) : isError ? (
-              <MensajeSinDatos columnas={7} mensaje="No se pudo cargar. Recarga la pantalla." />
+              <MensajeSinDatos columnas={8} mensaje="No se pudo cargar. Recarga la pantalla." />
             ) : !data?.content.length ? (
               <MensajeSinDatos
-                columnas={7}
+                columnas={8}
                 mensaje={
                   hayFiltros
                     ? "Sin resultados para los filtros seleccionados."
@@ -303,6 +307,20 @@ export default function UsuariosTab() {
                     <TableCell>{usuario.gmail || "—"}</TableCell>
                     <TableCell className="text-center">
                       <EstadoBadge accesoId={usuario.accesoId} />
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <div className="flex flex-col items-center gap-1">
+                        <VigenciaBadge
+                          estado={usuario.estadoVigencia}
+                          inicio={usuario.fechaInicioVigencia}
+                          fin={usuario.fechaFinVigencia}
+                        />
+                        <span className="text-xs text-muted-foreground">
+                          {usuario.fechaInicioVigencia
+                            ? `${formatearFecha(usuario.fechaInicioVigencia)} – ${usuario.fechaFinVigencia ? formatearFecha(usuario.fechaFinVigencia) : TEXTO_SIN_FIN}`
+                            : "—"}
+                        </span>
+                      </div>
                     </TableCell>
                     <TableCell className="text-center">
                       {estaBloqueado(usuario) ? (

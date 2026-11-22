@@ -1,4 +1,9 @@
 import { errorNacimiento } from "@/lib/edades"
+import {
+  errorVigencia,
+  inicioVigenciaPorDefecto,
+  validarFechaISO,
+} from "@/lib/vigencia"
 import * as z from "zod"
 
 import {
@@ -87,6 +92,19 @@ const usuarioSchemaBase = z.object({
   fechaNaci: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha requerida (aaaa-mm-dd)"),
+  fechaInicioVigencia: z
+    .string()
+    .refine(validarFechaISO, "Fecha requerida (aaaa-mm-dd)")
+    .default(() => inicioVigenciaPorDefecto()),
+  fechaFinVigencia: z
+    .string()
+    .refine(
+      (valor) => valor === "" || validarFechaISO(valor),
+      "Fecha requerida (aaaa-mm-dd)"
+    )
+    .nullable()
+    .optional(),
+  vigenciaIndefinida: z.boolean().default(true),
   accesoId: accesoId.optional(),
   rolIds: z.array(z.number()).min(1, "Asigna al menos un rol"),
   restablecerContrasena: z.boolean(),
@@ -107,7 +125,7 @@ const usuarioSchemaBase = z.object({
   fechaContratacion: z.string().optional().or(z.literal("")),
   niveles: z.array(z.number()),
 })
-export type UsuarioValues = z.infer<typeof usuarioSchemaBase>
+export type UsuarioFormValues = z.input<typeof usuarioSchemaBase>
 
 /**
  * Schema del modal de usuario. `exigeDocente` cambia según el flujo: al crear o
@@ -119,6 +137,17 @@ export function crearUsuarioSchema(exigeDocente: boolean, fechaOriginal?: string
   return usuarioSchemaBase.superRefine((valores, ctx) => {
     const error = errorNacimiento(valores.fechaNaci, "adulto", fechaOriginal)
     if (error) ctx.addIssue({ code: "custom", path: ["fechaNaci"], message: error })
+    const errorVig = errorVigencia({
+      inicio: valores.fechaInicioVigencia,
+      fin: valores.fechaFinVigencia,
+      indefinida: valores.vigenciaIndefinida,
+    })
+    if (errorVig) {
+      const campo = validarFechaISO(valores.fechaInicioVigencia)
+        ? "fechaFinVigencia"
+        : "fechaInicioVigencia"
+      ctx.addIssue({ code: "custom", path: [campo], message: errorVig })
+    }
     if (!exigeDocente) return
     if (valores.gradoAcademicoId == null) {
       ctx.addIssue({

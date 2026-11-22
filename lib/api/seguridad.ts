@@ -155,6 +155,9 @@ export interface UsuarioResponse {
   intentosFallidos: number | null
   fechaBloqueo: string | null
   credencialesEnviadas?: boolean | null
+  fechaInicioVigencia?: string | null
+  fechaFinVigencia?: string | null
+  estadoVigencia?: string | null
   roles: RolResponse[]
 }
 
@@ -166,6 +169,8 @@ export interface UsuarioRequest {
   gmail?: string | null
   celular?: string | null
   fechaNaci: string
+  fechaInicioVigencia: string
+  fechaFinVigencia?: string | null
   accesoId?: number | null
   restablecerContrasena?: boolean
   urlFoto?: string | null
