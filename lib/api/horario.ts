@@ -7,7 +7,7 @@ export { etiquetaSeccion }
 
 export interface HorarioListItem {
   idHorario: number
-  /** 1=Lunes … 7=Domingo */
+  /** 1=Lunes … 6=Sábado */
   diaSemana: number
   /** "HH:mm:ss" serializado por Jackson */
   horaInicio: string
@@ -67,6 +67,14 @@ export interface MiHorario {
   recreos: RecreoHorario[]
 }
 
+function compararHorarios(a: HorarioListItem, b: HorarioListItem): number {
+  return a.idHorario - b.idHorario ||
+    a.diaSemana - b.diaSemana ||
+    a.horaInicio.localeCompare(b.horaInicio) ||
+    a.curso.localeCompare(b.curso) ||
+    a.seccion.localeCompare(b.seccion)
+}
+
 export const horarioApi = {
   /** GET /horarios/mio — Todas las clases del docente con sesión iniciada. Sin año: el vigente. */
   async mio(idAnio?: number | null): Promise<MiHorario> {
@@ -88,7 +96,7 @@ export const horarioApi = {
     if (params?.idSeccion != null) query.set("idSeccion", String(params.idSeccion))
     if (params?.idTurno != null) query.set("idTurno", String(params.idTurno))
     if (params?.idGradoSeccion != null) query.set("idGradoSeccion", String(params.idGradoSeccion))
-    if (params?.idDocente != null) query.set("idDocente", String(params.idDocente))
+    if (params?.idDocente != null) query.set("docente", String(params.idDocente))
     // idAnio / anioEscolar: prioridad idAnio, fallback anioEscolar
     const anio = params?.idAnio ?? params?.anioEscolar
     if (anio != null) {
@@ -99,6 +107,26 @@ export const horarioApi = {
     if (params?.grado) query.set("grado", params.grado)
     if (params?.seccion) query.set("seccion", params.seccion)
     return apiFetch<Paginated<HorarioListItem>>(`/horarios?${query.toString()}`)
+  },
+
+  /** GET /horarios — recupera todas las páginas con los mismos filtros y orden estable. */
+  async listarTodo(params?: HorarioFiltros): Promise<HorarioListItem[]> {
+    const base: HorarioFiltros = {
+      ...params,
+      sort: params?.sort ?? "idHorario,asc",
+      size: params?.size ?? 100,
+    }
+    const todos: HorarioListItem[] = []
+    let pagina = 0
+
+    while (true) {
+      const respuesta = await horarioApi.listar({ ...base, page: pagina })
+      todos.push(...respuesta.content)
+      if (respuesta.last || respuesta.content.length === 0) break
+      pagina += 1
+    }
+
+    return todos.sort(compararHorarios)
   },
 
   /** GET /horarios/docente/{idDocente} — Docente: solo sus horarios (ahora Page) */
