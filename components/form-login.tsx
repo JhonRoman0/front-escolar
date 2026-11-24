@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { CampoTextoAcceso, botonAcceso } from "@/components/shared/campo-texto-acceso"
 import { useAuth } from "@/components/auth-provider"
+import type { DesafioDosFactor } from "@/lib/api/auth"
 
 const formSchema = z.object({
   codigo: z
@@ -29,7 +30,7 @@ const MAX_INTENTOS_FALLIDOS = 5
 const MENSAJE_CUENTA_BLOQUEADA =
   "Tu cuenta está bloqueada por intentos fallidos. Recupera tu contraseña o comunícate con el administrador."
 
-export function LoginForm() {
+export function LoginForm({ onDesafio }: { onDesafio: (desafio: DesafioDosFactor) => void }) {
   const { login } = useAuth()
   const [enviando, setEnviando] = useState(false)
   const [mostrarContrasena, setMostrarContrasena] = useState(false)
@@ -46,11 +47,24 @@ export function LoginForm() {
   async function onSubmit(values: LoginValues) {
     setEnviando(true)
     try {
-      await login(values)
+      const resp = await login(values)
       setFallos(0)
+      if (resp.requiereDosFactor && resp.desafio) {
+        onDesafio({
+          desafio: resp.desafio,
+          correoEnmascarado: resp.correoEnmascarado ?? "tu correo",
+          segundosReenvio: resp.segundosReenvio ?? 45,
+          minutosCodigo: resp.minutosCodigo ?? 5,
+        })
+        toast.success("Te enviamos un código a tu correo")
+        return
+      }
       toast.success("¡Bienvenido!")
     } catch (error) {
-      if (error instanceof ApiError && error.status === 423) {
+      if (error instanceof ApiError && (error.status === 429 || error.status === 503)) {
+        // Tope de códigos por hora o el correo no salió: el mensaje lo explica.
+        toast.error(error.message)
+      } else if (error instanceof ApiError && error.status === 423) {
         toast.error(MENSAJE_CUENTA_BLOQUEADA)
       } else if (error instanceof ApiError && error.status === 403) {
         // Usuario inactivo: no cuenta como intento fallido.

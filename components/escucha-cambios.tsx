@@ -4,6 +4,7 @@ import { useEffect } from "react"
 import { useQueryClient, type Query } from "@tanstack/react-query"
 
 import { escucharCambios } from "@/lib/eventos"
+import { authApi } from "@/lib/api/auth"
 
 /** Esperar un poco junta varios avisos seguidos (p. ej. la portería) en una sola recarga. */
 const AGRUPAR_MS = 1_500
@@ -49,6 +50,8 @@ export function EscuchaCambios() {
       },
       // Mientras estuvo desconectado pudo cambiar algo: se recarga lo que está en pantalla.
       onReconectado: () => void queryClient.invalidateQueries(),
+      // Si este dispositivo fue quitado, el backend responde 401 y apiFetch lleva al login.
+      onRevisarSesion: () => void authApi.me().catch(() => {}),
     })
     return () => {
       window.clearTimeout(temporizador)

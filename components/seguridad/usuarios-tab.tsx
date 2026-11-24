@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react"
 import { toast } from "sonner"
-import { Lock, LockOpen, FileDown, Pencil, Plus, RotateCcw, ShieldCheck } from "lucide-react"
+import { Lock, LockOpen, FileDown, LogOut, Pencil, Plus, RotateCcw, ShieldCheck } from "lucide-react"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -20,7 +20,13 @@ import {
 import { TablaPaginacion } from "@/components/shared/paginacion-tabla"
 import { BuscadorTabla } from "@/components/shared/buscador-tabla"
 import { FilterSelect } from "@/components/shared/filter-select"
-import { useEliminarUsuario, useDesbloquearUsuario, useUsuarios, useRoles } from "@/hooks/use-seguridad"
+import {
+  useCerrarSesionesUsuario,
+  useEliminarUsuario,
+  useDesbloquearUsuario,
+  useUsuarios,
+  useRoles,
+} from "@/hooks/use-seguridad"
 import { useDebouncedValue } from "@/hooks/use-debounce"
 import { usePuede } from "@/hooks/use-permisos"
 import type { UsuarioResponse } from "@/lib/api/seguridad"
@@ -88,6 +94,7 @@ export default function UsuariosTab() {
   )
   const eliminar = useEliminarUsuario()
   const desbloquear = useDesbloquearUsuario()
+  const cerrarSesiones = useCerrarSesionesUsuario()
   const puedeCrear = usePuede("USUARIOS", "CREAR")
   const puedeActualizar = usePuede("USUARIOS", "ACTUALIZAR")
   const puedeEliminar = usePuede("USUARIOS", "ELIMINAR")
@@ -168,6 +175,16 @@ export default function UsuariosTab() {
       }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Error al eliminar")
+    }
+  }
+
+  async function handleCerrarSesiones(usuario: UsuarioResponse) {
+    try {
+      await cerrarSesiones.mutateAsync(usuario.idUsuario)
+      toast.success(`Se cerraron las sesiones de "${usuario.nombre} ${usuario.apellidoPat}"`)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudieron cerrar las sesiones")
+      throw error
     }
   }
 
@@ -375,6 +392,16 @@ export default function UsuariosTab() {
                           >
                             <LockOpen />
                           </Button>
+                        )}
+                        {puedeActualizar && (
+                          <ConfirmarEliminar
+                            titulo="Cerrar sesiones"
+                            descripcion={`Se cerrarán todas las sesiones abiertas de "${nombreCompleto}" y se le volverá a pedir el código del correo en todos sus dispositivos.`}
+                            textoBoton="Cerrar sesiones"
+                            icono={<LogOut />}
+                            variantConfirmar="brand"
+                            onConfirm={() => handleCerrarSesiones(usuario)}
+                          />
                         )}
                         {puedeActualizar && (
                           <Button

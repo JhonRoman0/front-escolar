@@ -60,7 +60,9 @@ interface AuthContextValue {
   esAdmin: boolean
   cargando: boolean
   permisosCambiados: boolean
+  /** Si devuelve requiereDosFactor, aún no hay sesión: falta verificarDosFactor. */
   login: (data: LoginRequest) => Promise<LoginResponse>
+  verificarDosFactor: (desafio: string, codigo: string, recordar: boolean) => Promise<LoginResponse>
   logout: () => void
 }
 
@@ -237,6 +239,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function login(data: LoginRequest): Promise<LoginResponse> {
     const resp = await authApi.login(data)
+    if (resp.requiereDosFactor) return resp
+    abrirSesion(resp)
+    return resp
+  }
+
+  async function verificarDosFactor(desafio: string, codigo: string, recordar: boolean) {
+    const resp = await authApi.verificarDosFactor(desafio, codigo, recordar)
+    abrirSesion(resp)
+    return resp
+  }
+
+  function abrirSesion(resp: LoginResponse) {
+    if (!resp.usuario || !resp.permisos) return
     limpiarSesionBloqueada()
     setDetalleBloqueo(null)
     setEsAdmin(resp.esAdmin)
@@ -247,7 +262,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUsuario(resp.usuario)
     setPermisosCambiados(false)
     router.replace("/")
-    return resp
   }
 
   function logout() {
@@ -281,7 +295,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       estado: estadoDeclarado,
     }
     return (
-      <AuthContext.Provider value={{ usuario, permisos, esAdmin, cargando, permisosCambiados, login, logout }}>
+      <AuthContext.Provider value={{ usuario, permisos, esAdmin, cargando, permisosCambiados, login, verificarDosFactor, logout }}>
         <VigenciaVencidaModal
           detalle={detalleModal}
           usuario={usuario}
@@ -307,7 +321,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ usuario, permisos, esAdmin, cargando, permisosCambiados, login, logout }}>
+    <AuthContext.Provider value={{ usuario, permisos, esAdmin, cargando, permisosCambiados, login, verificarDosFactor, logout }}>
       {children}
       {cambioPendiente && (
         <CambiarContrasenaDialog

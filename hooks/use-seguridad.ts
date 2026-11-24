@@ -131,6 +131,12 @@ export function useDesbloquearUsuario() {
   })
 }
 
+export function useCerrarSesionesUsuario() {
+  return useMutation({
+    mutationFn: (id: number) => usuariosApi.cerrarSesiones(id),
+  })
+}
+
 export function useSubirFotoUsuario() {
   const invalidar = useInvalidarMutacion(KEYS.usuarios)
   return useMutation({
