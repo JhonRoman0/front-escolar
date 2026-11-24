@@ -8,8 +8,6 @@ interface EntradaCodigoProps {
   valor: string
   onCambio: (valor: string) => void
   largo?: number
-  /** Enter en cualquier casilla (p. ej. para verificar). */
-  onEnter?: () => void
 }
 
 /**
@@ -18,7 +16,7 @@ interface EntradaCodigoProps {
  * completo y navegación por teclado accesible (role="group" + aria-label por
  * casilla). Controlado: el valor vive en el padre y se compone de dígitos.
  */
-export function EntradaCodigo({ valor, onCambio, largo = 6, onEnter }: EntradaCodigoProps) {
+export function EntradaCodigo({ valor, onCambio, largo = 6 }: EntradaCodigoProps) {
   const refs = useRef<Array<HTMLInputElement | null>>([])
 
   function enfocar(indice: number) {
@@ -38,11 +36,6 @@ export function EntradaCodigo({ valor, onCambio, largo = 6, onEnter }: EntradaCo
   }
 
   function manejarTecla(i: number, e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "Enter" && onEnter) {
-      e.preventDefault()
-      onEnter()
-      return
-    }
     if (e.key === "Backspace" && !valor[i] && i > 0) {
       enfocar(i - 1)
     }
@@ -60,7 +53,7 @@ export function EntradaCodigo({ valor, onCambio, largo = 6, onEnter }: EntradaCo
     <div
       role="group"
       aria-label="Código de verificación"
-      className="mx-auto flex w-full max-w-sm justify-center gap-1.5 sm:gap-2"
+      className="flex justify-center gap-2"
     >
       {Array.from({ length: largo }, (_, i) => (
         <Input
@@ -78,7 +71,7 @@ export function EntradaCodigo({ valor, onCambio, largo = 6, onEnter }: EntradaCo
           onKeyDown={(e) => manejarTecla(i, e)}
           onPaste={manejarPegado}
           aria-label={`Dígito ${i + 1}`}
-          className="h-12 min-w-0 max-w-12 flex-1 rounded-xl px-0 text-center text-lg font-semibold focus-visible:ring-brand-info"
+          className="h-12 w-11 rounded-xl text-center text-lg font-semibold focus-visible:ring-brand-info"
         />
       ))}
     </div>
