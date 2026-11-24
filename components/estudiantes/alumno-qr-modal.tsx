@@ -63,7 +63,7 @@ export function AlumnoQrModal({ alumno, open, onOpenChange }: AlumnoQrModalProps
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent size="md">
         <DialogHeader>
           <DialogTitle>Código QR del alumno</DialogTitle>
           <DialogDescription>
@@ -72,13 +72,14 @@ export function AlumnoQrModal({ alumno, open, onOpenChange }: AlumnoQrModalProps
         </DialogHeader>
 
         <div className="flex flex-col items-center gap-4 py-4">
-          <div className="rounded-lg border bg-white p-4">
+          <div className="w-full max-w-[280px] rounded-lg border bg-white p-2 sm:p-3">
             <QRCodeCanvas
               ref={canvasRef}
               value={alumno.codigoHash}
               size={QR_SIZE}
               level="H"
               marginSize={0}
+              className="block aspect-square h-auto w-full"
             />
           </div>
 

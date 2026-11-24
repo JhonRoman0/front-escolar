@@ -130,6 +130,58 @@ test("token obsoleto y vigencia no disponible no comparten tratamiento", () => {
   assert.equal(vigencia.MENSAJE_NO_DISPONIBLE, "No se pudo verificar la vigencia de su cuenta.")
 })
 
+test("etiquetas y opciones de vigencia se comparten entre filtros e informes", () => {
+  for (const [estado, etiqueta] of Object.entries({
+    VIGENTE: "Vigente",
+    INDEFINIDA: "Indefinida",
+    NO_INICIADA: "No iniciada",
+    VENCIDA: "Vencida",
+  })) {
+    assert.equal(vigencia.ETIQUETAS_ESTADO_VIGENCIA[estado], etiqueta)
+  }
+  assert.equal(
+    vigencia.OPCIONES_ESTADO_VIGENCIA.map((opcion) => opcion.value).join(","),
+    "VIGENTE,INDEFINIDA,NO_INICIADA,VENCIDA"
+  )
+  assert.equal(vigencia.OPCIONES_ESTADO_VIGENCIA[2].label, "No iniciada")
+  assert.equal(vigencia.etiquetaEstadoVigencia("NO_INICIADA"), "No iniciada")
+  assert.equal(vigencia.etiquetaEstadoVigencia("OTRO"), "Desconocida")
+})
+
+function restarDias(iso, dias) {
+  const fecha = new Date(`${iso}T00:00:00Z`)
+  fecha.setUTCDate(fecha.getUTCDate() + dias)
+  return fecha.toISOString().slice(0, 10)
+}
+
+test("el esquema respeta el inicio mínimo cuando el formulario lo informa", () => {
+  const hoy = vigencia.inicioVigenciaPorDefecto()
+  const base = {
+    nombre: "Ana",
+    apellidoPat: "Ruiz",
+    apellidoMat: "Perez",
+    documentoIdentidad: "87654321",
+    gmail: "ana@example.com",
+    celular: "987654321",
+    fechaNaci: edades.nacimientoMaximoAdulto(),
+    rolIds: [1],
+    restablecerContrasena: false,
+    niveles: [1],
+    fechaFinVigencia: null,
+    vigenciaIndefinida: true,
+  }
+  const esquema = crearUsuarioSchema(false, null, { inicioMinimo: hoy })
+
+  const anterior = esquema.safeParse({
+    ...base,
+    fechaInicioVigencia: restarDias(hoy, -1),
+  })
+  assert.equal(anterior.success, false)
+  assert.ok(anterior.error.issues.some((issue) => issue.path.join(".") === "fechaInicioVigencia"))
+
+  assert.equal(esquema.safeParse({ ...base, fechaInicioVigencia: hoy }).success, true)
+})
+
 test("el esquema exige fin cuando no es indefinida y lo prohíbe cuando sí lo es", () => {
   const base = {
     nombre: "Ana",

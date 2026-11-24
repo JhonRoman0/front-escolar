@@ -44,6 +44,7 @@ export interface FiltroDef {
   valor?: string
   onChange?: (valor: string) => void
   render?: () => ReactNode
+  anchoCompleto?: boolean
   /** Obliga a elegir un valor: no ofrece "Todos". */
   sinTodos?: boolean
 }
@@ -118,8 +119,9 @@ export function ReporteModal({ open, onOpenChange, titulo, descripcion, ...resto
 /** Filtros con valor, en texto para el encabezado del archivo. */
 function textoFiltros(filtros: FiltroDef[]): string[] {
   return filtros.flatMap((f) => {
-    const opcion = f.valor ? f.opciones?.find((o) => o.value === f.valor) : undefined
-    return opcion ? [`${f.label}: ${opcion.label}`] : []
+    if (!f.valor) return []
+    const opcion = f.opciones?.find((o) => o.value === f.valor)
+    return [`${f.label}: ${opcion?.label ?? f.valor}`]
   })
 }
 
@@ -240,7 +242,7 @@ function Contenido({
           {filtros.length > 0 && (
             <div className="grid grid-cols-2 gap-3">
               {filtros.map((f) => (
-                <div key={f.id} className={f.render ? "col-span-2 space-y-2" : "space-y-2"}>
+                <div key={f.id} className={f.render || f.anchoCompleto ? "col-span-2 space-y-2" : "space-y-2"}>
                   {f.render ? (
                     <>
                       <p className="text-sm font-medium">{f.label}</p>

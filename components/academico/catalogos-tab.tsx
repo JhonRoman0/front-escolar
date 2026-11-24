@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogFooter,
   DialogHeader,
@@ -1100,8 +1101,9 @@ function AnioDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent size="md" scroll="sticky">
         <DialogHeader><DialogTitle className="text-lg font-semibold tracking-tight">{esEdicion ? "Editar año escolar" : "Nuevo año escolar"}</DialogTitle></DialogHeader>
+        <DialogBody className="flex flex-col gap-5">
         {bloqueoCreacion && anioPendiente && (
           <div className="flex gap-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-amber-900 dark:border-amber-700/50 dark:bg-amber-500/10 dark:text-amber-300">
             <TriangleAlert className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
@@ -1276,6 +1278,7 @@ function AnioDialog({
             variantConfirmar="default"
           />
         )}
+        </DialogBody>
       </DialogContent>
     </Dialog>
   )

@@ -25,7 +25,11 @@ import { useDebouncedValue } from "@/hooks/use-debounce"
 import { usePuede } from "@/hooks/use-permisos"
 import type { UsuarioResponse } from "@/lib/api/seguridad"
 import { formatearFecha } from "@/lib/fechas"
-import { TEXTO_SIN_FIN } from "@/lib/vigencia"
+import {
+  OPCIONES_ESTADO_VIGENCIA,
+  TEXTO_SIN_FIN,
+  type EstadoVigencia,
+} from "@/lib/vigencia"
 import { reportesApi } from "@/lib/api/reportes"
 import { descargarTabla, tablaUsuarios, type FormatoReporte } from "@/lib/reportes/tablas"
 import { ReporteModal } from "@/components/reportes/reporte-modal"
@@ -58,8 +62,11 @@ export default function UsuariosTab() {
   const [busqueda, setBusqueda] = useState("")
   const [filtroRolTabla, setFiltroRolTabla] = useState("")
   const [filtroEstado, setFiltroEstado] = useState("")
+  const [filtroVigencia, setFiltroVigencia] = useState("")
+  const [reporteBusqueda, setReporteBusqueda] = useState("")
   const [reporteRol, setReporteRol] = useState("")
   const [reporteEstado, setReporteEstado] = useState("")
+  const [reporteVigencia, setReporteVigencia] = useState("")
   const busquedaDebounced = useDebouncedValue(busqueda, 400)
 
   const filtros = useMemo(
@@ -67,8 +74,11 @@ export default function UsuariosTab() {
       q: busquedaDebounced.trim() || undefined,
       idRol: filtroRolTabla ? Number(filtroRolTabla) : undefined,
       idAcceso: filtroEstado ? Number(filtroEstado) : undefined,
+      estadoVigencia: filtroVigencia
+        ? (filtroVigencia as EstadoVigencia)
+        : undefined,
     }),
-    [busquedaDebounced, filtroRolTabla, filtroEstado]
+    [busquedaDebounced, filtroRolTabla, filtroEstado, filtroVigencia]
   )
 
   const { data, isLoading, isError, refetch } = useUsuarios(
@@ -111,13 +121,22 @@ export default function UsuariosTab() {
     setPage(0)
   }
 
+  function cambiarVigencia(valor: string) {
+    setFiltroVigencia(valor)
+    setPage(0)
+  }
+
   const hayFiltros =
-    busqueda.trim() !== "" || filtroRolTabla !== "" || filtroEstado !== ""
+    busqueda.trim() !== "" ||
+    filtroRolTabla !== "" ||
+    filtroEstado !== "" ||
+    filtroVigencia !== ""
 
   function limpiarFiltros() {
     setBusqueda("")
     setFiltroRolTabla("")
     setFiltroEstado("")
+    setFiltroVigencia("")
     setPage(0)
   }
 
@@ -128,7 +147,10 @@ export default function UsuariosTab() {
     filtros: Record<string, string>,
     contexto: { colegio: string; filtros: string[] }
   ) {
-    const datos = await reportesApi.usuarios(inicio, fin, filtros)
+    const filtrosConBusqueda = reporteBusqueda
+      ? { ...filtros, q: reporteBusqueda }
+      : filtros
+    const datos = await reportesApi.usuarios(inicio, fin, filtrosConBusqueda)
     if (datos.length === 0) {
       toast.warning("No hay usuarios en el rango y filtros seleccionados")
       return
@@ -169,8 +191,10 @@ export default function UsuariosTab() {
           <div className="flex flex-wrap items-center gap-2">
             {puedeExportar && (
               <Button variant="outline" size="sm" onClick={() => {
+                setReporteBusqueda(busqueda.trim())
                 setReporteRol(filtroRolTabla)
                 setReporteEstado(filtroEstado)
+                setReporteVigencia(filtroVigencia)
                 setReporteOpen(true)
               }}>
                 <FileDown data-icon="inline-start" />
@@ -212,6 +236,13 @@ export default function UsuariosTab() {
             onValueChange={cambiarEstado}
             options={ESTADO_OPCIONES}
             allLabel="Todos los estados"
+            className="w-[180px]"
+          />
+          <FilterSelect
+            value={filtroVigencia}
+            onValueChange={cambiarVigencia}
+            options={OPCIONES_ESTADO_VIGENCIA}
+            allLabel="Todas las vigencias"
             className="w-[180px]"
           />
           {hayFiltros && (
@@ -395,12 +426,24 @@ export default function UsuariosTab() {
           open={reporteOpen}
           onOpenChange={setReporteOpen}
           titulo="Reporte de usuarios"
-          descripcion="Descarga el listado de usuarios del rango en PDF o Excel."
+          descripcion={
+            reporteBusqueda
+              ? `Descarga el listado de usuarios del rango en PDF o Excel. Se aplicará la búsqueda heredada del listado: «${reporteBusqueda}».`
+              : "Descarga el listado de usuarios del rango en PDF o Excel."
+          }
           presets={["todo", "ultimos_7", "este_mes", "personalizado"]}
           etiquetaTodo="Todos los usuarios"
           filtros={[
             { id: "idRol", label: "Rol", opciones: opcionesRol, valor: reporteRol, onChange: setReporteRol },
             { id: "idAcceso", label: "Estado", opciones: ESTADO_OPCIONES, valor: reporteEstado, onChange: setReporteEstado },
+            {
+              id: "estadoVigencia",
+              label: "Vigencia",
+              opciones: OPCIONES_ESTADO_VIGENCIA,
+              valor: reporteVigencia,
+              onChange: setReporteVigencia,
+              anchoCompleto: true,
+            },
           ]}
           onDescargar={handleDescargarReporte}
         />

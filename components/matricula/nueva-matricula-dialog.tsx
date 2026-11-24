@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { toast } from "sonner"
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogBody, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 import { Stepper } from "@/components/shared/stepper"
 import { useCrudMatriculas } from "@/hooks/use-matricula"
@@ -150,7 +150,7 @@ function Asistente({ onCerrar, onCreada }: { onCerrar: () => void; onCreada?: (m
   }
 
   const contenido = matriculaCreada ? (
-      <div className="flex min-h-0 flex-col items-center gap-3 overflow-y-auto py-2 text-center">
+      <div className="flex min-h-0 flex-col items-center gap-3 py-2 text-center">
         <CircleCheck className="size-10 shrink-0 text-exito" aria-hidden />
         <div className="w-full min-w-0 space-y-1 break-words">
           <p className="text-base font-semibold">Matrícula creada</p>
@@ -194,11 +194,13 @@ function Asistente({ onCerrar, onCreada }: { onCerrar: () => void; onCreada?: (m
     </div>
   )
   return (
-    <DialogContent className={`flex max-h-[90vh] flex-col ${matriculaCreada ? "sm:max-w-md" : "sm:max-w-2xl"}`}>
-        <DialogHeader className="shrink-0">
-          <DialogTitle className="text-lg font-semibold tracking-tight">Nueva matrícula</DialogTitle>
-        </DialogHeader>
-      {contenido}
+    <DialogContent size={matriculaCreada ? "md" : "2xl"} scroll="sticky">
+      <DialogHeader className="shrink-0">
+        <DialogTitle className="text-lg font-semibold tracking-tight">Nueva matrícula</DialogTitle>
+      </DialogHeader>
+      <DialogBody className="flex flex-col">
+        {contenido}
+      </DialogBody>
     </DialogContent>
   )
 }

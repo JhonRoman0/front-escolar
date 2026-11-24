@@ -39,26 +39,47 @@ function DialogOverlay({
   )
 }
 
+const dialogSizes = {
+  sm: "sm:max-w-sm",
+  md: "sm:max-w-md",
+  lg: "sm:max-w-lg",
+  xl: "sm:max-w-xl",
+  "2xl": "sm:max-w-2xl",
+  "4xl": "sm:max-w-4xl",
+} as const
+
 function DialogContent({
   className,
   children,
   showCloseButton = true,
   forceOverlay = false,
+  size = "sm",
+  scroll = "auto",
   ...props
 }: DialogPrimitive.Popup.Props & {
   showCloseButton?: boolean
-  // Renderiza siempre el overlay aunque el diálogo esté anidado dentro de otro.
-  // Base UI oculta el backdrop de los diálogos anidados salvo que se pida
-  // forceRender; sin esto la confirmación no atenúa al diálogo padre.
   forceOverlay?: boolean
+  size?: keyof typeof dialogSizes
+  scroll?: "none" | "auto" | "sticky"
 }) {
+  const scrollClasses = {
+    none: "max-h-none overflow-visible",
+    auto: "max-h-[90dvh] overflow-y-auto",
+    sticky:
+      "max-h-[90dvh] overflow-hidden [&_[data-slot=dialog-footer]]:sticky [&_[data-slot=dialog-footer]]:bottom-0 [&_[data-slot=dialog-footer]]:z-10",
+  }[scroll]
+
   return (
     <DialogPortal>
       <DialogOverlay forceRender={forceOverlay} />
       <DialogPrimitive.Popup
         data-slot="dialog-content"
+        data-close-button={showCloseButton}
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+          "fixed top-1/2 left-1/2 z-50 flex max-h-[90dvh] w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col gap-4 rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+          "[&[data-close-button=false]_[data-slot=dialog-header]]:pr-0",
+          dialogSizes[size],
+          scrollClasses,
           className
         )}
         {...props}
@@ -75,8 +96,7 @@ function DialogContent({
               />
             }
           >
-            <XIcon
-            />
+            <XIcon />
             <span className="sr-only">Close</span>
           </DialogPrimitive.Close>
         )}
@@ -85,11 +105,21 @@ function DialogContent({
   )
 }
 
+function DialogBody({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="dialog-body"
+      className={cn("-mx-4 min-h-0 flex-1 overflow-y-auto px-4", className)}
+      {...props}
+    />
+  )
+}
+
 function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="dialog-header"
-      className={cn("flex flex-col gap-2", className)}
+      className={cn("flex flex-col gap-2 pr-8", className)}
       {...props}
     />
   )
@@ -107,7 +137,7 @@ function DialogFooter({
     <div
       data-slot="dialog-footer"
       className={cn(
-        "-mx-4 -mb-4 flex flex-col-reverse gap-2 rounded-b-xl border-t bg-muted/50 p-4 sm:flex-row sm:justify-end",
+        "-mx-4 -mb-4 flex flex-col-reverse flex-wrap gap-2 rounded-b-xl border-t bg-muted/50 p-4 sm:flex-row sm:justify-end",
         className
       )}
       {...props}
@@ -153,6 +183,7 @@ function DialogDescription({
 
 export {
   Dialog,
+  DialogBody,
   DialogClose,
   DialogContent,
   DialogDescription,

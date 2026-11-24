@@ -38,12 +38,23 @@ function FieldLegend({
   )
 }
 
-function FieldGroup({ className, ...props }: React.ComponentProps<"div">) {
+function FieldGroup({
+  className,
+  columnas = 1,
+  ...props
+}: React.ComponentProps<"div"> & { columnas?: 1 | 2 | 3 }) {
+  const columnasClasses = {
+    1: "flex flex-col",
+    2: "grid grid-cols-1 sm:grid-cols-2",
+    3: "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3",
+  }[columnas]
+
   return (
     <div
       data-slot="field-group"
       className={cn(
-        "group/field-group @container/field-group flex w-full flex-col gap-5 data-[slot=checkbox-group]:gap-3 *:data-[slot=field-group]:gap-4",
+        "group/field-group @container/field-group w-full gap-5 data-[slot=checkbox-group]:gap-3 *:data-[slot=field-group]:gap-4",
+        columnasClasses,
         className
       )}
       {...props}

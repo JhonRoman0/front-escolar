@@ -10,6 +10,23 @@ export const ESTADOS_VIGENCIA = {
 export type EstadoVigencia =
   (typeof ESTADOS_VIGENCIA)[keyof typeof ESTADOS_VIGENCIA]
 
+export const ETIQUETAS_ESTADO_VIGENCIA: Record<EstadoVigencia, string> = {
+  VIGENTE: "Vigente",
+  INDEFINIDA: "Indefinida",
+  NO_INICIADA: "No iniciada",
+  VENCIDA: "Vencida",
+}
+
+export const OPCIONES_ESTADO_VIGENCIA = Object.values(ESTADOS_VIGENCIA).map(
+  (estado) => ({ value: estado, label: ETIQUETAS_ESTADO_VIGENCIA[estado] })
+)
+
+export function etiquetaEstadoVigencia(estado: unknown): string {
+  return esEstadoVigenciaValido(estado)
+    ? ETIQUETAS_ESTADO_VIGENCIA[estado]
+    : "Desconocida"
+}
+
 export const CODIGOS_VIGENCIA = {
   VIGENTE: "VIGENCIA_VIGENTE",
   INDEFINIDA: "VIGENCIA_INDEFINIDA",
