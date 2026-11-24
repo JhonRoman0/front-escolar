@@ -15,6 +15,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/components/auth-provider"
 import { CambiarContrasenaDialog } from "@/components/cuenta/cambiar-contrasena-dialog"
+import { DispositivosCard } from "@/components/cuenta/dispositivos-card"
 
 export default function CuentaVista() {
   const { usuario } = useAuth()
@@ -87,7 +88,8 @@ export default function CuentaVista() {
                 Protege el acceso a tu cuenta.
               </p>
               <p className="text-sm text-muted-foreground">
-                Puedes cambiar tu contraseña cuando lo necesites.
+                Puedes cambiar tu contraseña cuando lo necesites. Al iniciar sesión te pediremos
+                un código que llega a tu correo.
               </p>
             </div>
             <Button
@@ -101,6 +103,8 @@ export default function CuentaVista() {
           </div>
         </CardContent>
       </Card>
+
+      <DispositivosCard />
 
       <CambiarContrasenaDialog
         open={cambiarContrasenaAbierto}
