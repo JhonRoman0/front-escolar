@@ -21,7 +21,7 @@ import {
 import { PermisosActualizadosModal } from "@/components/seguridad/permisos-actualizados-modal"
 import { CambiarContrasenaDialog } from "@/components/cuenta/cambiar-contrasena-dialog"
 import { VigenciaVencidaModal } from "@/components/seguridad/vigencia-vencida-modal"
-import { EVENTO_REVISAR_CUENTA, EVENTO_REVISAR_PERMISOS } from "@/components/escucha-cambios"
+import { EVENTO_REVISAR_PERMISOS } from "@/components/escucha-cambios"
 import {
   EVENTO_SESION_BLOQUEADA,
   limpiarSesionBloqueada,
@@ -60,9 +60,7 @@ interface AuthContextValue {
   esAdmin: boolean
   cargando: boolean
   permisosCambiados: boolean
-  /** Si devuelve requiereDosFactor, aún no hay sesión: falta verificarDosFactor. */
   login: (data: LoginRequest) => Promise<LoginResponse>
-  verificarDosFactor: (desafio: string, codigo: string, recordar: boolean) => Promise<LoginResponse>
   logout: () => void
 }
 
@@ -237,41 +235,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [usuario, cargando, permisosCambiados, vigenciaInvalida])
 
-  // Datos de la cuenta en vivo: ante un aviso se vuelven a pedir. Sin skipLogout:
-  // si la sesión ya no vale (p. ej. se quitó este dispositivo), apiFetch lleva al login.
-  const haySesion = !!usuario
-  useEffect(() => {
-    if (!haySesion) return
-    async function revisarCuenta() {
-      try {
-        const actual = await authApi.me()
-        // Solo se reemplaza si cambió algo (evita volver a pintar sin motivo).
-        setUsuario((previo) =>
-          previo && JSON.stringify(previo) === JSON.stringify(actual) ? previo : actual
-        )
-      } catch {
-        // 401: apiFetch ya cerró la sesión; otros errores: se reintenta en el próximo aviso.
-      }
-    }
-    window.addEventListener(EVENTO_REVISAR_CUENTA, revisarCuenta)
-    return () => window.removeEventListener(EVENTO_REVISAR_CUENTA, revisarCuenta)
-  }, [haySesion])
-
   async function login(data: LoginRequest): Promise<LoginResponse> {
     const resp = await authApi.login(data)
-    if (resp.requiereDosFactor) return resp
-    abrirSesion(resp)
-    return resp
-  }
-
-  async function verificarDosFactor(desafio: string, codigo: string, recordar: boolean) {
-    const resp = await authApi.verificarDosFactor(desafio, codigo, recordar)
-    abrirSesion(resp)
-    return resp
-  }
-
-  function abrirSesion(resp: LoginResponse) {
-    if (!resp.usuario || !resp.permisos) return
     limpiarSesionBloqueada()
     setDetalleBloqueo(null)
     setEsAdmin(resp.esAdmin)
@@ -282,6 +247,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUsuario(resp.usuario)
     setPermisosCambiados(false)
     router.replace("/")
+    return resp
   }
 
   function logout() {
@@ -315,7 +281,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       estado: estadoDeclarado,
     }
     return (
-      <AuthContext.Provider value={{ usuario, permisos, esAdmin, cargando, permisosCambiados, login, verificarDosFactor, logout }}>
+      <AuthContext.Provider value={{ usuario, permisos, esAdmin, cargando, permisosCambiados, login, logout }}>
         <VigenciaVencidaModal
           detalle={detalleModal}
           usuario={usuario}
@@ -341,7 +307,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ usuario, permisos, esAdmin, cargando, permisosCambiados, login, verificarDosFactor, logout }}>
+    <AuthContext.Provider value={{ usuario, permisos, esAdmin, cargando, permisosCambiados, login, logout }}>
       {children}
       {cambioPendiente && (
         <CambiarContrasenaDialog

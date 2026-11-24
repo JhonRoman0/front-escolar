@@ -59,44 +59,16 @@ export interface PermisosRolResponse {
 }
 
 export interface LoginResponse {
-  token: string | null
-  usuario: UsuarioResponse | null
-  permisos: PermisosRolResponse | null
+  token: string
+  usuario: UsuarioResponse
+  permisos: PermisosRolResponse
   esAdmin: boolean
-  // Contraseña correcta pero falta el código del correo (aún sin sesión).
-  requiereDosFactor?: boolean
-  desafio?: string | null
-  correoEnmascarado?: string | null
-  segundosReenvio?: number | null
-  minutosCodigo?: number | null
-}
-
-/** Inicio de sesión a medias: datos del paso del código. */
-export interface DesafioDosFactor {
-  desafio: string
-  correoEnmascarado: string
-  segundosReenvio: number
-  minutosCodigo: number
-}
-
-export interface DispositivoResponse {
-  idDispositivo: number
-  navegador: string
-  ip: string | null
-  primerUso: string
-  ultimoUso: string
-  // Vacío si no es de confianza (o la confianza venció).
-  confiableHasta: string | null
-  actual: boolean
 }
 
 export interface CambiarContrasenaRequest {
   contrasenaActual: string
   nuevaContrasena: string
 }
-
-/** Clave de la consulta "mis dispositivos" (Mi perfil); la recargan los avisos de cuenta. */
-export const CLAVE_DISPOSITIVOS = ["mis-dispositivos"]
 
 // ─────────── API ───────────
 
@@ -107,34 +79,6 @@ export const authApi = {
       body: JSON.stringify(data),
       skipLogout: true,
     })
-  },
-
-  async verificarDosFactor(
-    desafio: string,
-    codigo: string,
-    recordar: boolean
-  ): Promise<LoginResponse> {
-    return apiFetch<LoginResponse>("/auth/2fa/verificar", {
-      method: "POST",
-      body: JSON.stringify({ desafio, codigo, recordar }),
-      skipLogout: true,
-    })
-  },
-
-  async reenviarDosFactor(desafio: string): Promise<LoginResponse> {
-    return apiFetch<LoginResponse>("/auth/2fa/reenviar", {
-      method: "POST",
-      body: JSON.stringify({ desafio }),
-      skipLogout: true,
-    })
-  },
-
-  async dispositivos(): Promise<DispositivoResponse[]> {
-    return apiFetch<DispositivoResponse[]>("/auth/dispositivos")
-  },
-
-  async olvidarDispositivo(id: number): Promise<void> {
-    return apiFetch<void>(`/auth/dispositivos/${id}`, { method: "DELETE" })
   },
 
   async me(): Promise<UsuarioResponse> {

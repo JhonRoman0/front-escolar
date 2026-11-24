@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, type ReactNode } from "react"
+import { useEffect, useState, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { toast } from "sonner"
@@ -12,16 +12,13 @@ import { CheckCircle2, Loader2, Lock, Mail } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { CampoTextoAcceso, botonAcceso } from "@/components/shared/campo-texto-acceso"
 import { LayoutAcceso } from "@/components/shared/layout-acceso"
-import { PasoCodigo, useCuentaRegresiva } from "@/components/auth/paso-codigo"
+import { EntradaCodigo } from "@/components/auth/entrada-codigo"
 import { authApi } from "@/lib/api/auth"
+import { ApiError } from "@/lib/api"
 import { contrasenaSegura } from "@/lib/schemas/comun"
-import {
-  SEGUNDOS_REINTENTO,
-  codigoDeError,
-  mensajeError,
-  segundosDeEspera,
-} from "@/lib/codigo-verificacion"
 import { cn } from "@/lib/utils"
+
+const SEGUNDOS_REINTENTO = 45
 
 const schemaCorreo = z.object({
   gmail: z.string().min(1, "El email es obligatorio").email("Correo inválido"),
@@ -45,10 +42,27 @@ function ocultarCorreo(gmail: string): string {
   return `${gmail[0]}**${gmail.slice(arroba)}`
 }
 
+function formatearContador(segundos: number): string {
+  const mm = String(Math.floor(segundos / 60)).padStart(2, "0")
+  const ss = String(segundos % 60).padStart(2, "0")
+  return `${mm}:${ss}`
+}
+
+function mensajeError(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback
+}
+
 const CODIGO_AGOTADO = "CODIGO_RECUPERACION_AGOTADO"
 
 function esCodigoAgotado(error: unknown): boolean {
-  return codigoDeError(error) === CODIGO_AGOTADO
+  return error instanceof ApiError && error.body?.codigo === CODIGO_AGOTADO
+}
+
+// 429 del backend: segundos que faltan para poder pedir otro código.
+function segundosDeEspera(error: unknown): number | null {
+  if (!(error instanceof ApiError) || error.status !== 429) return null
+  const segundos = Number(error.body?.segundosRestantes)
+  return Number.isFinite(segundos) && segundos > 0 ? segundos : null
 }
 
 export function RecuperarContrasenaWizard() {
@@ -74,7 +88,11 @@ export function RecuperarContrasenaWizard() {
 
   // Contador de reenvío (frontend, no la vigencia del código): solo descuenta
   // mientras el usuario está en el paso del código.
-  useCuentaRegresiva(paso === "codigo", segundos, setSegundos)
+  useEffect(() => {
+    if (paso !== "codigo" || segundos <= 0) return
+    const id = window.setInterval(() => setSegundos((s) => Math.max(0, s - 1)), 1000)
+    return () => window.clearInterval(id)
+  }, [paso, segundos])
 
   async function enviarCorreo(values: { gmail: string }) {
     setEnviando(true)
@@ -183,15 +201,42 @@ export function RecuperarContrasenaWizard() {
 
   if (paso === "codigo") {
     contenido = (
-      <PasoCodigo
-        codigo={codigo}
-        onCodigo={setCodigo}
-        onVerificar={verificarCodigo}
-        verificando={verificando}
-        segundos={segundos}
-        onReenviar={reenviarCodigo}
-        reenviando={reenviando}
-      />
+      <div className="space-y-4">
+        <EntradaCodigo valor={codigo} onCambio={(v) => setCodigo(v)} />
+        <Button
+          type="button"
+          size="lg"
+          className={cn(botonAcceso)}
+          disabled={codigo.length !== 6 || verificando}
+          onClick={verificarCodigo}
+        >
+          {verificando ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Verificando...
+            </>
+          ) : (
+            <>Verificar</>
+          )}
+        </Button>
+        <p className="text-center text-mini text-muted-foreground">
+          ¿No recibiste el código?{" "}
+          {segundos > 0 ? (
+            <span className="font-semibold text-foreground">
+              Reenviar código ({formatearContador(segundos)})
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={reenviarCodigo}
+              disabled={reenviando}
+              className="font-semibold text-brand-info hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {reenviando ? "Reenviando..." : "Reenviar código"}
+            </button>
+          )}
+        </p>
+      </div>
     )
   } else if (paso === "nueva") {
     contenido = (
