@@ -96,7 +96,7 @@ export interface DocenteReporteItem {
   fechaContratacion: string | null
 }
 
-// ≡ GET /usuarios/reporte?inicio?=&fin?=&idRol?=&idAcceso? → List.
+// ≡ GET /usuarios/reporte?inicio?=&fin?=&idRol?=&idAcceso?=&q?=&estadoVigencia? → List.
 export interface UsuarioReporteItem {
   codigo: string
   nombre: string
@@ -105,6 +105,9 @@ export interface UsuarioReporteItem {
   celular: string | null
   estado: string
   fechaCreacion: string
+  fechaInicioVigencia: string | null
+  fechaFinVigencia: string | null
+  estadoVigencia: string | null
   roles: string[]
 }
 

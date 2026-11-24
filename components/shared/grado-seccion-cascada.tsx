@@ -26,6 +26,10 @@ interface GradoSeccionCascadaProps {
   allowedAnios?: Set<number>
   defaultIdNivel?: number | null
   defaultIdGrado?: number | null
+  idNivel?: number | null
+  idGrado?: number | null
+  onNivelChange?: (idNivel: number | null) => void
+  onGradoChange?: (idGrado: number | null) => void
   showLabels?: boolean
   /** Como los demás filtros de barra: etiqueta dentro del botón, en una fila. */
   compacta?: boolean
@@ -40,12 +44,18 @@ export function GradoSeccionCascada({
   allowedAnios,
   defaultIdNivel = null,
   defaultIdGrado = null,
+  idNivel: idNivelControlado,
+  idGrado: idGradoControlado,
+  onNivelChange,
+  onGradoChange,
   showLabels = true,
   compacta = false,
 }: GradoSeccionCascadaProps) {
   const { data: niveles = [] } = useNiveles()
-  const [idNivel, setIdNivel] = useState<number | null>(defaultIdNivel)
-  const [idGrado, setIdGrado] = useState<number | null>(defaultIdGrado)
+  const [idNivelLocal, setIdNivelLocal] = useState<number | null>(defaultIdNivel)
+  const [idGradoLocal, setIdGradoLocal] = useState<number | null>(defaultIdGrado)
+  const idNivel = idNivelControlado !== undefined ? idNivelControlado : idNivelLocal
+  const idGrado = idGradoControlado !== undefined ? idGradoControlado : idGradoLocal
 
   // Los grados son comunes a todos los años; lo que es de cada año son sus
   // secciones. Un grado aparece si tiene secciones en el año, y solo esas.
@@ -69,16 +79,26 @@ export function GradoSeccionCascada({
     }
   }, [value, secciones, onSeccionInfo])
 
+  function ponerNivel(nuevo: number | null) {
+    if (idNivelControlado === undefined) setIdNivelLocal(nuevo)
+    onNivelChange?.(nuevo)
+  }
+
+  function ponerGrado(nuevo: number | null) {
+    if (idGradoControlado === undefined) setIdGradoLocal(nuevo)
+    onGradoChange?.(nuevo)
+  }
+
   function cambiarNivel(v: string | null) {
     const nuevo = v ? Number(v) : null
-    setIdNivel(nuevo)
-    setIdGrado(null)
+    ponerNivel(nuevo)
+    ponerGrado(null)
     onChange(null)
   }
 
   function cambiarGrado(v: string | null) {
     const nuevo = v ? Number(v) : null
-    setIdGrado(nuevo)
+    ponerGrado(nuevo)
     const grado = grados.find((g) => g.idGrado === nuevo)
     if (grado && grado.idGradoSeccionDefault != null && grado.secciones.length === 0) {
       onChange(grado.idGradoSeccionDefault)

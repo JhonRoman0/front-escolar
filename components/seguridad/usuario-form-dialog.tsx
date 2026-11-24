@@ -53,7 +53,12 @@ import {
   type UsuarioFormValues,
 } from "@/lib/schemas/seguridad"
 import { REGEX_DNI } from "@/lib/schemas/comun"
-import { TEXTO_SIN_FIN, inicioVigenciaPorDefecto } from "@/lib/vigencia"
+import {
+  ESTADOS_VIGENCIA,
+  TEXTO_SIN_FIN,
+  estadoVigenciaEfectivo,
+  inicioVigenciaPorDefecto,
+} from "@/lib/vigencia"
 import { BloqueFoto } from "@/components/shared/bloque-foto"
 import { CampoChip } from "@/components/shared/campo-chip"
 import { casillaTrasCambiarCorreo, CampoRestablecerContrasena } from "@/components/shared/campo-restablecer-contrasena"
@@ -123,6 +128,20 @@ export default function UsuarioFormDialog({
   const rolesVisibles = roles.filter((r) => r.nombre !== "Apoderado")
   const esApoderado = !!usuario?.roles.some((r) => r.nombre === "Apoderado")
 
+  const hoyVigencia = inicioVigenciaPorDefecto()
+  const inicioOriginal = usuario?.fechaInicioVigencia ?? null
+  const estadoOriginal = estadoVigenciaEfectivo({
+    estado: usuario?.estadoVigencia,
+    inicio: inicioOriginal,
+    fin: usuario?.fechaFinVigencia,
+  })
+  const inicioBloqueado =
+    esEdicion && estadoOriginal !== ESTADOS_VIGENCIA.NO_INICIADA
+  const inicioMinimo =
+    !esEdicion || estadoOriginal === ESTADOS_VIGENCIA.NO_INICIADA
+      ? hoyVigencia
+      : null
+
   const [fotoNueva, setFotoNueva] = useState<File | null>(null)
   const [preview, setPreview] = useState<string | null>(
     usuario?.urlFoto ?? null
@@ -140,11 +159,9 @@ export default function UsuarioFormDialog({
         !!rolDocente && values.rolIds.includes(rolDocente.idRol)
       const exige =
         seleccionaDocente && (esEdicion ? !docenteActivo : true)
-      return zodResolver(crearUsuarioSchema(exige, usuario?.fechaNaci))(
-        values,
-        context,
-        options
-      )
+      return zodResolver(
+        crearUsuarioSchema(exige, usuario?.fechaNaci, { inicioMinimo })
+      )(values, context, options)
     },
     defaultValues: {
       nombre: usuario?.nombre ?? "",
@@ -169,6 +186,10 @@ export default function UsuarioFormDialog({
   })
 
   const rolIds = useWatch({ control: form.control, name: "rolIds" })
+  const fechaInicio = useWatch({
+    control: form.control,
+    name: "fechaInicioVigencia",
+  })
   const vigenciaIndefinida = useWatch({
     control: form.control,
     name: "vigenciaIndefinida",
@@ -561,7 +582,22 @@ export default function UsuarioFormDialog({
                       <Field>
                         <FieldLabel>Fecha de inicio de vigencia *</FieldLabel>
                         <FieldContent>
-                          <Input type="date" {...field} />
+                          <Input
+                            type="date"
+                            {...field}
+                            min={inicioMinimo ?? undefined}
+                            disabled={inicioBloqueado}
+                            onChange={(event) => {
+                              const inicio = event.target.value
+                              const fin = form.getValues("fechaFinVigencia")
+                              field.onChange(event)
+                              if (fin && inicio && fin < inicio) {
+                                form.setValue("fechaFinVigencia", "", {
+                                  shouldValidate: true,
+                                })
+                              }
+                            }}
+                          />
                           <FieldError errors={[form.formState.errors.fechaInicioVigencia]} />
                         </FieldContent>
                       </Field>
@@ -576,9 +612,10 @@ export default function UsuarioFormDialog({
                         <FieldContent>
                           <Input
                             type="date"
-                            disabled={vigenciaIndefinida}
                             {...field}
                             value={field.value ?? ""}
+                            min={fechaInicio || inicioMinimo || undefined}
+                            disabled={!!vigenciaIndefinida}
                             onChange={(event) => {
                               if (event.target.value) {
                                 form.setValue("vigenciaIndefinida", false)

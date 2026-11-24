@@ -7,7 +7,7 @@ import { Baby, BookOpen, CalendarRange, GraduationCap, Info, Lock, Pencil, Schoo
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 
 import { EditorPeriodos, ListaPeriodos } from "@/components/academico/editor-periodos"
 import { BotonGuardar } from "@/components/shared/boton-guardar"
@@ -257,15 +257,17 @@ function NivelCard({ config, anio, editable, editaHora }: {
       )}
 
       <Dialog open={abierto} onOpenChange={setAbierto}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
+        <DialogContent size="xl" scroll="sticky">
           <DialogHeader>
             <DialogTitle>
               {config.nivel} · {config.anio}
             </DialogTitle>
           </DialogHeader>
-          {abierto && (
-            <FormularioNivel config={config} anio={anio} editaHora={editaHora} onCerrar={() => setAbierto(false)} />
-          )}
+          <DialogBody>
+            {abierto && (
+              <FormularioNivel config={config} anio={anio} editaHora={editaHora} onCerrar={() => setAbierto(false)} />
+            )}
+          </DialogBody>
         </DialogContent>
       </Dialog>
     </div>

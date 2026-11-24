@@ -7,6 +7,7 @@ import type {
 // Tipo movido a @/lib/api; se re-exporta por compatibilidad con los módulos existentes.
 export type { Paginated } from "@/lib/api"
 import type { Paginated } from "@/lib/api"
+import type { EstadoVigencia } from "@/lib/vigencia"
 
 // ── Roles ────────────────────────────────────────────────────────────────
 
@@ -188,6 +189,7 @@ export interface UsuariosFiltros {
   q?: string
   idRol?: number
   idAcceso?: number
+  estadoVigencia?: EstadoVigencia
 }
 
 export const usuariosApi = {
@@ -208,6 +210,7 @@ export const usuariosApi = {
     if (filtros.q) params.set("q", filtros.q)
     if (filtros.idRol != null) params.set("idRol", String(filtros.idRol))
     if (filtros.idAcceso != null) params.set("idAcceso", String(filtros.idAcceso))
+    if (filtros.estadoVigencia) params.set("estadoVigencia", filtros.estadoVigencia)
     return apiFetch<Paginated<UsuarioResponse>>(`/usuarios?${params.toString()}`)
   },
   async crear(data: UsuarioRequest): Promise<UsuarioResponse> {

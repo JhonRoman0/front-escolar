@@ -86,7 +86,7 @@ export function SelectorFecha({
   }, [min, max, diasSemana, fechasBloqueadas])
 
   return (
-    <Field className={className} data-invalid={error ? "" : undefined}>
+    <Field className={className} data-invalid={error ? true : undefined}>
       <FieldLabel htmlFor={id}>{label}</FieldLabel>
       <FieldContent>
         <Popover open={abierto} onOpenChange={handleOpenChange}>
@@ -99,7 +99,7 @@ export function SelectorFecha({
             aria-invalid={error ? true : undefined}
             className={cn(
               "flex h-8 w-full items-center justify-between gap-2 rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm whitespace-nowrap transition-colors outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50",
-              "data-[invalid]:border-destructive data-[invalid]:ring-3 data-[invalid]:ring-destructive/20",
+              "aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40",
               !seleccionada && "text-muted-foreground"
             )}
           >
@@ -117,7 +117,7 @@ export function SelectorFecha({
             // espacio real hasta el borde del viewport: en resoluciones
             // normales queda por encima del contenido (no aparece scrollbar)
             // y solo corta con scroll en pantallas de poca altura.
-            className="p-0 max-h-[var(--available-height)] overflow-y-auto"
+            className="max-h-[var(--available-height)] max-w-[min(var(--available-width),calc(100vw-2rem))] min-w-(--anchor-width) overflow-y-auto p-0"
             side="bottom"
             align="start"
             collisionAvoidance={{ side: "none" }}

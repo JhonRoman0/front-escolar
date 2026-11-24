@@ -7,6 +7,11 @@ import type {
 import { generarExcelTabla } from "./generar-excel"
 import { generarPdfTabla } from "./generar-pdf"
 import { edad, fechaCorta, type ColumnaReporte, type TablaReporte } from "./formato"
+import {
+  TEXTO_SIN_FIN,
+  estadoVigenciaEfectivo,
+  etiquetaEstadoVigencia,
+} from "@/lib/vigencia"
 
 export type FormatoReporte = "pdf" | "excel"
 
@@ -60,6 +65,23 @@ export function tablaUsuarios(datos: UsuarioReporteItem[], contexto: ContextoRep
       { titulo: "Celular", ancho: 12, tipo: "codigo", valor: (d) => d.celular },
       { titulo: "Roles", ancho: 24, valor: (d) => d.roles.join(", ") },
       { titulo: "Estado", ancho: 10, valor: (d) => d.estado },
+      {
+        titulo: "Estado vigencia",
+        ancho: 14,
+        valor: (d) => etiquetaEstadoVigencia(estadoVigenciaEfectivo({
+          estado: d.estadoVigencia,
+          inicio: d.fechaInicioVigencia,
+          fin: d.fechaFinVigencia,
+        })),
+      },
+      { titulo: "Inicio vigencia", ancho: 14, valor: (d) => fecha(d.fechaInicioVigencia) },
+      {
+        titulo: "Fin vigencia",
+        ancho: 16,
+        valor: (d) => d.fechaFinVigencia
+          ? fecha(d.fechaFinVigencia)
+          : d.fechaInicioVigencia ? TEXTO_SIN_FIN : null,
+      },
       { titulo: "Fecha creación", ancho: 14, valor: (d) => fecha(d.fechaCreacion) },
     ],
     "Reporte de Usuarios",

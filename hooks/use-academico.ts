@@ -151,10 +151,11 @@ export function useAula(id: number | null) {
   })
 }
 
-export function useAsignaciones() {
+export function useAsignaciones(enabled = true) {
   return useQuery({
     queryKey: KEYS.asignaciones,
     queryFn: asignacionesApi.listar,
+    enabled,
     placeholderData: keepPreviousData,
   })
 }

@@ -133,7 +133,11 @@ export type UsuarioFormValues = z.input<typeof usuarioSchemaBase>
  * obligatorios. Al editar un usuario que ya es docente, se gestionan desde la
  * pestaña Docentes y aquí se ignoran.
  */
-export function crearUsuarioSchema(exigeDocente: boolean, fechaOriginal?: string | null) {
+export function crearUsuarioSchema(
+  exigeDocente: boolean,
+  fechaOriginal?: string | null,
+  opcionesVigencia: { inicioMinimo?: string | null } = {}
+) {
   return usuarioSchemaBase.superRefine((valores, ctx) => {
     const error = errorNacimiento(valores.fechaNaci, "adulto", fechaOriginal)
     if (error) ctx.addIssue({ code: "custom", path: ["fechaNaci"], message: error })
@@ -147,6 +151,18 @@ export function crearUsuarioSchema(exigeDocente: boolean, fechaOriginal?: string
         ? "fechaFinVigencia"
         : "fechaInicioVigencia"
       ctx.addIssue({ code: "custom", path: [campo], message: errorVig })
+    }
+    const inicioMinimo = opcionesVigencia.inicioMinimo
+    if (
+      inicioMinimo &&
+      validarFechaISO(valores.fechaInicioVigencia) &&
+      valores.fechaInicioVigencia < inicioMinimo
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["fechaInicioVigencia"],
+        message: "La fecha de inicio no puede ser anterior a la fecha actual.",
+      })
     }
     if (!exigeDocente) return
     if (valores.gradoAcademicoId == null) {

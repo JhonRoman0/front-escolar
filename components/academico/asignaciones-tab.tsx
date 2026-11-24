@@ -11,13 +11,14 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Field, FieldContent, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field"
+import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import {
   Select,
   SelectContent,
@@ -82,6 +83,9 @@ function formatoHorario(h: { diaSemana: number; horaInicio: string; horaFin: str
 }
 
 const HORARIO_VACIO = { idAula: 0, diaSemana: 1, horaInicio: "", horaFin: "" }
+
+const COLUMNAS_HORARIO =
+  "sm:grid-cols-[minmax(0,2fr)_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)_2.25rem]"
 
 const TAMANIO_PAGINA = 10
 
@@ -501,15 +505,16 @@ function AsignacionFormDialog({
 
   return (
     <Dialog open onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent size="2xl" scroll="sticky">
         <DialogHeader>
           <DialogTitle className="text-lg font-semibold tracking-tight">
             {esEdicion ? "Editar asignación" : "Nueva asignación"}
           </DialogTitle>
           <DialogDescription>Elige la sección, el docente y el curso; luego su horario semanal.</DialogDescription>
         </DialogHeader>
+        <DialogBody>
         <form onSubmit={form.handleSubmit((v) => guardar(v, false))} className="space-y-5" noValidate>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <FieldGroup columnas={2} className="gap-4">
             <Field>
               <FieldLabel>Año escolar</FieldLabel>
               <FieldContent>
@@ -568,7 +573,7 @@ function AsignacionFormDialog({
                 <FieldError errors={[errores.idGradoSeccion]} />
               </FieldContent>
             </Field>
-          </div>
+          </FieldGroup>
 
           {sinSalon && seccion && grado && (
             <div className="flex gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-700/50 dark:bg-amber-500/10 dark:text-amber-300">
@@ -585,7 +590,7 @@ function AsignacionFormDialog({
           )}
 
           <fieldset disabled={!seccion || sinSalon || sinRecreo} className="space-y-5 disabled:opacity-60">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <FieldGroup columnas={2} className="gap-4">
               <Controller
                 control={form.control}
                 name="idDocente"
@@ -661,7 +666,7 @@ function AsignacionFormDialog({
                   </Field>
                 )}
               />
-            </div>
+            </FieldGroup>
 
             <Field>
               <FieldLabel>Horarios</FieldLabel>
@@ -692,7 +697,7 @@ function AsignacionFormDialog({
                     </div>
                   )}
                   {/* Encabezados de las columnas (en móvil cada campo ya tiene su texto). */}
-                  <div className="hidden grid-cols-[2fr_1.3fr_1fr_1fr_2.25rem] gap-2 px-3 text-xs font-medium text-muted-foreground sm:grid">
+                  <div className={`hidden gap-2 px-3 text-xs font-medium text-muted-foreground sm:grid ${COLUMNAS_HORARIO}`}>
                     <span>Aula</span>
                     <span>Día</span>
                     <span>Inicio</span>
@@ -704,7 +709,7 @@ function AsignacionFormDialog({
                     const dia = horarios[index]?.diaSemana
                     return (
                       <div key={fila.id} className="flex flex-col gap-1.5 rounded-lg border bg-muted/20 p-3">
-                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-[2fr_1.3fr_1fr_1fr_2.25rem]">
+                        <div className={`grid grid-cols-1 gap-2 ${COLUMNAS_HORARIO}`}>
                           <Controller
                             control={form.control}
                             name={`horarios.${index}.idAula`}
@@ -846,6 +851,7 @@ function AsignacionFormDialog({
             </Button>
           </DialogFooter>
         </form>
+        </DialogBody>
       </DialogContent>
     </Dialog>
   )

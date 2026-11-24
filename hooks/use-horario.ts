@@ -1,4 +1,4 @@
-import { keepPreviousData, useQuery } from "@tanstack/react-query"
+import { keepPreviousData, useQueries, useQuery } from "@tanstack/react-query"
 
 import { useAuth } from "@/components/auth-provider"
 import { useDocenteDeUsuario } from "@/hooks/use-academico"
@@ -41,6 +41,17 @@ export function useHorarios(filtros?: HorarioFiltros & { enabled?: boolean }) {
   })
 }
 
+/** Admin: todas las páginas con los mismos filtros; sin datos parciales ni previousData. */
+export function useHorariosCompletos(filtros?: HorarioFiltros & { enabled?: boolean; firma?: string }) {
+  const { enabled = true, firma: firmaDada, ...rest } = filtros ?? {}
+  const firma = firmaDada ?? JSON.stringify(rest)
+  return useQuery({
+    queryKey: [...KEYS.horarios, "admin-completo", firma],
+    queryFn: async () => ({ firma, horarios: await horarioApi.listarTodo(rest) }),
+    enabled,
+  })
+}
+
 /** Docente: solo sus horarios (ahora Page) */
 export function useHorarioDocente(
   idDocente: number | null,
@@ -69,6 +80,17 @@ export function useRecreosSeccion(idGradoSeccion: number | null) {
     queryKey: [...KEYS.horarios, "recreos", idGradoSeccion],
     queryFn: () => horarioApi.recreosDeSeccion(idGradoSeccion as number),
     enabled: idGradoSeccion != null,
+  })
+}
+
+/** Recreos de varias secciones, con la misma key que la consulta individual. */
+export function useRecreosSecciones(ids: number[]) {
+  return useQueries({
+    queries: ids.map((id) => ({
+      queryKey: [...KEYS.horarios, "recreos", id],
+      queryFn: () => horarioApi.recreosDeSeccion(id),
+      enabled: id != null,
+    })),
   })
 }
 

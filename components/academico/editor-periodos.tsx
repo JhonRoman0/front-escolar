@@ -51,7 +51,7 @@ export function EditorPeriodos({
     <div className="flex flex-col gap-2">
       {value.map((p, i) => (
         <div key={i} className="flex flex-col gap-1">
-          <div className="grid grid-cols-[120px_1fr_1fr] items-center gap-2">
+          <div className="grid grid-cols-1 items-center gap-2 sm:grid-cols-[minmax(0,7.5rem)_minmax(0,1fr)_minmax(0,1fr)]">
             <span className="whitespace-nowrap text-xs font-medium">{nombrePeriodo(tipo, i + 1)}</span>
             <Input
               type="date"
@@ -61,6 +61,7 @@ export function EditorPeriodos({
               max={finAnio ?? undefined}
               aria-invalid={!!errores[i] && !!p.fechaInicio}
               onChange={(e) => cambiar(i, "fechaInicio", e.target.value)}
+              className="min-w-0"
             />
             <Input
               type="date"
@@ -70,6 +71,7 @@ export function EditorPeriodos({
               max={finAnio ?? undefined}
               aria-invalid={!!errores[i] && !!p.fechaFin}
               onChange={(e) => cambiar(i, "fechaFin", e.target.value)}
+              className="min-w-0"
             />
           </div>
           {errores[i] && (p.fechaInicio || p.fechaFin) && (
