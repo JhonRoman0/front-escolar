@@ -243,10 +243,6 @@ export const usuariosApi = {
   async desbloquear(id: number): Promise<void> {
     return apiFetch<void>(`/usuarios/${id}/desbloquear`, { method: "POST" })
   },
-  // Cierra sus sesiones y le vuelve a pedir el código en todos sus navegadores.
-  async cerrarSesiones(id: number): Promise<void> {
-    return apiFetch<void>(`/usuarios/${id}/cerrar-sesiones`, { method: "POST" })
-  },
   async subirFoto(id: number, file: File): Promise<UsuarioResponse> {
     const formData = new FormData()
     formData.append("foto", file)

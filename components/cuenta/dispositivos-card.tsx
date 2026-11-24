@@ -9,10 +9,10 @@ import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ConfirmarEliminar } from "@/components/seguridad/confirmar-eliminar"
 import { useAuth } from "@/components/auth-provider"
-import { authApi, type DispositivoResponse } from "@/lib/api/auth"
+import { authApi, CLAVE_DISPOSITIVOS, type DispositivoResponse } from "@/lib/api/auth"
 import { formatearFecha } from "@/lib/fechas"
 
-const CLAVE = ["mis-dispositivos"]
+const CLAVE = CLAVE_DISPOSITIVOS
 
 function fechaHora(valor: string | null): string {
   if (!valor) return "—"

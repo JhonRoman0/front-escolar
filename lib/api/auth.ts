@@ -95,6 +95,9 @@ export interface CambiarContrasenaRequest {
   nuevaContrasena: string
 }
 
+/** Clave de la consulta "mis dispositivos" (Mi perfil); la recargan los avisos de cuenta. */
+export const CLAVE_DISPOSITIVOS = ["mis-dispositivos"]
+
 // ─────────── API ───────────
 
 export const authApi = {

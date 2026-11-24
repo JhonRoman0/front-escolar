@@ -21,8 +21,8 @@ export interface OyenteCambios {
   onCambios: (modulos: string[]) => void
   /** Volvió la conexión: pudo perderse algún aviso, conviene recargar. */
   onReconectado: () => void
-  /** Se quitó un dispositivo de la cuenta: revisar si esta sesión sigue valiendo. */
-  onRevisarSesion?: () => void
+  /** Cambió algo de la cuenta (inicio de sesión o dispositivo quitado). */
+  onCuenta?: () => void
 }
 
 const ESPERA_INICIAL_MS = 2_000
@@ -64,7 +64,7 @@ export function escucharCambios(oyente: OyenteCambios): () => void {
         // Aviso mal formado: se ignora.
       }
     })
-    fuente.addEventListener("sesion", () => oyente.onRevisarSesion?.())
+    fuente.addEventListener("cuenta", () => oyente.onCuenta?.())
     fuente.onerror = () => {
       conectado = false
       // CONNECTING: EventSource reintenta solo. CLOSED: no vuelve; reintento a mano.

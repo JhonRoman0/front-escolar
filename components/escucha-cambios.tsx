@@ -4,7 +4,7 @@ import { useEffect } from "react"
 import { useQueryClient, type Query } from "@tanstack/react-query"
 
 import { escucharCambios } from "@/lib/eventos"
-import { authApi } from "@/lib/api/auth"
+import { CLAVE_DISPOSITIVOS } from "@/lib/api/auth"
 
 /** Esperar un poco junta varios avisos seguidos (p. ej. la portería) en una sola recarga. */
 const AGRUPAR_MS = 1_500
@@ -14,8 +14,13 @@ const CLAVES_ASISTENCIA = new Set(["asistencias", "asistencia-estadisticas", "da
 /** Cambios en Accesos: además se revisan los permisos del usuario. */
 const MODULOS_PERMISOS = new Set(["roles-permiso", "roles", "usuarios", "permisos", "acciones", "modulos"])
 
+/** Módulos que pueden cambiar los datos de una cuenta (nombre, correo, roles, foto). */
+const MODULOS_CUENTA = new Set(["usuarios", "roles", "docentes", "apoderados", "matriculas"])
+
 /** Evento que escucha el AuthProvider para revisar los permisos al momento. */
 export const EVENTO_REVISAR_PERMISOS = "escolar:revisar-permisos"
+/** Evento que escucha el AuthProvider para volver a pedir los datos del usuario. */
+export const EVENTO_REVISAR_CUENTA = "escolar:revisar-cuenta"
 
 /**
  * Mantiene la conexión de avisos mientras hay sesión. Al llegar un cambio, marca
@@ -40,6 +45,9 @@ export function EscuchaCambios() {
       if ([...modulos].some((m) => MODULOS_PERMISOS.has(m))) {
         window.dispatchEvent(new Event(EVENTO_REVISAR_PERMISOS))
       }
+      if ([...modulos].some((m) => MODULOS_CUENTA.has(m))) {
+        window.dispatchEvent(new Event(EVENTO_REVISAR_CUENTA))
+      }
     }
 
     const detener = escucharCambios({
@@ -50,8 +58,12 @@ export function EscuchaCambios() {
       },
       // Mientras estuvo desconectado pudo cambiar algo: se recarga lo que está en pantalla.
       onReconectado: () => void queryClient.invalidateQueries(),
-      // Si este dispositivo fue quitado, el backend responde 401 y apiFetch lleva al login.
-      onRevisarSesion: () => void authApi.me().catch(() => {}),
+      // Aviso solo para este usuario: recarga sus dispositivos y revisa su cuenta
+      // (si este dispositivo fue quitado, /auth/me responde 401 y se vuelve al login).
+      onCuenta: () => {
+        void queryClient.invalidateQueries({ queryKey: CLAVE_DISPOSITIVOS })
+        window.dispatchEvent(new Event(EVENTO_REVISAR_CUENTA))
+      },
     })
     return () => {
       window.clearTimeout(temporizador)

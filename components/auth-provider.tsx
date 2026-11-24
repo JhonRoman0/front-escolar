@@ -21,7 +21,7 @@ import {
 import { PermisosActualizadosModal } from "@/components/seguridad/permisos-actualizados-modal"
 import { CambiarContrasenaDialog } from "@/components/cuenta/cambiar-contrasena-dialog"
 import { VigenciaVencidaModal } from "@/components/seguridad/vigencia-vencida-modal"
-import { EVENTO_REVISAR_PERMISOS } from "@/components/escucha-cambios"
+import { EVENTO_REVISAR_CUENTA, EVENTO_REVISAR_PERMISOS } from "@/components/escucha-cambios"
 import {
   EVENTO_SESION_BLOQUEADA,
   limpiarSesionBloqueada,
@@ -236,6 +236,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       window.removeEventListener(EVENTO_REVISAR_PERMISOS, verificarPermisos)
     }
   }, [usuario, cargando, permisosCambiados, vigenciaInvalida])
+
+  // Datos de la cuenta en vivo: ante un aviso se vuelven a pedir. Sin skipLogout:
+  // si la sesión ya no vale (p. ej. se quitó este dispositivo), apiFetch lleva al login.
+  const haySesion = !!usuario
+  useEffect(() => {
+    if (!haySesion) return
+    async function revisarCuenta() {
+      try {
+        const actual = await authApi.me()
+        // Solo se reemplaza si cambió algo (evita volver a pintar sin motivo).
+        setUsuario((previo) =>
+          previo && JSON.stringify(previo) === JSON.stringify(actual) ? previo : actual
+        )
+      } catch {
+        // 401: apiFetch ya cerró la sesión; otros errores: se reintenta en el próximo aviso.
+      }
+    }
+    window.addEventListener(EVENTO_REVISAR_CUENTA, revisarCuenta)
+    return () => window.removeEventListener(EVENTO_REVISAR_CUENTA, revisarCuenta)
+  }, [haySesion])
 
   async function login(data: LoginRequest): Promise<LoginResponse> {
     const resp = await authApi.login(data)
