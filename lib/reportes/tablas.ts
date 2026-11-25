@@ -12,6 +12,7 @@ import {
   estadoVigenciaEfectivo,
   etiquetaEstadoVigencia,
 } from "@/lib/vigencia"
+import { etiquetaTipoIngreso } from "@/lib/api/matricula"
 
 export type FormatoReporte = "pdf" | "excel"
 
@@ -140,20 +141,19 @@ export function tablaMatriculas(datos: MatriculaReporteItem[], contexto: Context
   return armar(
     datos,
     [
-      { titulo: "Alumno", ancho: 34, valor: (d) => d.alumno },
+      { titulo: "Alumno", ancho: 36, valor: (d) => d.alumno },
+      { titulo: "Tipo de ingreso", ancho: 15, valor: (d) => etiquetaTipoIngreso(d.tipoIngreso) },
       { titulo: "Código", ancho: 18, tipo: "codigo", valor: (d) => d.codigo },
       { titulo: "DNI", ancho: 11, tipo: "codigo", valor: (d) => d.documentoIdentidad },
       { titulo: "Año", ancho: 6, valor: (d) => d.anio },
       { titulo: "Nivel", ancho: 11, valor: (d) => d.nivel },
-      { titulo: "Grado y sección", ancho: 15, valor: (d) => d.gradoSeccion },
+      { titulo: "Grado y sección", ancho: 16, valor: (d) => d.gradoSeccion },
       { titulo: "Turno", ancho: 9, valor: (d) => d.turno },
       { titulo: "Método de pago", ancho: 16, valor: (d) => d.metodoPago },
       { titulo: "Monto (S/)", ancho: 10, tipo: "monto", valor: (d) => d.monto },
-      { titulo: "Pagado (S/)", ancho: 10, tipo: "monto", valor: (d) => d.montoPago },
-      { titulo: "Saldo (S/)", ancho: 10, tipo: "monto", valor: (d) => d.saldo },
       { titulo: "Fecha pago", ancho: 11, valor: (d) => fecha(d.fechaPago) },
       { titulo: "Registro", ancho: 11, valor: (d) => fecha(d.fechaRegistro) },
-      { titulo: "Registrado por", ancho: 22, valor: (d) => d.registradoPor },
+      { titulo: "Registrado por", ancho: 24, valor: (d) => d.registradoPor },
       { titulo: "Estado", ancho: 9, valor: (d) => d.estado },
     ],
     "Reporte de Matrícula",

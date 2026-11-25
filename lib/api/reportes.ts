@@ -1,4 +1,5 @@
 import { apiFetch, type Paginated } from "@/lib/api"
+import type { TipoIngresoMatricula } from "@/lib/api/matricula"
 
 // ── Tipos (≈ DTOs del ReporteController) ─────────────────────────────────
 
@@ -47,10 +48,11 @@ export interface NotaReporteItem {
   docente: string
 }
 
-// ≡ GET /matriculas/reporte?inicio?=&fin?=&idAnio?=&idNivel?=&idGrado?=&idGradoSeccion?=&idAcceso? → List.
+// ≡ GET /matriculas/reporte?inicio?=&fin?=&idAnio?=&idNivel?=&idGrado?=&idGradoSeccion?=&idAcceso?=&tipoIngreso? → List.
 export interface MatriculaReporteItem {
   idMatricula: number
   alumno: string
+  tipoIngreso: TipoIngresoMatricula | null
   codigo: string
   documentoIdentidad: string | null
   anio: string

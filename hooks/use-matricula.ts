@@ -10,6 +10,7 @@ import {
   matriculasApi,
   type InscripcionRequest,
   type MatriculaEdicionRequest,
+  type TipoIngresoMatricula,
 } from "@/lib/api/matricula"
 
 const KEYS = {
@@ -19,13 +20,16 @@ const KEYS = {
   apoderados: ["apoderados"] as const,
 }
 
-export function useMatriculas(page: number, size = 10, idAcceso?: number, idAnio?: number, habilitado = true) {
+export function useMatriculas(page: number, size = 10, idAcceso?: number, idAnio?: number,
+                              habilitado = true, tipoIngreso?: TipoIngresoMatricula) {
   return useQuery({
-    queryKey: [...KEYS.matriculas, page, size, idAcceso ?? null, idAnio ?? null],
-    queryFn: () => matriculasApi.listar(page, size, idAcceso, idAnio),
+    queryKey: [...KEYS.matriculas, page, size, idAcceso ?? null, idAnio ?? null, tipoIngreso ?? null],
+    queryFn: () => matriculasApi.listar(page, size, idAcceso, idAnio, tipoIngreso),
     enabled: habilitado,
     placeholderData: (previousData, previousQuery) =>
-      previousQuery?.queryKey[3] === (idAcceso ?? null) && previousQuery?.queryKey[4] === (idAnio ?? null)
+      previousQuery?.queryKey[3] === (idAcceso ?? null)
+      && previousQuery?.queryKey[4] === (idAnio ?? null)
+      && previousQuery?.queryKey[5] === (tipoIngreso ?? null)
         ? previousData
         : undefined,
   })
