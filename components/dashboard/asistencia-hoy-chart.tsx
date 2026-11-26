@@ -12,14 +12,14 @@ import {
 } from "recharts"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import type { EstadoDato } from "@/lib/api/dashboard"
 import type { EstadisticasResponse } from "@/lib/api/asistencia"
 
 interface AsistenciaHoyChartProps {
   estadisticas?: EstadisticasResponse
-  cargando?: boolean
+  estado: EstadoDato
 }
 
-// Colores por estado de asistencia (misma convención que las KPI).
 const ESTADOS = [
   { key: "presentes", nombre: "Puntual", color: "#10b981" },
   { key: "tardanzas", nombre: "Tardanza", color: "#f59e0b" },
@@ -29,14 +29,21 @@ const ESTADOS = [
 
 export function AsistenciaHoyChart({
   estadisticas,
-  cargando,
+  estado,
 }: AsistenciaHoyChartProps) {
   const datos = ESTADOS.map((e) => ({
     nombre: e.nombre,
-    total: estadisticas ? (estadisticas[e.key] as number) : 0,
+    total: estadisticas?.[e.key] ?? 0,
     color: e.color,
   }))
-  const hayDatos = !!estadisticas && estadisticas.totalEsperado > 0
+  const mensaje =
+    estado === "error"
+      ? "No se pudo cargar la asistencia."
+      : estado === "sin-anio"
+        ? "Seleccione un año escolar para ver la asistencia."
+        : estado === "sin-datos"
+          ? "Sin datos de asistencia para el año seleccionado."
+          : null
 
   return (
     <Card>
@@ -47,13 +54,13 @@ export function AsistenciaHoyChart({
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {cargando ? (
+        {estado === "cargando" ? (
           <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">
             Cargando…
           </div>
-        ) : !hayDatos ? (
+        ) : mensaje ? (
           <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">
-            Sin registros de asistencia para hoy.
+            {mensaje}
           </div>
         ) : (
           <ResponsiveContainer width="100%" height={256}>
@@ -77,7 +84,7 @@ export function AsistenciaHoyChart({
                 tick={{ fontSize: 12 }}
               />
               <Tooltip
-                cursor={{ fill: "var(--accent)" }}
+                cursor={{ fill: "var(--brand-subtle)" }}
                 formatter={(valor) => [`${valor} alumno(s)`, "Total"]}
               />
               <Bar dataKey="total" radius={[6, 6, 0, 0]} maxBarSize={56}>

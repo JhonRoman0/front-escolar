@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
 
 import {
-  anioEscolarActivo,
   distribucionGrado,
   estadisticasHoy,
   tendenciaSemana,
@@ -15,12 +14,11 @@ const KEYS = {
   dashboard: ["dashboard"] as const,
 }
 
-
-export function useKpiAlumnos(habilitado: boolean) {
+export function useKpiAlumnos(idAnio: number | null, habilitado: boolean) {
   return useQuery({
-    queryKey: [...KEYS.dashboard, "total-alumnos"],
-    queryFn: totalAlumnos,
-    enabled: habilitado,
+    queryKey: [...KEYS.dashboard, "total-alumnos", idAnio],
+    queryFn: () => totalAlumnos(idAnio as number),
+    enabled: habilitado && idAnio !== null,
   })
 }
 
@@ -40,43 +38,34 @@ export function useKpiUsuarios(habilitado: boolean) {
   })
 }
 
-export function useKpiMatriculas(habilitado: boolean) {
+export function useKpiMatriculas(idAnio: number | null, habilitado: boolean) {
   return useQuery({
-    queryKey: [...KEYS.dashboard, "total-matriculas"],
-    queryFn: totalMatriculas,
-    enabled: habilitado,
+    queryKey: [...KEYS.dashboard, "total-matriculas", idAnio],
+    queryFn: () => totalMatriculas(idAnio as number),
+    enabled: habilitado && idAnio !== null,
   })
 }
 
-export function useAnioEscolarActivo(habilitado: boolean) {
+export function useEstadisticasHoy(fecha: string, idAnio: number | null, habilitado: boolean) {
   return useQuery({
-    queryKey: [...KEYS.dashboard, "anio-activo"],
-    queryFn: anioEscolarActivo,
-    enabled: habilitado,
+    queryKey: [...KEYS.dashboard, "estadisticas-hoy", fecha, idAnio],
+    queryFn: () => estadisticasHoy(fecha, idAnio as number),
+    enabled: habilitado && idAnio !== null,
   })
 }
 
-// Estadísticas de hoy: igual de frescas que las de /asistencia (30 s).
-export function useEstadisticasHoy(fecha: string, habilitado: boolean) {
+export function useTendenciaSemana(fecha: string, idAnio: number | null, habilitado: boolean) {
   return useQuery({
-    queryKey: [...KEYS.dashboard, "estadisticas-hoy", fecha],
-    queryFn: () => estadisticasHoy(fecha),
-    enabled: habilitado,
+    queryKey: [...KEYS.dashboard, "tendencia-semana", fecha, idAnio],
+    queryFn: () => tendenciaSemana(fecha, idAnio as number),
+    enabled: habilitado && idAnio !== null,
   })
 }
 
-export function useTendenciaSemana(fecha: string, habilitado: boolean) {
+export function useDistribucionGrado(idAnio: number | null, habilitado: boolean) {
   return useQuery({
-    queryKey: [...KEYS.dashboard, "tendencia-semana", fecha],
-    queryFn: () => tendenciaSemana(fecha),
-    enabled: habilitado,
-  })
-}
-
-export function useDistribucionGrado(habilitado: boolean) {
-  return useQuery({
-    queryKey: [...KEYS.dashboard, "distribucion-grado"],
-    queryFn: distribucionGrado,
-    enabled: habilitado,
+    queryKey: [...KEYS.dashboard, "distribucion-grado", idAnio],
+    queryFn: () => distribucionGrado(idAnio as number),
+    enabled: habilitado && idAnio !== null,
   })
 }

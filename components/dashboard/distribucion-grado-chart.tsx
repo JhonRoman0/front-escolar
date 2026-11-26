@@ -11,37 +11,43 @@ import {
 } from "recharts"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import type { DistribucionGrado } from "@/lib/api/dashboard"
+import type { DistribucionGrado, EstadoDato } from "@/lib/api/dashboard"
 
 interface DistribucionGradoChartProps {
   datos?: DistribucionGrado[]
-  cargando?: boolean
+  estado: EstadoDato
 }
 
 export function DistribucionGradoChart({
   datos,
-  cargando,
+  estado,
 }: DistribucionGradoChartProps) {
-  const hayDatos = !!datos?.length
-  // La altura crece con la cantidad de grados para que las barras respiren.
   const altura = Math.max(220, (datos?.length ?? 0) * 48 + 40)
+  const mensaje =
+    estado === "error"
+      ? "No se pudo cargar la distribución."
+      : estado === "sin-anio"
+        ? "Seleccione un año escolar para ver la distribución."
+        : estado === "sin-datos"
+          ? "Sin alumnos matriculados en el año seleccionado."
+          : null
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Alumnos por grado</CardTitle>
         <CardDescription>
-          Matrículas activas agrupadas por grado escolar
+          Alumnos únicos matriculados en el año seleccionado
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {cargando ? (
+        {estado === "cargando" ? (
           <div className="flex h-56 items-center justify-center text-sm text-muted-foreground">
             Cargando…
           </div>
-        ) : !hayDatos ? (
+        ) : mensaje ? (
           <div className="flex h-56 items-center justify-center text-sm text-muted-foreground">
-            Sin matrículas registradas.
+            {mensaje}
           </div>
         ) : (
           <ResponsiveContainer width="100%" height={altura}>
@@ -71,7 +77,7 @@ export function DistribucionGradoChart({
                 tick={{ fontSize: 12 }}
               />
               <Tooltip
-                cursor={{ fill: "var(--accent)" }}
+                cursor={{ fill: "var(--brand-subtle)" }}
                 formatter={(valor) => [`${valor} alumno(s)`, "Matriculados"]}
               />
               <Bar

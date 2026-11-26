@@ -623,12 +623,19 @@ export const cursosApi = {
   },
 }
 export const turnosApi = crud<TurnoResponse, TurnoRequest>("/turnos")
+function queryGrados(params: Record<string, string | number>): Promise<GradoResponse[]> {
+  const busqueda = new URLSearchParams()
+  for (const [clave, valor] of Object.entries(params)) busqueda.set(clave, String(valor))
+  return apiFetch<GradoResponse[]>(`/grados?${busqueda.toString()}`)
+}
+
 export const gradosApi = {
   ...crud<GradoResponse, GradoRequest>("/grados"),
+  async porAnio(idAnio: number): Promise<GradoResponse[]> {
+    return queryGrados({ idAnio })
+  },
   async porNivel(idNivel: number, idAnio?: number | null): Promise<GradoResponse[]> {
-    const params = new URLSearchParams({ idNivel: String(idNivel) })
-    if (idAnio) params.set("idAnio", String(idAnio))
-    return apiFetch<GradoResponse[]>(`/grados?${params.toString()}`)
+    return queryGrados({ idNivel, ...(idAnio ? { idAnio } : {}) })
   },
   async mover(id: number, subir: boolean): Promise<void> {
     return apiFetch<void>(`/grados/${id}/orden?subir=${subir}`, { method: "PUT" })

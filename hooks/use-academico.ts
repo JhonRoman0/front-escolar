@@ -111,10 +111,11 @@ export function useGrados() {
   })
 }
 
-export function useAniosEscolares() {
+export function useAniosEscolares(habilitado = true) {
   return useQuery({
     queryKey: KEYS.anios,
     queryFn: aniosEscolaresApi.listar,
+    enabled: habilitado,
   })
 }
 
