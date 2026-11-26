@@ -14,6 +14,7 @@ import { CampoTextoAcceso, botonAcceso } from "@/components/shared/campo-texto-a
 import { LayoutAcceso } from "@/components/shared/layout-acceso"
 import { PasoCodigo, useCuentaRegresiva } from "@/components/auth/paso-codigo"
 import { authApi } from "@/lib/api/auth"
+import { RUTA_LOGIN } from "@/lib/navegacion"
 import { contrasenaSegura } from "@/lib/schemas/comun"
 import {
   SEGUNDOS_REINTENTO,
@@ -173,7 +174,7 @@ export function RecuperarContrasenaWizard() {
 
   const pie = (
     <div className="text-center text-body">
-      <Link href="/login" className="font-semibold text-brand-info hover:underline">
+      <Link href={RUTA_LOGIN} className="font-semibold text-brand-info hover:underline">
         Volver al login
       </Link>
     </div>
@@ -265,7 +266,7 @@ export function RecuperarContrasenaWizard() {
         <Button
           type="button"
           size="lg"
-          onClick={() => router.push("/login")}
+          onClick={() => router.push(RUTA_LOGIN)}
           className={cn(botonAcceso, "mt-4")}
         >
           Ir al login

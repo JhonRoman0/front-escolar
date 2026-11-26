@@ -11,15 +11,26 @@ import {
 } from "recharts"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import type { TendenciaDia } from "@/lib/api/dashboard"
+import {
+  MOTIVO_ASISTENCIA_TEXTO,
+  type EstadoDato,
+  type TendenciaDia,
+} from "@/lib/api/dashboard"
 
 interface TendenciaChartProps {
   datos?: TendenciaDia[]
-  cargando?: boolean
+  estado: EstadoDato
 }
 
-export function TendenciaChart({ datos, cargando }: TendenciaChartProps) {
-  const hayDatos = !!datos?.some((d) => d.porcentaje != null)
+export function TendenciaChart({ datos, estado }: TendenciaChartProps) {
+  const mensaje =
+    estado === "error"
+      ? "No se pudo cargar la tendencia."
+      : estado === "sin-anio"
+        ? "Seleccione un año escolar para ver la tendencia."
+        : estado === "sin-datos"
+          ? "Sin datos de asistencia para el año seleccionado."
+          : null
 
   return (
     <Card>
@@ -30,13 +41,13 @@ export function TendenciaChart({ datos, cargando }: TendenciaChartProps) {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {cargando ? (
+        {estado === "cargando" ? (
           <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">
             Cargando…
           </div>
-        ) : !hayDatos ? (
+        ) : mensaje ? (
           <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">
-            Sin datos de asistencia esta semana.
+            {mensaje}
           </div>
         ) : (
           <ResponsiveContainer width="100%" height={256}>
@@ -63,10 +74,13 @@ export function TendenciaChart({ datos, cargando }: TendenciaChartProps) {
                 tick={{ fontSize: 12 }}
               />
               <Tooltip
-                formatter={(valor) => [
-                  valor == null ? "sin clase" : `${valor}%`,
-                  "Asistencia",
-                ]}
+                formatter={(valor, _nombre, item) => {
+                  const motivo = (item?.payload as TendenciaDia | undefined)?.motivo
+                  if (motivo) return [MOTIVO_ASISTENCIA_TEXTO[motivo], "Asistencia"]
+                  return valor == null
+                    ? [MOTIVO_ASISTENCIA_TEXTO["sin-datos"], "Asistencia"]
+                    : [`${valor}%`, "Asistencia"]
+                }}
                 labelFormatter={(_, payload) => {
                   const punto = payload?.[0]?.payload as
                     | TendenciaDia

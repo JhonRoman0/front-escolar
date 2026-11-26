@@ -5,12 +5,14 @@ import type {
   ReporteGeneralItem,
   NotaReporteItem,
 } from "@/lib/api/reportes"
-import type {
-  DistribucionGrado,
-  TendenciaDia,
+import {
+  MOTIVO_ASISTENCIA_TEXTO,
+  type DistribucionGrado,
+  type TendenciaDia,
 } from "@/lib/api/dashboard"
 import type { EstadisticasResponse } from "@/lib/api/asistencia"
-import { formatearFecha, formatearHora } from "@/lib/fechas"
+import { dateAIso, formatearFecha, formatearHora } from "@/lib/fechas"
+import { NOMBRE_SISTEMA } from "@/lib/navegacion"
 import {
   MINUTOS_SLOT,
   NOMBRES_DIAS,
@@ -32,10 +34,14 @@ import {
   type PesoTexto,
 } from "@/lib/horario"
 import { celdaTexto, contarEstados, fechaCorta, type TablaReporte } from "./formato"
-import { AZUL, GRIS, MARGEN } from "./pdf-institucional"
+import { AZUL, GRIS, MARGEN, ultimaY } from "./pdf-institucional"
 
 const FILA_ALTERNA: [number, number, number] = [245, 247, 252]
 const TEXTO_CURSO_PDF: [number, number, number] = [30, 30, 30]
+const COLOR_TICKS_GRILLA: [number, number, number] = [210, 210, 210]
+const COLOR_LINEAS_GRILLA: [number, number, number] = [220, 220, 220]
+const COLOR_FONDO_RECREO: [number, number, number] = [229, 231, 235]
+const COLOR_TEXTO_RECREO: [number, number, number] = [90, 90, 90]
 const ALTO_LINEA_PDF = 2.3
 const SEPARACION_LINEAS_PDF = 0.15
 const PADDING_X_PDF = 1.6
@@ -86,12 +92,12 @@ function escribirEncabezado(
 ): number {
   doc.setFontSize(16)
   doc.setFont("helvetica", "bold")
-  doc.text(titulo, 14, 15)
+  doc.text(titulo, MARGEN, 15)
 
   doc.setFontSize(10)
   doc.setFont("helvetica", "normal")
   lineas.forEach((linea, i) => {
-    doc.text(linea, 14, 22 + i * 5)
+    doc.text(linea, MARGEN, 22 + i * 5)
   })
   // Y donde puede empezar la tabla.
   return 26 + lineas.length * 5
@@ -114,7 +120,7 @@ export function generarPdfAsistencia({
   datos,
   inicio,
   fin,
-  nombreColegio = "Sistema Escolar",
+  nombreColegio = NOMBRE_SISTEMA,
 }: PdfAsistenciaOpciones): void {
   const doc = nuevoDoc("landscape")
   const c = contarEstados(datos)
@@ -159,12 +165,11 @@ export function generarPdfAsistencia({
   doc.save(`reporte-asistencia-${inicio}_${fin}.pdf`)
 }
 
-// ── Auditoría de códigos de autorización ─────────────────────────────────
-
 // ── Resumen ejecutivo del panel ──────────────────────────────────────────
 
 export interface PdfResumenOpciones {
   fecha: string
+  anioEscolar?: string
   estadisticas?: EstadisticasResponse
   tendencia?: TendenciaDia[]
   distribucion?: DistribucionGrado[]
@@ -173,18 +178,18 @@ export interface PdfResumenOpciones {
 
 export function generarPdfResumen({
   fecha,
+  anioEscolar,
   estadisticas,
   tendencia,
   distribucion,
-  nombreColegio = "Sistema Escolar",
+  nombreColegio = NOMBRE_SISTEMA,
 }: PdfResumenOpciones): void {
   const doc = nuevoDoc("portrait")
 
-  let startY = escribirEncabezado(doc, "Resumen Ejecutivo", [
-    nombreColegio,
-    `Fecha: ${fechaCorta(fecha)}`,
-    `Generado: ${generarAhora()}`,
-  ])
+  const lineasEncabezado = [nombreColegio, `Fecha: ${fechaCorta(fecha)}`]
+  if (anioEscolar) lineasEncabezado.push(`Año escolar: ${anioEscolar}`)
+  lineasEncabezado.push(`Generado: ${generarAhora()}`)
+  let startY = escribirEncabezado(doc, "Resumen Ejecutivo", lineasEncabezado)
 
   // Sección 1: asistencia de hoy.
   if (estadisticas) {
@@ -192,7 +197,12 @@ export function generarPdfResumen({
       startY,
       head: [["Asistencia de hoy", "Valor"]],
       body: [
-        ["% de asistencia", `${estadisticas.porcentajeAsistencia}%`],
+        [
+          "% de asistencia",
+          estadisticas.totalEsperado > 0
+            ? `${estadisticas.porcentajeAsistencia}%`
+            : MOTIVO_ASISTENCIA_TEXTO["sin-datos"],
+        ],
         ["Puntuales", String(estadisticas.presentes)],
         ["Tardanzas", String(estadisticas.tardanzas)],
         ["Justificadas", String(estadisticas.justificados)],
@@ -204,7 +214,7 @@ export function generarPdfResumen({
       alternateRowStyles: { fillColor: FILA_ALTERNA },
       columnStyles: { 1: { halign: "right" } },
     })
-    startY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 10
+    startY = ultimaY(doc) + 10
   }
 
   // Sección 2: tendencia semanal.
@@ -215,14 +225,16 @@ export function generarPdfResumen({
       body: tendencia.map((t) => [
         t.dia,
         formatearFecha(t.fecha),
-        t.porcentaje == null ? "sin clase" : `${t.porcentaje}%`,
+        t.motivo
+          ? MOTIVO_ASISTENCIA_TEXTO[t.motivo]
+          : `${t.porcentaje}%`,
       ]),
       styles: { fontSize: 9, cellPadding: 2 },
       headStyles: { fillColor: AZUL, textColor: 255, fontStyle: "bold" },
       alternateRowStyles: { fillColor: FILA_ALTERNA },
       columnStyles: { 2: { halign: "right" } },
     })
-    startY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 10
+    startY = ultimaY(doc) + 10
   }
 
   // Sección 3: alumnos por grado.
@@ -255,7 +267,7 @@ export function generarPdfNotas({
   datos,
   inicio,
   fin,
-  nombreColegio = "Sistema Escolar",
+  nombreColegio = NOMBRE_SISTEMA,
 }: OpcionesReporte & { datos: NotaReporteItem[] }): void {
   const doc = nuevoDoc("landscape")
 
@@ -303,12 +315,12 @@ export function generarPdfNotas({
 export function generarPdfTabla(tabla: TablaReporte): void {
   const doc = nuevoDoc("landscape")
   const startY = escribirEncabezado(doc, tabla.titulo, tabla.encabezado)
-  const anchoUtil = doc.internal.pageSize.getWidth() - 28
+  const anchoUtil = doc.internal.pageSize.getWidth() - MARGEN * 2
   const total = tabla.columnas.reduce((suma, c) => suma + c.ancho, 0)
 
   autoTable(doc, {
     startY,
-    margin: { left: 14, right: 14 },
+    margin: { left: MARGEN, right: MARGEN },
     head: [tabla.columnas.map((c) => c.titulo)],
     body: tabla.filas.map((fila) => fila.map((valor, i) => celdaTexto(valor, tabla.columnas[i]))),
     columnStyles: Object.fromEntries(
@@ -359,7 +371,7 @@ interface BandaPdf {
   hasta: number
 }
 
-export function construirPdfHorario(paginas: readonly PaginaHorarioPdf[], nombreColegio = "Sistema Escolar"): jsPDF {
+export function construirPdfHorario(paginas: readonly PaginaHorarioPdf[], nombreColegio = NOMBRE_SISTEMA): jsPDF {
   const doc = nuevoDoc("landscape")
   paginas.forEach((pagina, i) => {
     if (i > 0) doc.addPage()
@@ -368,8 +380,8 @@ export function construirPdfHorario(paginas: readonly PaginaHorarioPdf[], nombre
   return doc
 }
 
-export function generarPdfHorario(paginas: readonly PaginaHorarioPdf[], nombreColegio = "Sistema Escolar"): void {
-  construirPdfHorario(paginas, nombreColegio).save(`horario-semanal-${new Date().toISOString().slice(0, 10)}.pdf`)
+export function generarPdfHorario(paginas: readonly PaginaHorarioPdf[], nombreColegio = NOMBRE_SISTEMA): void {
+  construirPdfHorario(paginas, nombreColegio).save(`horario-semanal-${dateAIso(new Date())}.pdf`)
 }
 
 function fuentePorPeso(peso: PesoTexto): "bold" | "normal" {
@@ -583,7 +595,7 @@ function dibujarBanda(
   const posicionY = (min: number) => yGrid + ((min - banda.desde) / MINUTOS_SLOT) * rowH
 
   const ticks = ticksHorario({ min: banda.desde, max: banda.hasta })
-  doc.setDrawColor(210, 210, 210)
+  doc.setDrawColor(...COLOR_TICKS_GRILLA)
   for (const min of ticks.slice(0, -1)) {
     const ly = posicionY(min)
     doc.line(MARGEN + colHoraW, ly, xFin, ly)
@@ -602,7 +614,7 @@ function dibujarBanda(
     doc.text(minutosAHora(min), xHora, yTexto, { align: "right", baseline })
   })
 
-  doc.setDrawColor(220, 220, 220)
+  doc.setDrawColor(...COLOR_LINEAS_GRILLA)
   doc.line(MARGEN, yGrid, MARGEN, yGrid + altoGrilla)
   for (let d = 0; d <= diasVisibles.length; d++) {
     const lx = MARGEN + colHoraW + d * colDiaW
@@ -661,7 +673,7 @@ function dibujarBanda(
     const hastaIndice = diasVisibles.indexOf(hastaDia)
     if (desdeIndice < 0 || hastaIndice < desdeIndice) continue
     const ancho = (hastaIndice - desdeIndice + 1) * colDiaW
-    doc.setFillColor(229, 231, 235)
+    doc.setFillColor(...COLOR_FONDO_RECREO)
     doc.rect(c.x + 0.5, c.y + 0.5, ancho - 1, Math.max(1, c.alto - 1), "F")
     if (c.alto >= 4.5) {
       const anchoContenido = Math.max(1, ancho - PADDING_X_PDF * 2)
@@ -674,7 +686,7 @@ function dibujarBanda(
         let yLinea = c.y + Math.max(PADDING_Y_PDF, (c.alto - altoTexto) / 2) + ALTO_LINEA_PDF * 0.85
         doc.setFont("helvetica", "bold")
         doc.setFontSize(5.8)
-        doc.setTextColor(90, 90, 90)
+        doc.setTextColor(...COLOR_TEXTO_RECREO)
         doc.text("Recreo", c.x + ancho / 2, yLinea, { align: "center" })
         yLinea += ALTO_LINEA_PDF + SEPARACION_LINEAS_PDF
         doc.setFont("helvetica", "normal")
@@ -687,7 +699,7 @@ function dibujarBanda(
       } else {
         doc.setFont("helvetica", "bold")
         doc.setFontSize(6)
-        doc.setTextColor(90, 90, 90)
+        doc.setTextColor(...COLOR_TEXTO_RECREO)
         doc.text("Recreo", c.x + ancho / 2, c.y + c.alto / 2 + 1, { align: "center" })
       }
     }

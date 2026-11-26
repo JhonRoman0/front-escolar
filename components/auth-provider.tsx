@@ -22,6 +22,7 @@ import { PermisosActualizadosModal } from "@/components/seguridad/permisos-actua
 import { CambiarContrasenaDialog } from "@/components/cuenta/cambiar-contrasena-dialog"
 import { VigenciaVencidaModal } from "@/components/seguridad/vigencia-vencida-modal"
 import { EVENTO_REVISAR_CUENTA, EVENTO_REVISAR_PERMISOS } from "@/components/escucha-cambios"
+import { PANEL_CONTROL, RUTA_LOGIN } from "@/lib/navegacion"
 import {
   EVENTO_SESION_BLOQUEADA,
   limpiarSesionBloqueada,
@@ -42,10 +43,9 @@ import {
   mensajeEstadoVigencia,
 } from "@/lib/vigencia"
 
-const RUTA_LOGIN = "/login"
 const INTERVALO_VERIFICACION_PERMISOS_MS = 30_000
 const RETARDO_PRIMER_CHEQUEO_PERMISOS_MS = 1_500
-const RUTAS_PUBLICAS = ["/login", "/sin-acceso"]
+const RUTAS_PUBLICAS = [RUTA_LOGIN, "/sin-acceso"]
 function esRutaPublica(pathname: string) {
   return (
     RUTAS_PUBLICAS.includes(pathname) ||
@@ -193,7 +193,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     if (usuario && enLogin) {
-      router.replace("/")
+      router.replace(PANEL_CONTROL.url)
     }
   }, [usuario, cargando, pathname, router, vigenciaInvalida])
 
@@ -281,7 +281,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setPermisosState(resp.permisos)
     setUsuario(resp.usuario)
     setPermisosCambiados(false)
-    router.replace("/")
+    router.replace(PANEL_CONTROL.url)
   }
 
   function logout() {

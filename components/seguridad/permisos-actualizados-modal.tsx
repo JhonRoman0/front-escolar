@@ -62,7 +62,7 @@ export function PermisosActualizadosModal({
         >
           Cerrando sesión en {segundos} {segundos === 1 ? "segundo" : "segundos"}…
         </p>
-        <DialogFooter className="sm:justify-center">
+        <DialogFooter className="sticky bottom-0 z-10 bg-muted sm:justify-center">
           <Button onClick={onCerrarSesion}>Cerrar sesión ahora</Button>
         </DialogFooter>
       </DialogContent>

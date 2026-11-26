@@ -5,6 +5,7 @@ import type { Boleta, AlumnoBoleta } from "@/lib/api/notas-finales"
 import type { ColegioResponse } from "@/lib/api/colegio"
 import {
   bandaTitulo,
+  CABECERA_TABLA,
   camposPdf,
   DESTACADO,
   encabezadoInstitucional,
@@ -23,10 +24,17 @@ function columnaPeriodo(boleta: Boleta, numero: number): string {
   return `${numero}.° ${boleta.tipoPeriodo === "TRIMESTRE" ? "trim." : "bim."}`
 }
 
-function paginaAlumno(doc: jsPDF, boleta: Boleta, alumno: AlumnoBoleta, colegio: ColegioResponse | null, logo: string | null) {
+function paginaAlumno(
+  doc: jsPDF,
+  boleta: Boleta,
+  alumno: AlumnoBoleta,
+  colegio: ColegioResponse | null,
+  logo: string | null,
+  nombreColegio?: string | null
+) {
   const { seccion } = boleta
   const actual = boleta.periodos.find((p) => p.numero === boleta.periodo)
-  let y = encabezadoInstitucional(doc, colegio, logo, "BOLETA DE NOTAS")
+  let y = encabezadoInstitucional(doc, colegio, logo, "BOLETA DE NOTAS", nombreColegio)
 
   y = bandaTitulo(doc, "DATOS DEL ESTUDIANTE", y)
   camposPdf(
@@ -51,7 +59,7 @@ function paginaAlumno(doc: jsPDF, boleta: Boleta, alumno: AlumnoBoleta, colegio:
       {
         content: area.transversal ? `${area.nombre} (competencia transversal)` : area.nombre,
         colSpan: 1 + columnas,
-        styles: { fillColor: [235, 238, 245], fontStyle: "bold" },
+        styles: { fillColor: CABECERA_TABLA, fontStyle: "bold" },
       },
     ])
     for (const c of area.competencias) {
@@ -66,7 +74,7 @@ function paginaAlumno(doc: jsPDF, boleta: Boleta, alumno: AlumnoBoleta, colegio:
     head: [["Competencia", ...boleta.periodos.map((p) => columnaPeriodo(boleta, p.numero)), ...(boleta.conFinal ? ["Final"] : [])]],
     body: cuerpo,
     styles: { fontSize: 7.5, cellPadding: 1.3, overflow: "linebreak" },
-    headStyles: { fillColor: [235, 238, 245], textColor: 40, fontStyle: "bold" },
+    headStyles: { fillColor: CABECERA_TABLA, textColor: 40, fontStyle: "bold" },
     columnStyles: Object.fromEntries(
       Array.from({ length: columnas }, (_, i) => [i + 1, { cellWidth: 17, halign: "center" as const }])
     ),
@@ -117,7 +125,7 @@ function paginaAlumno(doc: jsPDF, boleta: Boleta, alumno: AlumnoBoleta, colegio:
     head: [["Asistencias", "Tardanzas", "Faltas justificadas", "Faltas injustificadas"]],
     body: [[String(puntual), String(tardanza), String(justificada), String(inasistencia)]],
     styles: { fontSize: 8, cellPadding: 1.3, halign: "center" },
-    headStyles: { fillColor: [235, 238, 245], textColor: 40, fontStyle: "bold" },
+    headStyles: { fillColor: CABECERA_TABLA, textColor: 40, fontStyle: "bold" },
   })
 
   firmasPdf(doc, ultimaY(doc), [{ rol: "Tutor(a)" }, { rol: "Dirección" }, { rol: "Padre, madre o apoderado" }])
@@ -128,13 +136,14 @@ export function generarPdfBoletas(
   boleta: Boleta,
   colegio: ColegioResponse | null,
   logo: string | null,
-  idMatricula: number | null
+  idMatricula: number | null,
+  nombreColegio?: string | null
 ): string {
   const alumnos = idMatricula ? boleta.alumnos.filter((a) => a.idMatricula === idMatricula) : boleta.alumnos
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" })
   alumnos.forEach((alumno, i) => {
     if (i > 0) doc.addPage()
-    paginaAlumno(doc, boleta, alumno, colegio, logo)
+    paginaAlumno(doc, boleta, alumno, colegio, logo, nombreColegio)
   })
   piePdf(doc, "Documento interno del colegio.")
   const { seccion } = boleta

@@ -14,10 +14,12 @@ import { BotonLimpiarFiltros } from "@/components/shared/boton-limpiar-filtros"
 import { FilterSelect } from "@/components/shared/filter-select"
 import { GradoSeccionCascada } from "@/components/shared/grado-seccion-cascada"
 import { useAniosEscolares, useAsignaciones, useDocenteDeUsuario, useDocentes, useGrados, useTurnos } from "@/hooks/use-academico"
+import { useIdentidadInstitucional } from "@/hooks/use-colegio"
 import { useHorariosCompletos, useMiHorario, useRecreosSeccion, useRecreosSecciones, useRolHorario } from "@/hooks/use-horario"
 import { anioParaFiltro } from "@/lib/api/academico"
 import { type HorarioListItem, type RecreoHorario } from "@/lib/api/horario"
 import { aMinutos } from "@/lib/horario"
+import { NOMBRE_SISTEMA } from "@/lib/navegacion"
 import { generarPdfHorario } from "@/lib/reportes/generar-pdf"
 
 type Vista = "mio" | "colegio"
@@ -78,6 +80,7 @@ function Horario({ esAdmin }: { esAdmin: boolean }) {
   const { usuario, permisos } = useAuth()
   const esDocente = permisos?.vinculo === "DOCENTE"
   const puedeDescargar = usePuede("HORARIOS", "IMPRIMIR_EXPORTAR")
+  const { data: identidad } = useIdentidadInstitucional()
   const [vistaElegida, setVistaElegida] = useState<Vista | null>(null)
   const vista: Vista = esDocente ? (esAdmin ? vistaElegida ?? "mio" : "mio") : "colegio"
 
@@ -324,7 +327,7 @@ function Horario({ esAdmin }: { esAdmin: boolean }) {
       vista: esConsultaDocente ? "docente" : "seccion",
       horaEntrada: turnoPdf?.horaEntrada,
       horaSalida: turnoPdf?.horaSalida,
-    }])
+    }], identidad?.nombre?.trim() || NOMBRE_SISTEMA)
   }
 
   const opcionesAnio = useMemo(

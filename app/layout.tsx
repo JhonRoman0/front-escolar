@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/sonner";
 
 import "./globals.css";
 import { cn } from "@/lib/utils";
+import { NOMBRE_SISTEMA } from "@/lib/navegacion";
 
 const ralewayHeading = Raleway({ subsets: ["latin"], variable: "--font-heading" });
 
@@ -19,7 +20,7 @@ const fontMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Sistema Escolar",
+  title: NOMBRE_SISTEMA,
   description: "Sistema de Gestión Escolar",
 };
 

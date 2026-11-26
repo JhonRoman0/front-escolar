@@ -20,6 +20,7 @@ import { EstadoBadge } from "@/components/seguridad/estado-badge"
 import { Badge } from "@/components/ui/badge"
 import { TablaPaginacion } from "@/components/shared/paginacion-tabla"
 import { FilterSelect } from "@/components/shared/filter-select"
+import { BotonLimpiarFiltros } from "@/components/shared/boton-limpiar-filtros"
 import { ACCESO, anioParaFiltro, estadoAnioTexto, OPCIONES_ESTADO_ACCESO } from "@/lib/api/academico"
 import {
   FilasCargando,
@@ -28,7 +29,14 @@ import {
 import { useCrudMatriculas, useMatriculas } from "@/hooks/use-matricula"
 import { usePuede } from "@/hooks/use-permisos"
 import { useAniosEscolares } from "@/hooks/use-academico"
-import { ANIO_POR_COMENZAR, type MatriculaResponse } from "@/lib/api/matricula"
+import {
+  ANIO_POR_COMENZAR,
+  ETIQUETA_TIPO_INGRESO,
+  TIPO_INGRESO_OPCIONES,
+  VARIANTE_TIPO_INGRESO,
+  type MatriculaResponse,
+  type TipoIngresoMatricula,
+} from "@/lib/api/matricula"
 import { reportesApi } from "@/lib/api/reportes"
 import { descargarTabla, tablaMatriculas, type FormatoReporte } from "@/lib/reportes/tablas"
 import { ReporteModal } from "@/components/reportes/reporte-modal"
@@ -45,15 +53,18 @@ const TAMANIO_PAGINA = 10
 export function MatriculasTab() {
   const [page, setPage] = useState(0)
   const [filtroEstado, setFiltroEstado] = useState("")
+  const [filtroIngreso, setFiltroIngreso] = useState<TipoIngresoMatricula | "">("")
   const [idAnioElegido, setIdAnioElegido] = useState<number | null>(null)
   const { data: aniosEscolares = [], isLoading: cargandoAnios } = useAniosEscolares()
-  const idAnio = idAnioElegido ?? anioParaFiltro(aniosEscolares)?.idAnio
+  const anioDefecto = anioParaFiltro(aniosEscolares)
+  const idAnio = idAnioElegido ?? anioDefecto?.idAnio
   const { data, isLoading: cargandoMatriculas, isError, refetch } = useMatriculas(
     page,
     TAMANIO_PAGINA,
     filtroEstado ? Number(filtroEstado) : undefined,
     idAnio,
-    idAnio != null
+    idAnio != null,
+    filtroIngreso || undefined
   )
   const isLoading = cargandoAnios || cargandoMatriculas
   const crud = useCrudMatriculas()
@@ -70,6 +81,7 @@ export function MatriculasTab() {
   const [reporteOpen, setReporteOpen] = useState(false)
   const filtrosReporte = useFiltrosAcademicos()
   const [reporteEstado, setReporteEstado] = useState("")
+  const [reporteIngreso, setReporteIngreso] = useState<TipoIngresoMatricula | "">("")
 
   async function handleDescargarReporte(
     formato: FormatoReporte,
@@ -91,6 +103,25 @@ export function MatriculasTab() {
 
   function cambiarEstadoFiltro(value: string) {
     setFiltroEstado(value)
+    setPage(0)
+  }
+
+  function cambiarIngreso(value: string) {
+    setFiltroIngreso(value as TipoIngresoMatricula | "")
+    setPage(0)
+  }
+
+  function cambiarReporteIngreso(value: string) {
+    setReporteIngreso(value as TipoIngresoMatricula | "")
+  }
+
+  const hayFiltros =
+    idAnio !== (anioDefecto?.idAnio ?? null) || filtroEstado !== "" || filtroIngreso !== ""
+
+  function limpiarFiltros() {
+    setIdAnioElegido(null)
+    setFiltroEstado("")
+    setFiltroIngreso("")
     setPage(0)
   }
 
@@ -137,10 +168,18 @@ export function MatriculasTab() {
                 allLabel="Todos los estados"
                 className="w-[180px] max-w-full shrink-0"
               />
+              <FilterSelect
+                value={filtroIngreso}
+                onValueChange={cambiarIngreso}
+                options={TIPO_INGRESO_OPCIONES}
+                allLabel="Todos los ingresos"
+                className="w-[180px] max-w-full shrink-0"
+              />
               {puedeExportar && (
                 <Button variant="outline" size="sm" className="h-8 rounded-[8px] border-[#A9A9AA] text-[12px]" onClick={() => {
                     filtrosReporte.iniciar({ idAnio: idAnio ?? null })
                     setReporteEstado(filtroEstado)
+                    setReporteIngreso(filtroIngreso)
                     setReporteOpen(true)
                   }}>
                   <FileDown data-icon="inline-start" />
@@ -157,6 +196,11 @@ export function MatriculasTab() {
                   Nueva matrícula
                 </Button>
               )}
+              <BotonLimpiarFiltros
+                visible={hayFiltros}
+                onClick={limpiarFiltros}
+                className="ml-0 sm:ml-auto"
+              />
             </div>
           </div>
 
@@ -196,9 +240,9 @@ export function MatriculasTab() {
                   <TableRow key={matricula.idMatricula}>
                     <TableCell>
                       <p className="font-medium">{matricula.alumno}</p>
-                      {(matricula.tipoIngreso === "NUEVO_INGRESO" || matricula.tipoIngreso === "CONTINUANTE") && (
-                        <Badge variant={matricula.tipoIngreso === "NUEVO_INGRESO" ? "info" : "secondary"} className="my-1">
-                          {matricula.tipoIngreso === "NUEVO_INGRESO" ? "Nuevo ingreso" : "Continuante"}
+                      {matricula.tipoIngreso && (
+                        <Badge variant={VARIANTE_TIPO_INGRESO[matricula.tipoIngreso]} className="my-1">
+                          {ETIQUETA_TIPO_INGRESO[matricula.tipoIngreso]}
                         </Badge>
                       )}
                       <p className="font-mono text-xs text-muted-foreground">
@@ -327,12 +371,16 @@ export function MatriculasTab() {
               {
                 id: "idAcceso",
                 label: "Estado",
-                opciones: [
-                  { value: "1", label: "Activa" },
-                  { value: "3", label: "Inactiva" },
-                ],
+                opciones: OPCIONES_ESTADO_ACCESO,
                 valor: reporteEstado,
                 onChange: setReporteEstado,
+              },
+              {
+                id: "tipoIngreso",
+                label: "Tipo de ingreso",
+                opciones: TIPO_INGRESO_OPCIONES,
+                valor: reporteIngreso,
+                onChange: cambiarReporteIngreso,
               },
             ]}
             onDescargar={handleDescargarReporte}

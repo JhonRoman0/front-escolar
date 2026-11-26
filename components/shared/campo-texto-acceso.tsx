@@ -2,6 +2,7 @@
 
 import type { LucideIcon } from "lucide-react"
 import { Eye, EyeOff } from "lucide-react"
+import { useId } from "react"
 
 import { cn } from "@/lib/utils"
 
@@ -57,9 +58,20 @@ export function CampoTextoAcceso({
   alternando = false,
   onAlternar,
   className,
+  id: idProp,
+  "aria-describedby": ariaDescribedByProp,
+  "aria-invalid": ariaInvalidProp,
   ...props
 }: CampoTextoAccesoProps) {
   const decorado = Boolean(Icono) || alternable
+  const generatedId = useId()
+  const id = idProp ?? generatedId
+  const auxiliarId = `${id}-auxiliar`
+  const errorId = `${id}-error`
+  const descritoPor =
+    [ariaDescribedByProp, auxiliar && auxiliarId, error && errorId]
+      .filter(Boolean)
+      .join(" ") || undefined
 
   const input = (
     <Input
@@ -70,12 +82,15 @@ export function CampoTextoAcceso({
         className
       )}
       {...props}
+      id={id}
+      aria-invalid={ariaInvalidProp ?? Boolean(error)}
+      aria-describedby={descritoPor}
     />
   )
 
   return (
     <Field>
-      <FieldLabel className="text-label font-bold">{etiqueta}</FieldLabel>
+      <FieldLabel htmlFor={id} className="text-label font-bold">{etiqueta}</FieldLabel>
       <FieldContent>
         {decorado ? (
           <div className="relative">
@@ -87,9 +102,10 @@ export function CampoTextoAcceso({
               <button
                 type="button"
                 onClick={onAlternar}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
-                tabIndex={-1}
+                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
                 aria-label={alternando ? "Ocultar contraseña" : "Mostrar contraseña"}
+                aria-pressed={alternando}
+                aria-controls={id}
               >
                 {alternando ? (
                   <EyeOff className="h-4 w-4" />
@@ -103,9 +119,9 @@ export function CampoTextoAcceso({
           input
         )}
         {auxiliar && (
-          <p className="mt-1 text-mini text-muted-foreground">{auxiliar}</p>
+          <p id={auxiliarId} className="mt-1 text-mini text-muted-foreground">{auxiliar}</p>
         )}
-        <FieldError errors={error ? [error] : []} />
+        <FieldError id={errorId} errors={error ? [error] : []} />
       </FieldContent>
     </Field>
   )

@@ -5,9 +5,11 @@ import { usePathname } from "next/navigation"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { useMenuItems } from "@/hooks/use-menu-items"
+import { PANEL_CONTROL } from "@/lib/navegacion"
 
 const TITULOS: Record<string, string> = {
-  "/": "Panel de Control",
+  [PANEL_CONTROL.url]: PANEL_CONTROL.nombre,
   "/cuenta": "Cuenta",
   "/seguridad": "Seguridad",
   "/academico": "Académico",
@@ -21,8 +23,10 @@ const TITULOS: Record<string, string> = {
 
 export default function SiteHeader() {
   const pathname = usePathname()
+  const { items } = useMenuItems()
+  const modulo = items.find((item) => pathname === item.url || pathname.startsWith(`${item.url}/`))
 
-  const pageTitle = TITULOS[pathname] ?? "Panel de Control"
+  const pageTitle = TITULOS[pathname] ?? modulo?.nombre ?? PANEL_CONTROL.nombre
 
   return (
     <header className="flex h-12 shrink-0 items-center gap-2 border-b transition-[width,height] ease-linear">

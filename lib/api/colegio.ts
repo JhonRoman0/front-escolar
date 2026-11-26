@@ -22,7 +22,19 @@ export interface ColegioRequest {
   codigoColegio: string
 }
 
+export interface IdentidadInstitucionalResponse {
+  nombre: string | null
+  logoUrl: string | null
+}
+
 // ── API (requiere auth) ──────────────────────────────────────────────────
+
+export const identidadApi = {
+  /** GET /colegios/identidad — nombre y logo públicos, sin autenticación. */
+  obtener(): Promise<IdentidadInstitucionalResponse> {
+    return apiFetch<IdentidadInstitucionalResponse>("/colegios/identidad", { skipLogout: true })
+  },
+}
 
 export const colegioApi = {
   /** GET /colegios/actual — el colegio singleton. */

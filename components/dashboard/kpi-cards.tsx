@@ -1,5 +1,4 @@
-"use client"
-
+import type { LucideIcon } from "lucide-react"
 import {
   CalendarRange,
   ClipboardList,
@@ -8,21 +7,16 @@ import {
   Users,
   UserSquare2,
 } from "lucide-react"
-import type { LucideIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import {
-  useAnioEscolarActivo,
-  useEstadisticasHoy,
-  useKpiAlumnos,
-  useKpiDocentes,
-  useKpiMatriculas,
-  useKpiUsuarios,
-} from "@/hooks/use-dashboard"
-import { usePuedeLeer } from "@/hooks/use-permisos"
-import { fechaHoyISO, formatearFecha } from "@/lib/fechas"
+  estadoAnioTexto,
+  type AnioEscolarResponse,
+} from "@/lib/api/academico"
+import type { EstadisticasResponse } from "@/lib/api/asistencia"
+import type { EstadoDato } from "@/lib/api/dashboard"
+import { formatearFecha } from "@/lib/fechas"
 
-// Paleta de tarjetas (claro/oscuro), mismo estilo que las KPI de asistencia.
 const AZUL = {
   bg: "bg-blue-50 dark:bg-blue-950/40",
   valor: "text-blue-700 dark:text-blue-300",
@@ -43,92 +37,166 @@ const ROJO = {
   valor: "text-rose-700 dark:text-rose-300",
   icono: "text-rose-600 dark:text-rose-400",
 }
+const GRIS = {
+  bg: "bg-muted",
+  valor: "text-muted-foreground",
+  icono: "text-muted-foreground",
+}
+
+type Paleta = typeof AZUL
+
+const ESTADO_TITULO: Record<Exclude<EstadoDato, "listo">, string> = {
+  cargando: "Cargando…",
+  error: "No se pudo cargar",
+  "sin-anio": "Año escolar no resuelto",
+  "sin-datos": "Sin datos",
+}
 
 interface KpiItem {
   label: string
-  valor: string | number
+  valor: string
   subtitulo: string
   icono: LucideIcon
-  paleta: typeof AZUL
+  paleta: Paleta
+  estado: EstadoDato
 }
 
-export function DashboardKpiCards() {
-  const puedeAlumnos = usePuedeLeer("ALUMNOS")
-  const puedeDocentes = usePuedeLeer("DOCENTES")
-  const puedeUsuarios = usePuedeLeer("USUARIOS")
-  const puedeMatriculas = usePuedeLeer("MATRICULAS")
-  const puedeAnios = usePuedeLeer("ANIOS_ESCOLARES")
-  const puedeAsistencia = usePuedeLeer("ASISTENCIAS")
+interface EstadosKpi {
+  alumnos: EstadoDato
+  docentes: EstadoDato
+  usuarios: EstadoDato
+  matriculas: EstadoDato
+  asistencia: EstadoDato
+}
 
-  const qAlumnos = useKpiAlumnos(puedeAlumnos)
-  const qDocentes = useKpiDocentes(puedeDocentes)
-  const qUsuarios = useKpiUsuarios(puedeUsuarios)
-  const qMatriculas = useKpiMatriculas(puedeMatriculas)
-  const qAnio = useAnioEscolarActivo(puedeAnios)
-  const qAsistencia = useEstadisticasHoy(fechaHoyISO(), puedeAsistencia)
+interface DashboardKpiCardsProps {
+  fechaHoy: string
+  anioSeleccionado: AnioEscolarResponse | null
+  puedeAlumnos: boolean
+  puedeDocentes: boolean
+  puedeUsuarios: boolean
+  puedeMatriculas: boolean
+  puedeVerAnio: boolean
+  puedeAsistencia: boolean
+  alumnos?: number
+  docentes?: number
+  usuarios?: number
+  matriculas?: number
+  estadisticas?: EstadisticasResponse
+  estados: EstadosKpi
+}
+
+function valorPorEstado(valor: string | number | undefined, estado: EstadoDato) {
+  if (estado === "cargando") return "…"
+  if (estado !== "listo" || valor === undefined) return "—"
+  return String(valor)
+}
+
+export function DashboardKpiCards({
+  fechaHoy,
+  anioSeleccionado,
+  puedeAlumnos,
+  puedeDocentes,
+  puedeUsuarios,
+  puedeMatriculas,
+  puedeVerAnio,
+  puedeAsistencia,
+  alumnos,
+  docentes,
+  usuarios,
+  matriculas,
+  estadisticas,
+  estados,
+}: DashboardKpiCardsProps) {
+  const anio = anioSeleccionado?.anio
+  const anioReferencia = anio ? `en ${anio}` : "en el año seleccionado"
+  const asistenciaLista =
+    estados.asistencia === "listo" &&
+    estadisticas !== undefined &&
+    estadisticas.totalEsperado > 0
+  const porcentajeAsistencia =
+    asistenciaLista && estadisticas ? estadisticas.porcentajeAsistencia : null
+  const paletaAsistencia: Paleta =
+    porcentajeAsistencia === null
+      ? GRIS
+      : porcentajeAsistencia < 75
+        ? ROJO
+        : porcentajeAsistencia >= 90
+          ? VERDE
+          : NARANJA
 
   const items: KpiItem[] = []
 
   if (puedeAlumnos) {
     items.push({
       label: "Alumnos",
-      valor: qAlumnos.isLoading ? "…" : (qAlumnos.data ?? "—"),
-      subtitulo: "registrados en el sistema",
+      valor: valorPorEstado(alumnos, estados.alumnos),
+      subtitulo: `matriculados ${anioReferencia}`,
       icono: Users,
       paleta: AZUL,
+      estado: estados.alumnos,
     })
   }
+
   if (puedeDocentes) {
     items.push({
       label: "Docentes",
-      valor: qDocentes.isLoading ? "…" : (qDocentes.data ?? "—"),
+      valor: valorPorEstado(docentes, estados.docentes),
       subtitulo: "en planilla",
       icono: GraduationCap,
       paleta: AZUL,
+      estado: estados.docentes,
     })
   }
+
   if (puedeUsuarios) {
     items.push({
       label: "Usuarios",
-      valor: qUsuarios.isLoading ? "…" : (qUsuarios.data ?? "—"),
+      valor: valorPorEstado(usuarios, estados.usuarios),
       subtitulo: "con acceso al sistema",
       icono: UserSquare2,
       paleta: AZUL,
+      estado: estados.usuarios,
     })
   }
+
   if (puedeMatriculas) {
     items.push({
       label: "Matrículas",
-      valor: qMatriculas.isLoading ? "…" : (qMatriculas.data ?? "—"),
-      subtitulo: "gestionadas",
+      valor: valorPorEstado(matriculas, estados.matriculas),
+      subtitulo: `activas ${anioReferencia}`,
       icono: ClipboardList,
       paleta: AZUL,
+      estado: estados.matriculas,
     })
   }
-  if (puedeAnios) {
+
+  if (puedeVerAnio && anioSeleccionado) {
     items.push({
       label: "Año escolar",
-      valor: qAnio.isLoading ? "…" : (qAnio.data?.anio ?? "—"),
-      subtitulo: qAnio.data ? "activo actualmente" : "ninguno activo",
+      valor: anioSeleccionado.anio,
+      subtitulo: estadoAnioTexto(anioSeleccionado.estado),
       icono: CalendarRange,
       paleta: NARANJA,
+      estado: "listo",
     })
   }
 
-  // % de asistencia de hoy con semáforo según umbral.
   if (puedeAsistencia) {
-    const pct = qAsistencia.data?.porcentajeAsistencia
-    const paleta =
-      pct == null || pct < 75 ? ROJO : pct >= 90 ? VERDE : NARANJA
-
     items.push({
       label: "Asistencia hoy",
-      valor: qAsistencia.isLoading ? "…" : (pct != null ? `${pct}%` : "—"),
-      subtitulo: formatearFecha(new Date()),
+      valor: valorPorEstado(
+        porcentajeAsistencia === null ? undefined : `${porcentajeAsistencia}%`,
+        estados.asistencia,
+      ),
+      subtitulo: formatearFecha(fechaHoy),
       icono: TrendingUp,
-      paleta,
+      paleta: paletaAsistencia,
+      estado: estados.asistencia,
     })
   }
+
+  if (items.length === 0) return null
 
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 xl:grid-cols-6">
@@ -139,15 +207,16 @@ export function DashboardKpiCards() {
             key={kpi.label}
             className={cn(
               "flex items-start justify-between rounded-xl border p-4",
-              kpi.paleta.bg
+              kpi.paleta.bg,
             )}
           >
             <div className="flex flex-col">
               <span
                 className={cn(
                   "text-2xl font-bold sm:text-3xl",
-                  kpi.paleta.valor
+                  kpi.paleta.valor,
                 )}
+                title={kpi.estado === "listo" ? undefined : ESTADO_TITULO[kpi.estado]}
               >
                 {kpi.valor}
               </span>

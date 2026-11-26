@@ -19,12 +19,14 @@ import { FilterSelect } from "@/components/shared/filter-select"
 import { HeaderSeccion } from "@/components/shared/header-seccion"
 import { CargandoTarjetas } from "@/components/shared/table-helpers"
 import { useAniosEscolares } from "@/hooks/use-academico"
+import { useIdentidadInstitucional } from "@/hooks/use-colegio"
 import { useCursosFinales, useDetalleNotaFinal, useGuardarNotasFinales, useReabrirNotaFinal } from "@/hooks/use-notas-finales"
 import { usePuede, usePuedeLeer } from "@/hooks/use-permisos"
 import { anioParaFiltro, estadoAnioTexto } from "@/lib/api/academico"
 import type { CeldaNotaFinal, DetalleNotaFinal, NotaFinalItem } from "@/lib/api/notas-finales"
 import { reportesApi } from "@/lib/api/reportes"
-import { ESCALAS, errorCalificacion, errorConclusion, periodoParaFiltro } from "@/lib/calificaciones"
+import { cantidadPeriodos, ESCALAS, errorCalificacion, errorConclusion, nombrePeriodo, periodoParaFiltro } from "@/lib/calificaciones"
+import { NOMBRE_SISTEMA } from "@/lib/navegacion"
 import { generarExcelNotas } from "@/lib/reportes/generar-excel"
 import { generarPdfNotas } from "@/lib/reportes/generar-pdf"
 import { BotonBoletas } from "./boton-boletas"
@@ -32,8 +34,6 @@ import { BotonExportarSiagie } from "./boton-exportar-siagie"
 import { CeldaNotaFinalEditable, MOTIVO_MAXIMO, type ModoCelda, type ValorNotaFinal } from "./celda-nota-final"
 import { FiltrosCurso, useFiltrosCurso } from "./filtros-curso"
 import { NotasAnuales } from "./notas-anuales"
-
-const OPCIONES_PERIODO_REPORTE = [1, 2, 3, 4].map((n) => ({ value: String(n), label: `Periodo ${n}` }))
 
 function clave(idMatricula: number, idCompetencia: number) {
   return `${idMatricula}-${idCompetencia}`
@@ -43,6 +43,7 @@ type Vista = "bimestrales" | "anuales"
 
 export default function NotasFinalesTab() {
   const { data: anios = [] } = useAniosEscolares()
+  const { data: identidad } = useIdentidadInstitucional()
   const [idAnioElegido, setIdAnioElegido] = useState<number | null>(null)
   const idAnio = idAnioElegido ?? anioParaFiltro(anios)?.idAnio ?? null
   // Cada submódulo tiene su permiso: se ve solo el que el usuario puede leer.
@@ -64,6 +65,13 @@ export default function NotasFinalesTab() {
   const curso = filtrosCurso.seleccionado
   // El periodo depende del nivel; cambiar de curso o de periodo no toca los demás filtros.
   const periodos = filtrosCurso.delNivel?.periodos ?? []
+  const tipoPeriodoReporte = filtrosCurso.delNivel?.tipoPeriodo ?? "BIMESTRE"
+  const opcionesPeriodoReporte = periodos.length
+    ? periodos.map((p) => ({ value: String(p.numero), label: p.nombre }))
+    : Array.from({ length: cantidadPeriodos(tipoPeriodoReporte) }, (_, i) => {
+        const numero = i + 1
+        return { value: String(numero), label: nombrePeriodo(tipoPeriodoReporte, numero) }
+      })
   const [numeroElegido, setNumeroElegido] = useState<number | null>(null)
   const periodo = periodos.find((p) => p.numero === numeroElegido) ?? periodoParaFiltro(periodos)
   const { data: detalle, isLoading: cargandoDetalle } = useDetalleNotaFinal(
@@ -92,6 +100,9 @@ export default function NotasFinalesTab() {
   const [reporteOpen, setReporteOpen] = useState(false)
   const filtrosReporte = useFiltrosAcademicos()
   const [periodoReporte, setPeriodoReporte] = useState("")
+  const periodoReporteValido = opcionesPeriodoReporte.some((o) => o.value === periodoReporte)
+    ? periodoReporte
+    : ""
 
   async function handleDescargarReporte(
     formato: "pdf" | "excel",
@@ -107,7 +118,14 @@ export default function NotasFinalesTab() {
       toast.warning("No hay notas en el rango y filtros seleccionados")
       return
     }
-    if (formato === "pdf") generarPdfNotas({ datos, inicio, fin })
+    if (formato === "pdf") {
+      generarPdfNotas({
+        datos,
+        inicio,
+        fin,
+        nombreColegio: identidad?.nombre?.trim() || NOMBRE_SISTEMA,
+      })
+    }
     else generarExcelNotas({ datos, inicio, fin })
     toast.success(`Reporte ${formato.toUpperCase()} generado (${datos.length} registros)`)
   }
@@ -230,8 +248,8 @@ export default function NotasFinalesTab() {
             {
               id: "periodo",
               label: "Periodo",
-              opciones: OPCIONES_PERIODO_REPORTE,
-              valor: periodoReporte,
+              opciones: opcionesPeriodoReporte,
+              valor: periodoReporteValido,
               onChange: setPeriodoReporte,
             },
           ]}

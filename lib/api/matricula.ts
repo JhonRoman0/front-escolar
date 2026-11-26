@@ -24,6 +24,27 @@ export const ANIO_VIGENTE = 1
 export const ANIO_CERRADO = 2
 export const ANIO_POR_COMENZAR = 3
 
+export type TipoIngresoMatricula = "NUEVO_INGRESO" | "CONTINUANTE"
+
+export const TIPO_INGRESO_OPCIONES: { value: TipoIngresoMatricula; label: string }[] = [
+  { value: "NUEVO_INGRESO", label: "Nuevo ingreso" },
+  { value: "CONTINUANTE", label: "Continuante" },
+]
+
+export const ETIQUETA_TIPO_INGRESO: Record<TipoIngresoMatricula, string> = {
+  NUEVO_INGRESO: "Nuevo ingreso",
+  CONTINUANTE: "Continuante",
+}
+
+export const VARIANTE_TIPO_INGRESO: Record<TipoIngresoMatricula, "info" | "secondary"> = {
+  NUEVO_INGRESO: "info",
+  CONTINUANTE: "secondary",
+}
+
+export function etiquetaTipoIngreso(tipo?: TipoIngresoMatricula | null): string {
+  return tipo ? ETIQUETA_TIPO_INGRESO[tipo] : "—"
+}
+
 export interface FichaTrayectoria {
   idMatricula: number
   anio: string
@@ -62,7 +83,7 @@ export interface FichaMatricula {
 }
 
 export interface MatriculaResponse {
-  tipoIngreso?: "NUEVO_INGRESO" | "CONTINUANTE" | null
+  tipoIngreso?: TipoIngresoMatricula | null
   idMatricula: number
   idAlumno: number
   idAlumnoApoderado: number
@@ -217,10 +238,12 @@ export interface MatriculaEdicionRequest {
 // ── API ──────────────────────────────────────────────────────────────────
 
 export const matriculasApi = {
-  async listar(page = 0, size = 10, idAcceso?: number, idAnio?: number): Promise<Paginated<MatriculaResponse>> {
+  async listar(page = 0, size = 10, idAcceso?: number, idAnio?: number,
+               tipoIngreso?: TipoIngresoMatricula): Promise<Paginated<MatriculaResponse>> {
     const params = new URLSearchParams({ page: String(page), size: String(size) })
     if (idAcceso != null) params.set("idAcceso", String(idAcceso))
     if (idAnio != null) params.set("idAnio", String(idAnio))
+    if (tipoIngreso) params.set("tipoIngreso", tipoIngreso)
     return apiFetch<Paginated<MatriculaResponse>>(
       `/matriculas?${params.toString()}`
     )
