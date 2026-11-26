@@ -3,6 +3,7 @@ import autoTable, { type RowInput } from "jspdf-autotable"
 
 import type { ColegioResponse } from "@/lib/api/colegio"
 import type { CursoEvaluable, EvaluacionDetalle } from "@/lib/api/evaluaciones"
+import { nombrePeriodo } from "@/lib/calificaciones"
 import { formatearFecha } from "@/lib/fechas"
 import {
   AZUL,
@@ -19,6 +20,11 @@ function nombreCurso(curso: CursoEvaluable): string {
   return curso.area ? `${curso.curso} (${curso.area})` : curso.curso
 }
 
+function nombrePeriodoEvaluacion(curso: CursoEvaluable, numero: number): string {
+  return curso.periodos.find((periodo) => periodo.numero === numero)?.nombre
+    ?? nombrePeriodo(curso.tipoPeriodo, numero)
+}
+
 function siguienteY(doc: jsPDF, desde: number, altoReservado: number): number {
   const limite = doc.internal.pageSize.getHeight() - MARGEN - 6
   if (desde + altoReservado > limite) {
@@ -32,13 +38,14 @@ export function generarPdfEvaluacion(
   detalle: EvaluacionDetalle,
   curso: CursoEvaluable,
   colegio: ColegioResponse | null,
-  logo: string | null
+  logo: string | null,
+  nombreColegio?: string | null
 ): string {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" })
   const evaluacion = detalle.evaluacion
   const margenTabla = { left: MARGEN, right: MARGEN, bottom: MARGEN + 6 }
 
-  let y = encabezadoInstitucional(doc, colegio, logo, "EVALUACIÓN")
+  let y = encabezadoInstitucional(doc, colegio, logo, "EVALUACIÓN", nombreColegio)
   y = bandaTitulo(doc, "DATOS DE LA EVALUACIÓN", y)
   camposPdf(
     doc,
@@ -46,7 +53,7 @@ export function generarPdfEvaluacion(
       ["Evaluación", evaluacion.nombre, "Fecha", formatearFecha(evaluacion.fecha)],
       ["Curso", nombreCurso(curso), "Nivel", curso.nivel],
       ["Grado", curso.grado, "Sección", curso.seccion ?? "—"],
-      ["Docente", curso.docente, "Periodo", `Periodo ${evaluacion.periodo}`],
+      ["Docente", curso.docente, "Periodo", nombrePeriodoEvaluacion(curso, evaluacion.periodo)],
     ],
     y
   )

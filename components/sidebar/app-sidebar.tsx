@@ -1,6 +1,5 @@
 "use client"
 
-import Image from "next/image"
 import Link from "next/link"
 
 import {
@@ -16,11 +15,15 @@ import {
 import MenuModules from "@/components/sidebar/menu-modules"
 import NavUser from "@/components/sidebar/nav-user"
 import { useAuth } from "@/components/auth-provider"
+import { MarcaInstitucional } from "@/components/shared/marca-institucional"
+import { useIdentidadInstitucional } from "@/hooks/use-colegio"
 import { useMenuItems } from "@/hooks/use-menu-items"
+import { NOMBRE_SISTEMA, PANEL_CONTROL } from "@/lib/navegacion"
 
 export default function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { usuario } = useAuth()
   const { items } = useMenuItems()
+  const { data: identidad } = useIdentidadInstitucional()
 
   if (!usuario) return null
 
@@ -36,17 +39,12 @@ export default function AppSidebar({ ...props }: React.ComponentProps<typeof Sid
           <SidebarMenuItem>
             {/* Mismo patrón que MenuModules: el Link entra por `render` para que el
                 botón y el enlace sean un solo elemento clickeable. */}
-            <SidebarMenuButton size="lg" render={<Link href="/" />}>
-              <Image
-                src="/logo-colegio.jpg"
-                alt="Logo del colegio"
-                width={24}
-                height={24}
-                className="h-6 w-6 rounded-lg object-cover"
-              />
-              <span className="select-none text-base font-semibold text-black/20 font-[family-name:var(--font-sidebar)]">
-                Sistema Escolar
-              </span>
+            <SidebarMenuButton
+              size="lg"
+              render={<Link href={PANEL_CONTROL.url} />}
+              tooltip={identidad?.nombre?.trim() || NOMBRE_SISTEMA}
+            >
+              <MarcaInstitucional variant="sidebar" />
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

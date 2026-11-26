@@ -21,8 +21,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { useColegio } from "@/hooks/use-colegio"
+import { useIdentidadInstitucional } from "@/hooks/use-colegio"
 import { fechaHoyISO } from "@/lib/fechas"
+import { NOMBRE_SISTEMA } from "@/lib/navegacion"
 
 type Formato = "pdf" | "excel"
 
@@ -99,7 +100,6 @@ interface ReporteModalProps {
     filtros: Record<string, string>,
     contexto: { colegio: string; filtros: string[] }
   ) => Promise<void>
-  nombreColegio?: string
 }
 
 export function ReporteModal({ open, onOpenChange, titulo, descripcion, ...resto }: ReporteModalProps) {
@@ -132,7 +132,7 @@ function Contenido({
   onDescargar,
   onCerrar,
 }: Omit<ReporteModalProps, "open" | "onOpenChange" | "titulo" | "descripcion"> & { onCerrar: () => void }) {
-  const { data: colegio } = useColegio()
+  const { data: identidad } = useIdentidadInstitucional()
   const [preset, setPreset] = useState<Preset>(presets[0] ?? "todo")
   const [{ inicio, fin }, setRango] = useState(() => rangoDePreset(presets[0] ?? "todo"))
   const [generando, setGenerando] = useState<Formato | null>(null)
@@ -158,7 +158,7 @@ function Contenido({
         if (f.valor) filtroValues[f.id] = f.valor
       }
       await onDescargar(formato, inicio, fin, filtroValues, {
-        colegio: colegio?.nombre ?? "Sistema Escolar",
+        colegio: identidad?.nombre?.trim() || NOMBRE_SISTEMA,
         filtros: textoFiltros(filtros),
       })
       onCerrar()

@@ -2,12 +2,14 @@ import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
 
 import type { ColegioResponse } from "@/lib/api/colegio"
+import { NOMBRE_SISTEMA } from "@/lib/navegacion"
 
 /** Piezas comunes de los documentos del colegio en PDF: ficha de matrícula y boleta. */
 
 export const AZUL: [number, number, number] = [0, 68, 151]
 export const GRIS: [number, number, number] = [110, 110, 120]
 export const DESTACADO: [number, number, number] = [223, 232, 248]
+export const CABECERA_TABLA: [number, number, number] = [235, 238, 245]
 export const MARGEN = 14
 const LOGO = 20
 
@@ -48,7 +50,8 @@ export function encabezadoInstitucional(
   doc: jsPDF,
   colegio: ColegioResponse | null,
   logo: string | null,
-  tituloDocumento: string
+  tituloDocumento: string,
+  nombre?: string | null
 ): number {
   let x = MARGEN
   if (logo) {
@@ -57,7 +60,7 @@ export function encabezadoInstitucional(
   }
   doc.setFont("helvetica", "bold")
   doc.setFontSize(13)
-  doc.text(colegio?.nombre ?? "Sistema Escolar", x, 17)
+  doc.text(nombre?.trim() || colegio?.nombre || NOMBRE_SISTEMA, x, 17)
   doc.setFont("helvetica", "normal")
   doc.setFontSize(8.5)
   doc.setTextColor(...GRIS)
@@ -151,7 +154,8 @@ export async function imagenParaPdf(
   }
 }
 
-/** Logo del colegio listo para el PDF, o null si no hay. */
-export function logoColegio(colegio: ColegioResponse | null): Promise<string | null> {
-  return imagenParaPdf(colegio?.urlFoto, 240, 240, "contener")
+/** Logo configurado listo para el PDF, o null si no hay o falla la conversión. */
+export function logoDesdeUrl(url: string | null | undefined): Promise<string | null> {
+  return imagenParaPdf(url, 240, 240, "contener")
 }
+

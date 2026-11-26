@@ -135,7 +135,7 @@ export function CambiarContrasenaDialog({
               />
             )}
           />
-          <DialogFooter>
+          <DialogFooter className="sticky bottom-0 z-10 bg-muted">
             {obligatorio ? (
               <Button type="button" variant="outline" onClick={onCerrarSesion}>
                 Cerrar sesión

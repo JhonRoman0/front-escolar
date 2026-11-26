@@ -10,7 +10,8 @@ import type {
   TendenciaDia,
 } from "@/lib/api/dashboard"
 import type { EstadisticasResponse } from "@/lib/api/asistencia"
-import { formatearFecha, formatearHora } from "@/lib/fechas"
+import { dateAIso, formatearFecha, formatearHora } from "@/lib/fechas"
+import { NOMBRE_SISTEMA } from "@/lib/navegacion"
 import {
   MINUTOS_SLOT,
   NOMBRES_DIAS,
@@ -114,7 +115,7 @@ export function generarPdfAsistencia({
   datos,
   inicio,
   fin,
-  nombreColegio = "Sistema Escolar",
+  nombreColegio = NOMBRE_SISTEMA,
 }: PdfAsistenciaOpciones): void {
   const doc = nuevoDoc("landscape")
   const c = contarEstados(datos)
@@ -176,7 +177,7 @@ export function generarPdfResumen({
   estadisticas,
   tendencia,
   distribucion,
-  nombreColegio = "Sistema Escolar",
+  nombreColegio = NOMBRE_SISTEMA,
 }: PdfResumenOpciones): void {
   const doc = nuevoDoc("portrait")
 
@@ -255,7 +256,7 @@ export function generarPdfNotas({
   datos,
   inicio,
   fin,
-  nombreColegio = "Sistema Escolar",
+  nombreColegio = NOMBRE_SISTEMA,
 }: OpcionesReporte & { datos: NotaReporteItem[] }): void {
   const doc = nuevoDoc("landscape")
 
@@ -359,7 +360,7 @@ interface BandaPdf {
   hasta: number
 }
 
-export function construirPdfHorario(paginas: readonly PaginaHorarioPdf[], nombreColegio = "Sistema Escolar"): jsPDF {
+export function construirPdfHorario(paginas: readonly PaginaHorarioPdf[], nombreColegio = NOMBRE_SISTEMA): jsPDF {
   const doc = nuevoDoc("landscape")
   paginas.forEach((pagina, i) => {
     if (i > 0) doc.addPage()
@@ -368,8 +369,8 @@ export function construirPdfHorario(paginas: readonly PaginaHorarioPdf[], nombre
   return doc
 }
 
-export function generarPdfHorario(paginas: readonly PaginaHorarioPdf[], nombreColegio = "Sistema Escolar"): void {
-  construirPdfHorario(paginas, nombreColegio).save(`horario-semanal-${new Date().toISOString().slice(0, 10)}.pdf`)
+export function generarPdfHorario(paginas: readonly PaginaHorarioPdf[], nombreColegio = NOMBRE_SISTEMA): void {
+  construirPdfHorario(paginas, nombreColegio).save(`horario-semanal-${dateAIso(new Date())}.pdf`)
 }
 
 function fuentePorPeso(peso: PesoTexto): "bold" | "normal" {

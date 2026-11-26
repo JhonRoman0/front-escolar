@@ -70,6 +70,7 @@ export function EntradaCodigo({ valor, onCambio, largo = 6, onEnter }: EntradaCo
           }}
           type="text"
           inputMode="numeric"
+          enterKeyHint={i === largo - 1 ? "done" : "next"}
           pattern="[0-9]*"
           autoComplete={i === 0 ? "one-time-code" : "off"}
           maxLength={1}
@@ -78,7 +79,7 @@ export function EntradaCodigo({ valor, onCambio, largo = 6, onEnter }: EntradaCo
           onKeyDown={(e) => manejarTecla(i, e)}
           onPaste={manejarPegado}
           aria-label={`Dígito ${i + 1}`}
-          className="h-12 min-w-0 max-w-12 flex-1 rounded-xl px-0 text-center text-lg font-semibold focus-visible:ring-brand-info"
+          className="h-12 min-w-0 max-w-12 flex-1 rounded-xl px-0 text-center text-campo font-semibold focus-visible:ring-brand-info"
         />
       ))}
     </div>

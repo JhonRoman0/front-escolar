@@ -1,6 +1,7 @@
 "use client"
 
 import { Fragment, useState } from "react"
+import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { ChevronDown, ClipboardPen, Eye, FileDown, Pencil, Plus } from "lucide-react"
 
@@ -20,11 +21,13 @@ import { useColegio } from "@/hooks/use-colegio"
 import { useAvanceFinales, useCursosEvaluables, useEliminarEvaluacion, useEvaluaciones } from "@/hooks/use-evaluaciones"
 import { usePuede } from "@/hooks/use-permisos"
 import { anioParaFiltro, estadoAnioTexto } from "@/lib/api/academico"
+import { identidadApi, type IdentidadInstitucionalResponse } from "@/lib/api/colegio"
 import { competenciaCompleta, evaluacionesApi, type CursoEvaluable, type EvaluacionResumen } from "@/lib/api/evaluaciones"
 import { ESCALAS, periodoParaFiltro } from "@/lib/calificaciones"
 import { formatearFecha } from "@/lib/fechas"
+import { IDENTIDAD_COLEGIO_KEY } from "@/lib/query-keys"
 import { generarPdfEvaluacion } from "@/lib/reportes/generar-evaluacion"
-import { logoColegio } from "@/lib/reportes/pdf-institucional"
+import { logoDesdeUrl } from "@/lib/reportes/pdf-institucional"
 import { EvaluacionFormDialog } from "./evaluacion-form-dialog"
 import { FiltrosCurso, useFiltrosCurso } from "./filtros-curso"
 import { NotasEvaluacionDialog } from "./notas-evaluacion-dialog"
@@ -39,6 +42,7 @@ function nombreCurso(c: CursoEvaluable) {
 }
 
 export default function EvaluacionesTab() {
+  const queryClient = useQueryClient()
   const { data: anios = [] } = useAniosEscolares()
   const { data: colegio } = useColegio()
   const [idAnioElegido, setIdAnioElegido] = useState<number | null>(null)
@@ -93,11 +97,14 @@ export default function EvaluacionesTab() {
     if (!curso) return
     setIdExportando(evaluacion.idEvaluacion)
     try {
+      const identidad =
+        queryClient.getQueryData<IdentidadInstitucionalResponse>(IDENTIDAD_COLEGIO_KEY)
+        ?? (colegio ? null : await identidadApi.obtener().catch(() => null))
       const [detalle, logo] = await Promise.all([
         evaluacionesApi.detalle(evaluacion.idEvaluacion),
-        logoColegio(colegio ?? null),
+        logoDesdeUrl(identidad?.logoUrl ?? colegio?.urlFoto),
       ])
-      generarPdfEvaluacion(detalle, curso, colegio ?? null, logo)
+      generarPdfEvaluacion(detalle, curso, colegio ?? null, logo, identidad?.nombre ?? colegio?.nombre)
       toast.success(`PDF de "${evaluacion.nombre}" descargado`)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo generar el PDF")

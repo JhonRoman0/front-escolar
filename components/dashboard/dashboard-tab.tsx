@@ -16,12 +16,15 @@ import {
   useEstadisticasHoy,
   useTendenciaSemana,
 } from "@/hooks/use-dashboard"
+import { useIdentidadInstitucional } from "@/hooks/use-colegio"
 import { usePuedeLeer } from "@/hooks/use-permisos"
 import { fechaHoyISO, formatearFecha } from "@/lib/fechas"
+import { NOMBRE_SISTEMA } from "@/lib/navegacion"
 import { generarPdfResumen } from "@/lib/reportes/generar-pdf"
 
 export function DashboardTab() {
   const { usuario } = useAuth()
+  const { data: identidad } = useIdentidadInstitucional()
   const puedeAsistencia = usePuedeLeer("ASISTENCIAS")
   const puedeMatriculas = usePuedeLeer("MATRICULAS")
   const [generandoResumen, setGenerandoResumen] = useState(false)
@@ -42,6 +45,7 @@ export function DashboardTab() {
         estadisticas: qAsistencia.data,
         tendencia: qTendencia.data,
         distribucion: qDistribucion.data,
+        nombreColegio: identidad?.nombre?.trim() || NOMBRE_SISTEMA,
       })
       toast.success("Resumen ejecutivo descargado")
     } catch (error) {

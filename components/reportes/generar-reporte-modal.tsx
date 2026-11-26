@@ -22,6 +22,8 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 
+import { useIdentidadInstitucional } from "@/hooks/use-colegio"
+import { NOMBRE_SISTEMA } from "@/lib/navegacion"
 import { reportesApi } from "@/lib/api/reportes"
 import { generarExcelAsistencia } from "@/lib/reportes/generar-excel"
 import { generarPdfAsistencia } from "@/lib/reportes/generar-pdf"
@@ -75,15 +77,13 @@ function rangoDePreset(preset: Preset): { inicio: string; fin: string } {
 interface GenerarReporteModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  /** Nombre del colegio para el encabezado del PDF (default: "Sistema Escolar"). */
-  nombreColegio?: string
 }
 
 export function GenerarReporteModal({
   open,
   onOpenChange,
-  nombreColegio = "Sistema Escolar",
 }: GenerarReporteModalProps) {
+  const { data: identidad } = useIdentidadInstitucional()
   const [preset, setPreset] = useState<Preset>("ultimos_7")
   const [{ inicio, fin }, setRango] = useState(() =>
     rangoDePreset("ultimos_7")
@@ -113,7 +113,12 @@ export function GenerarReporteModal({
       }
 
       if (formato === "pdf") {
-        generarPdfAsistencia({ datos, inicio, fin, nombreColegio })
+        generarPdfAsistencia({
+          datos,
+          inicio,
+          fin,
+          nombreColegio: identidad?.nombre?.trim() || NOMBRE_SISTEMA,
+        })
       } else {
         generarExcelAsistencia({ datos, inicio, fin })
       }

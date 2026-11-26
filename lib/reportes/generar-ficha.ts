@@ -2,16 +2,17 @@ import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
 
 import { matriculasApi, type FichaMatricula } from "@/lib/api/matricula"
-import { colegioApi, type ColegioResponse } from "@/lib/api/colegio"
+import { colegioApi, identidadApi, type ColegioResponse } from "@/lib/api/colegio"
 import { edad, fechaCorta } from "./formato"
 import {
   bandaTitulo as titulo,
+  CABECERA_TABLA,
   camposPdf as campos,
   DESTACADO,
   encabezadoInstitucional,
   firmasPdf,
   imagenParaPdf,
-  logoColegio,
+  logoDesdeUrl,
   MARGEN,
   piePdf,
   ultimaY,
@@ -32,13 +33,14 @@ function sexoTexto(sexo: string | null): string {
 export function generarPdfFicha(
   ficha: FichaMatricula,
   colegio: ColegioResponse | null,
-  imagenes: ImagenesFicha
+  imagenes: ImagenesFicha,
+  nombreColegio?: string | null
 ): void {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" })
   const anchoPagina = doc.internal.pageSize.getWidth()
   const { alumno, matricula } = ficha
 
-  let y = encabezadoInstitucional(doc, colegio, imagenes.logo, "FICHA DE MATRÍCULA")
+  let y = encabezadoInstitucional(doc, colegio, imagenes.logo, "FICHA DE MATRÍCULA", nombreColegio)
 
   // Alumno
   y = titulo(doc, "DATOS DEL ALUMNO", y)
@@ -96,7 +98,7 @@ export function generarPdfFicha(
         ])
       : [[{ content: "Sin apoderados registrados", colSpan: 6, styles: { halign: "center" as const } }]],
     styles: { fontSize: 7.5, cellPadding: 1.3, overflow: "linebreak" },
-    headStyles: { fillColor: [235, 238, 245], textColor: 40, fontStyle: "bold" },
+    headStyles: { fillColor: CABECERA_TABLA, textColor: 40, fontStyle: "bold" },
   })
 
   // Trayectoria: toda la escolaridad en el colegio, con el año elegido resaltado
@@ -107,7 +109,7 @@ export function generarPdfFicha(
     head: [["Año", "Nivel", "Grado y sección", "Turno", "Estado"]],
     body: ficha.trayectoria.map((t) => [t.anio, t.nivel, t.gradoSeccion, t.turno, t.estado]),
     styles: { fontSize: 8, cellPadding: 1.3 },
-    headStyles: { fillColor: [235, 238, 245], textColor: 40, fontStyle: "bold" },
+    headStyles: { fillColor: CABECERA_TABLA, textColor: 40, fontStyle: "bold" },
     didParseCell: ({ section, row, cell }) => {
       if (section === "body" && ficha.trayectoria[row.index]?.idMatricula === matricula.idMatricula) {
         cell.styles.fillColor = DESTACADO
@@ -131,9 +133,10 @@ export async function descargarFicha(idMatricula: number): Promise<void> {
     matriculasApi.ficha(idMatricula),
     colegioApi.actual().catch(() => null),
   ])
+  const identidad = colegio ? null : await identidadApi.obtener().catch(() => null)
   const [logo, foto] = await Promise.all([
-    logoColegio(colegio),
+    logoDesdeUrl(identidad?.logoUrl ?? colegio?.urlFoto),
     imagenParaPdf(ficha.alumno.urlFoto, 336, 408, "cubrir"),
   ])
-  generarPdfFicha(ficha, colegio, { logo, foto })
+  generarPdfFicha(ficha, colegio, { logo, foto }, identidad?.nombre ?? colegio?.nombre)
 }
