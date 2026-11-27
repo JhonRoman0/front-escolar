@@ -8,7 +8,11 @@ import AccesosTab from "@/components/seguridad/accesos-tab"
 import { usePuedeLeer } from "@/hooks/use-permisos"
 
 export default function SeguridadPage() {
+  const puedeUsuarios = usePuedeLeer("USUARIOS")
+  const puedeRoles = usePuedeLeer("ROLES")
   const puedeAccesos = usePuedeLeer("ROLES_PERMISOS")
+  // Se abre la primera pestaña que el usuario puede ver.
+  const inicial = puedeUsuarios ? "usuarios" : puedeRoles ? "roles" : "accesos"
 
   return (
     <div className="flex flex-col gap-4">
@@ -16,18 +20,22 @@ export default function SeguridadPage() {
         <h1 className="text-[20px] font-bold tracking-tight text-foreground">Seguridad</h1>
         <p className="text-[12px] font-medium leading-5 text-muted-foreground">Usuarios, roles y accesos por rol.</p>
       </div>
-      <Tabs defaultValue="usuarios">
+      <Tabs defaultValue={inicial}>
         <TabsList variant="segmented" className="w-full justify-start overflow-x-auto">
-          <TabsTrigger value="usuarios">Usuarios</TabsTrigger>
-          <TabsTrigger value="roles">Roles</TabsTrigger>
+          {puedeUsuarios && <TabsTrigger value="usuarios">Usuarios</TabsTrigger>}
+          {puedeRoles && <TabsTrigger value="roles">Roles</TabsTrigger>}
           {puedeAccesos && <TabsTrigger value="accesos">Accesos</TabsTrigger>}
         </TabsList>
-        <TabsContent value="usuarios">
-          <UsuariosTab />
-        </TabsContent>
-        <TabsContent value="roles">
-          <RolesTab />
-        </TabsContent>
+        {puedeUsuarios && (
+          <TabsContent value="usuarios">
+            <UsuariosTab />
+          </TabsContent>
+        )}
+        {puedeRoles && (
+          <TabsContent value="roles">
+            <RolesTab />
+          </TabsContent>
+        )}
         {puedeAccesos && (
           <TabsContent value="accesos">
             <AccesosTab />

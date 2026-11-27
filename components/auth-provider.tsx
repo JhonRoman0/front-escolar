@@ -97,14 +97,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelado = false
 
+    // Sesión obsoleta (cambiaron sus permisos, roles o vigencia): hay que borrar
+    // la cookie en el backend. Si solo se limpia lo local, /login vuelve a leer la
+    // misma cookie, la encuentra obsoleta y recarga sin fin.
+    async function salirPorSesionObsoleta(mensaje: string) {
+      toast.error(mensaje)
+      limpiarSesionBloqueada()
+      await authApi.logout().catch(() => {})
+      cerrarSesionLocal()
+      if (window.location.pathname === RUTA_LOGIN) {
+        // Ya está en el login: no se recarga, solo queda sin sesión.
+        setDetalleBloqueo(null)
+        setUsuario(null)
+        return
+      }
+      window.location.replace(RUTA_LOGIN)
+    }
+
     function alBloquear(event: Event) {
       const detalle = (event as CustomEvent<DetalleSesionBloqueada>).detail
       if (!detalle) return
       if (esCodigoSesionObsoleta(detalle.codigo)) {
-        toast.error(detalle.mensaje)
-        limpiarSesionBloqueada()
-        cerrarSesionLocal()
-        window.location.replace(RUTA_LOGIN)
+        void salirPorSesionObsoleta(detalle.mensaje)
         return
       }
       setDetalleBloqueo(detalle)
@@ -152,10 +166,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (error instanceof ApiError && error.status === 403 && esCodigoBloqueoSesion(error.body?.codigo)) {
           const codigo = String(error.body?.codigo)
           if (esCodigoSesionObsoleta(codigo)) {
-            toast.error(error.message)
-            limpiarSesionBloqueada()
-            cerrarSesionLocal()
-            window.location.replace(RUTA_LOGIN)
+            await salirPorSesionObsoleta(error.message)
             return
           }
           marcarSesionBloqueada({

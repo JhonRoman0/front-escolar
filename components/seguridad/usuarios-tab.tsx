@@ -39,6 +39,7 @@ import { VigenciaBadge } from "./vigencia-badge"
 import { FilasCargando, MensajeSinDatos } from "./shared"
 import UsuarioFormDialog from "./usuario-form-dialog"
 import { COLOR_ROL_ADMIN, COLOR_ROL_FALLBACK, esRolAdmin } from "@/lib/roles"
+import { useAuth } from "@/components/auth-provider"
 
 const TAMANIO_PAGINA = 10
 
@@ -88,6 +89,7 @@ export default function UsuariosTab() {
   )
   const eliminar = useEliminarUsuario()
   const desbloquear = useDesbloquearUsuario()
+  const { esAdmin } = useAuth()
   const puedeCrear = usePuede("USUARIOS", "CREAR")
   const puedeActualizar = usePuede("USUARIOS", "ACTUALIZAR")
   const puedeEliminar = usePuede("USUARIOS", "ELIMINAR")
@@ -289,6 +291,8 @@ export default function UsuariosTab() {
             ) : (
               data.content.map((usuario) => {
                 const nombreCompleto = `${usuario.nombre} ${usuario.apellidoPat} ${usuario.apellidoMat}`.trim()
+                // El backend lo exige igual: a un usuario ADMIN solo lo toca otro ADMIN.
+                const gestionable = esAdmin || !usuario.roles.some((r) => esRolAdmin(r.nombre))
                 const iniciales = `${usuario.nombre[0] ?? ""}${usuario.apellidoPat[0] ?? ""}`.toUpperCase()
                 return (
                   <TableRow key={usuario.idUsuario}>
@@ -365,7 +369,7 @@ export default function UsuariosTab() {
                     </TableCell>
                     <TableCell className="text-center">
                       <div className="flex justify-center gap-2">
-                        {estaBloqueado(usuario) && puedeActualizar && (
+                        {estaBloqueado(usuario) && puedeActualizar && gestionable && (
                           <Button
                             variant="outline"
                             size="icon-sm"
@@ -376,7 +380,7 @@ export default function UsuariosTab() {
                             <LockOpen />
                           </Button>
                         )}
-                        {puedeActualizar && (
+                        {puedeActualizar && gestionable && (
                           <Button
                             variant="outline"
                             size="icon-sm"
@@ -390,7 +394,7 @@ export default function UsuariosTab() {
                             <Pencil />
                           </Button>
                         )}
-                        {puedeEliminar && (
+                        {puedeEliminar && gestionable && (
                           <ConfirmarEliminar
                             titulo="Eliminar usuario"
                             descripcion={`¿Estás seguro de eliminar a "${nombreCompleto}"? Perderá el acceso al sistema.`}
