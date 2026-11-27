@@ -16,6 +16,28 @@ interface TablaPaginacionProps<T> {
   onPage: (page: number) => void
 }
 
+const TAMANIO_PAGINA = 10
+
+export function paginarFilas<T>(filas: T[], paginaSolicitada: number): Paginated<T> {
+  const totalElements = filas.length
+  const totalPages = Math.ceil(totalElements / TAMANIO_PAGINA)
+  const number = Math.min(Math.max(paginaSolicitada, 0), Math.max(0, totalPages - 1))
+  const inicio = number * TAMANIO_PAGINA
+  const content = filas.slice(inicio, inicio + TAMANIO_PAGINA)
+
+  return {
+    content,
+    totalElements,
+    totalPages,
+    size: TAMANIO_PAGINA,
+    number,
+    numberOfElements: content.length,
+    first: number === 0,
+    last: number >= totalPages - 1,
+    empty: totalElements === 0,
+  }
+}
+
 type ElementoPaginacion = number | "ellipsis"
 
 function paginasVisibles(actual: number, total: number): ElementoPaginacion[] {

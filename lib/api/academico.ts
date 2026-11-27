@@ -1,5 +1,14 @@
 import { apiFetch, crud } from "@/lib/api"
 import { fechaHoyISO, formatearFecha } from "@/lib/fechas"
+import {
+  ESTADO_CAMBIO,
+  ESTADO_SUSPENSION,
+  type EstadoCambio as EstadoCambioDocente,
+  type EstadoSuspension as EstadoSuspensionDocente,
+  type TipoCambioDocente,
+} from "@/lib/schemas/academico"
+
+export type { TipoCambioDocente, EstadoCambioDocente, EstadoSuspensionDocente }
 
 // Jackson serializa LocalTime como "08:00:00"; el form y los inputs usan "HH:mm"
 export function horaCorta(hora?: string | null): string {
@@ -423,7 +432,12 @@ interface AulaRequest {
 
 // ── Suspensión de Docente ────────────────────────────────────────────────
 
-interface SuspensionResponse {
+export const ESTADO_SUSPENSION_DOCENTE: readonly EstadoSuspensionDocente[] =
+  Object.values(ESTADO_SUSPENSION)
+export type OrigenRegistro = "MANUAL" | "AUTOMATICO"
+
+export interface SuspensionResponse {
+  anio?: string | null
   idSuspension: number
   idDocente: number
   docente: string
@@ -434,6 +448,14 @@ interface SuspensionResponse {
   fechaInicio: string
   fechaFin: string | null
   accesoId: number | null
+  estado?: EstadoSuspensionDocente | null
+  fechaFinalizacion?: string | null
+  motivoResolucion?: string | null
+  incidencia?: boolean
+  motivoIncidencia?: string | null
+  puedeEditar?: boolean
+  puedeCancelar?: boolean
+  puedeFinalizar?: boolean
 }
 
 export interface SuspensionRequest {
@@ -447,15 +469,87 @@ export interface SuspensionRequest {
 
 // ── Cambios de Docente ───────────────────────────────────────────────────
 
-interface CambioDocenteResponse {
+export const ESTADO_CAMBIO_DOCENTE: readonly EstadoCambioDocente[] =
+  Object.values(ESTADO_CAMBIO)
+
+export interface CambioDocenteResponse {
   idCambio: number
-  idAsignacion: number
+  tipo: TipoCambioDocente
+  estado: EstadoCambioDocente
+  idAnio: number
+  anio: string
+  idDocenteAnterior: number
   docenteAnterior: string
-  docenteNuevo: string
+  idDocenteNuevo: number | null
+  docenteNuevo: string | null
+  idMotivo: number
   motivo: string
   motivoDetalle: string | null
   fechaCambio: string
+  fechaInicio: string
+  fechaFin: string | null
+  fechaAplicacion: string | null
+  fechaFinalizacion: string | null
+  idUsuarioRegistro: number
   usuarioRegistro: string
+  origenRegistro: OrigenRegistro
+  origenUltimaOperacion: OrigenRegistro
+  incidencia: boolean
+  motivoIncidencia: string | null
+  resolucionAdministrativa: string | null
+  fechaResolucion: string | null
+  motivoResolucion: string | null
+  detalles: CambioDocenteDetalle[]
+}
+
+export interface CambioDocenteDetalle {
+  idAsignacion: number
+  curso: string | null
+  grado: string | null
+  seccion: string | null
+  anio: string | null
+  idDocenteDesde: number
+  idDocenteHacia: number | null
+  sinCobertura: boolean
+  devuelta: boolean
+  fechaTransferencia: string | null
+  fechaDevolucion: string | null
+  origenTransferencia: OrigenRegistro | null
+  origenDevolucion: OrigenRegistro | null
+  horarios?: Array<{
+    idHorario: number
+    diaSemana: number
+    horaInicio: string
+    horaFin: string
+  }>
+}
+
+export interface CambioDocenteRequest {
+  tipo: TipoCambioDocente
+  fechaInicio: string
+  fechaFin?: string | null
+  idMotivo: number
+  motivoDetalle?: string | null
+  idsAsignacion: number[]
+  idDocenteSustituto: number
+}
+
+export interface ResolverIncidenciaRequest {
+  resolucion: string
+}
+
+export interface MotivoCambioDocenteRequest {
+  nombre: string
+  aplicaTemporal: boolean
+  aplicaDefinitivo: boolean
+}
+
+export interface MotivoCambioDocenteResponse {
+  idMotivoCambioDocente: number
+  nombre: string
+  aplicaTemporal: boolean
+  aplicaDefinitivo: boolean
+  activo: boolean
 }
 
 // ── Asignación ───────────────────────────────────────────────────────────
@@ -727,21 +821,111 @@ export const suspensionesApi = {
       body: JSON.stringify(data),
     })
   },
-  async finalizar(id: number): Promise<SuspensionResponse> {
-    return apiFetch<SuspensionResponse>(`/suspensiones/${id}/finalizar`, {
+  async actualizar(
+    id: number,
+    data: SuspensionRequest
+  ): Promise<SuspensionResponse> {
+    return apiFetch<SuspensionResponse>(`/suspensiones/${id}`, {
       method: "PUT",
+      body: JSON.stringify(data),
     })
   },
-  async eliminar(id: number): Promise<void> {
-    return apiFetch<void>(`/suspensiones/${id}`, { method: "DELETE" })
+  async editarVigente(id: number, { motivo, motivoDetalle, fechaFin }: SuspensionRequest) {
+    return apiFetch<SuspensionResponse>(`/suspensiones/${id}/edicion-vigente`, {
+      method: "PUT",
+      body: JSON.stringify({ motivo, motivoDetalle, fechaFin }),
+    })
+  },
+  async finalizar(id: number, motivo?: string): Promise<SuspensionResponse> {
+    const query = motivo ? `?motivo=${encodeURIComponent(motivo)}` : ""
+    return apiFetch<SuspensionResponse>(`/suspensiones/${id}/finalizar${query}`, {
+      method: "POST",
+    })
+  },
+  async cancelar(id: number, motivo?: string): Promise<SuspensionResponse> {
+    const query = motivo ? `?motivo=${encodeURIComponent(motivo)}` : ""
+    return apiFetch<SuspensionResponse>(`/suspensiones/${id}/cancelar${query}`, {
+      method: "POST",
+    })
   },
 }
 
-// ── Cambios de Docente (solo lectura) ────────────────────────────────────
+// ── Cambios de Docente ───────────────────────────────────────────────────
 
 export const cambiosDocenteApi = {
+  async asignacionesParaCambio(idDocente: number): Promise<AsignacionResponse[]> {
+    return apiFetch<AsignacionResponse[]>(`/cambios-docente/docente/${idDocente}/asignaciones`)
+  },
   async listar(): Promise<CambioDocenteResponse[]> {
     return apiFetch<CambioDocenteResponse[]>("/cambios-docente")
+  },
+  async crear(data: CambioDocenteRequest): Promise<CambioDocenteResponse> {
+    return apiFetch<CambioDocenteResponse>("/cambios-docente", {
+      method: "POST",
+      body: JSON.stringify(data),
+    })
+  },
+  async actualizar(
+    id: number,
+    data: CambioDocenteRequest
+  ): Promise<CambioDocenteResponse> {
+    return apiFetch<CambioDocenteResponse>(`/cambios-docente/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    })
+  },
+  async editarVigente(id: number, { idMotivo, motivoDetalle, fechaFin }: CambioDocenteRequest) {
+    return apiFetch<CambioDocenteResponse>(`/cambios-docente/${id}/edicion-vigente`, {
+      method: "PUT",
+      body: JSON.stringify({ idMotivo, motivoDetalle, fechaFin }),
+    })
+  },
+  async resolverIncidencia(
+    id: number,
+    data: ResolverIncidenciaRequest
+  ): Promise<CambioDocenteResponse> {
+    return apiFetch<CambioDocenteResponse>(`/cambios-docente/${id}/resolver-incidencia`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    })
+  },
+  async finalizar(id: number): Promise<CambioDocenteResponse> {
+    return apiFetch<CambioDocenteResponse>(`/cambios-docente/${id}/finalizar`, {
+      method: "PUT",
+    })
+  },
+  async cancelar(id: number, motivo: string): Promise<CambioDocenteResponse> {
+    return apiFetch<CambioDocenteResponse>(
+      `/cambios-docente/${id}/cancelar?motivo=${encodeURIComponent(motivo)}`,
+      { method: "PUT" }
+    )
+  },
+}
+
+// ── Motivos de Cambio de Docente ─────────────────────────────────────────
+
+export const motivosCambioDocenteApi = {
+  async listar(tipo?: TipoCambioDocente): Promise<MotivoCambioDocenteResponse[]> {
+    const query = tipo ? `?tipo=${tipo}` : ""
+    return apiFetch<MotivoCambioDocenteResponse[]>(`/motivos-cambio-docente${query}`)
+  },
+  async crear(data: MotivoCambioDocenteRequest): Promise<MotivoCambioDocenteResponse> {
+    return apiFetch<MotivoCambioDocenteResponse>("/motivos-cambio-docente", {
+      method: "POST",
+      body: JSON.stringify(data),
+    })
+  },
+  async actualizar(
+    id: number,
+    data: MotivoCambioDocenteRequest
+  ): Promise<MotivoCambioDocenteResponse> {
+    return apiFetch<MotivoCambioDocenteResponse>(`/motivos-cambio-docente/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    })
+  },
+  async eliminar(id: number): Promise<void> {
+    return apiFetch<void>(`/motivos-cambio-docente/${id}`, { method: "DELETE" })
   },
 }
 
