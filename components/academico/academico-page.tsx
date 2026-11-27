@@ -6,8 +6,7 @@ import DocentesTab from "./docentes-tab"
 import CatalogosTab, { CursosTab } from "./catalogos-tab"
 import AsignacionesTab from "./asignaciones-tab"
 import { CompetenciasTab } from "./competencias-tab"
-import SuspensionesTab from "./suspensiones-tab"
-import CambiosDocenteTab from "./cambios-docente-tab"
+import CambiosDocentePage from "./cambios-docente-page"
 import RecreosTab from "./recreos-tab"
 import { usePuedeLeer } from "@/hooks/use-permisos"
 
@@ -27,10 +26,11 @@ export default function AcademicoPage() {
   const puedeRecreos = usePuedeLeer("RECREOS")
 
   const tieneEstructura = puedeAnios || puedeGrados || puedeTurnos || puedeAulas || puedeConfiguracion || puedeOrdenGrados
+  const puedeCambiosDocenteModulo = puedeCambiosDocente || puedeSuspensiones
 
   // Estructura académica va primero: es el catálogo base del módulo y el resto
   // de pestañas dependen de lo que se registre ahí.
-  const defaultTab = tieneEstructura ? "estructura" : puedeDocentes ? "docentes" : puedeCursos ? "cursos" : puedeAsignaciones ? "asignaciones" : "docentes"
+  const defaultTab = tieneEstructura ? "estructura" : puedeDocentes ? "docentes" : puedeCursos ? "cursos" : puedeAsignaciones ? "asignaciones" : puedeCambiosDocenteModulo ? "cambios-docente" : "docentes"
 
   return (
     <div className="flex flex-col gap-4">
@@ -49,8 +49,9 @@ export default function AcademicoPage() {
           {puedeCompetencias && <TabsTrigger value="competencias">Competencias</TabsTrigger>}
           {puedeRecreos && <TabsTrigger value="recreos">Recreos</TabsTrigger>}
           {puedeAsignaciones && <TabsTrigger value="asignaciones">Asignaciones</TabsTrigger>}
-          {puedeSuspensiones && <TabsTrigger value="suspensiones">Suspensiones</TabsTrigger>}
-          {puedeCambiosDocente && <TabsTrigger value="cambios">Cambios docente</TabsTrigger>}
+          {puedeCambiosDocenteModulo && (
+            <TabsTrigger value="cambios-docente">Cambios de docente</TabsTrigger>
+          )}
         </TabsList>
 
         {tieneEstructura && (
@@ -90,14 +91,9 @@ export default function AcademicoPage() {
             <RecreosTab />
           </TabsContent>
         )}
-        {puedeSuspensiones && (
-          <TabsContent value="suspensiones">
-            <SuspensionesTab />
-          </TabsContent>
-        )}
-        {puedeCambiosDocente && (
-          <TabsContent value="cambios">
-            <CambiosDocenteTab />
+        {puedeCambiosDocenteModulo && (
+          <TabsContent value="cambios-docente">
+            <CambiosDocentePage />
           </TabsContent>
         )}
       </Tabs>

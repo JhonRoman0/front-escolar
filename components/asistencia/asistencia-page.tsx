@@ -14,9 +14,11 @@ import { FeriadosTab } from "./feriados-tab"
 export default function AsistenciaPage() {
   const { esAdmin, permisos } = useAuth()
   const puedeConfigurar = usePuede("ASISTENCIAS", "CONFIGURAR")
+  const puedeRegistrar = usePuede("ASISTENCIAS", "CREAR")
+  const puedeJustificar = usePuede("ASISTENCIAS", "ACTUALIZAR")
 
   // El apoderado verá la asistencia de su hijo en su portal.
-  if (!esAdmin && permisos?.vinculo === "APODERADO") {
+  if (!esAdmin && !puedeRegistrar && !puedeJustificar && permisos?.vinculo === "APODERADO") {
     return (
       <Card>
         <CardContent className="flex flex-col items-center justify-center py-12 text-muted-foreground">

@@ -57,7 +57,7 @@ import { TarjetaSeccion } from "@/components/shared/tarjeta-seccion"
 import { BuscadorTabla } from "@/components/shared/buscador-tabla"
 import { BotonLimpiarFiltros } from "@/components/shared/boton-limpiar-filtros"
 import { FilterSelect } from "@/components/shared/filter-select"
-import { TablaPaginacion } from "@/components/shared/paginacion-tabla"
+import { paginarFilas, TablaPaginacion } from "@/components/shared/paginacion-tabla"
 import {
   useActualizarDocente,
   useDocentes,
@@ -70,7 +70,6 @@ import {
 } from "@/hooks/use-academico"
 import { useConsultarDni } from "@/hooks/use-reniec"
 import { useDebouncedValue } from "@/hooks/use-debounce"
-import type { Paginated } from "@/lib/api"
 import type {
   DocenteRequest,
   DocenteResponse,
@@ -82,7 +81,6 @@ import { reportesApi } from "@/lib/api/reportes"
 import { descargarTabla, tablaDocentes, type FormatoReporte } from "@/lib/reportes/tablas"
 import { ReporteModal } from "@/components/reportes/reporte-modal"
 
-const TAMANIO_PAGINA = 10
 
 const ESTADO_OPCIONES = [
   { value: "1", label: "Activo" },
@@ -160,22 +158,8 @@ export default function DocentesTab() {
     filtroNivel,
   ])
 
-  const totalRegistros = docentesFiltrados.length
-  const totalPaginas = Math.ceil(totalRegistros / TAMANIO_PAGINA)
-  const pagina = Math.min(page, Math.max(0, totalPaginas - 1))
-  const fin = Math.min((pagina + 1) * TAMANIO_PAGINA, totalRegistros)
-  const docentesPaginados = docentesFiltrados.slice(pagina * TAMANIO_PAGINA, fin)
-  const datosPaginacion: Paginated<DocenteResponse> = {
-    content: docentesPaginados,
-    totalElements: totalRegistros,
-    totalPages: totalPaginas,
-    size: TAMANIO_PAGINA,
-    number: pagina,
-    numberOfElements: docentesPaginados.length,
-    first: pagina === 0,
-    last: pagina >= totalPaginas - 1,
-    empty: totalRegistros === 0,
-  }
+  const datosPaginacion = paginarFilas(docentesFiltrados, page)
+  const { content: docentesPaginados, number: pagina } = datosPaginacion
 
   function cambiarBusqueda(valor: string) {
     setBusqueda(valor)

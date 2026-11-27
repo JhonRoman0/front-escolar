@@ -5,7 +5,7 @@ import { emailRequerido, MENSAJE_DNI, MENSAJE_SOLO_LETRAS_Y_ESPACIOS, REGEX_DNI,
 import { esHoraValida, turnoAnterior, turnoSiguiente, type TurnoFranja } from "@/lib/turnos"
 
 const accesoId = z.number().int().min(1, "Selecciona un estado").max(3)
-const REGEX_FECHA = /^\d{4}-\d{2}-\d{2}$/
+export const REGEX_FECHA = /^\d{4}-\d{2}-\d{2}$/
 const fecha = z
   .string()
   .regex(REGEX_FECHA, "Fecha requerida (aaaa-mm-dd)")
@@ -465,3 +465,76 @@ export const asignacionSchema = z
     })
   })
 export type AsignacionValues = z.infer<typeof asignacionSchema>
+
+export const motivoCambioDocenteSchema = z
+  .object({
+    nombre: z
+      .string()
+      .trim()
+      .min(1, "El nombre es requerido")
+      .max(150),
+    aplicaTemporal: z.boolean(),
+    aplicaDefinitivo: z.boolean(),
+  })
+  .refine((val) => val.aplicaTemporal || val.aplicaDefinitivo, {
+    message: "El motivo debe aplicar al menos a un tipo de cambio",
+  })
+export type MotivoCambioDocenteValues = z.infer<typeof motivoCambioDocenteSchema>
+
+export const TIPO_CAMBIO_DOCENTE = {
+  TEMPORAL: "TEMPORAL",
+  DEFINITIVO: "DEFINITIVO",
+} as const
+
+export type TipoCambioDocente = (typeof TIPO_CAMBIO_DOCENTE)[keyof typeof TIPO_CAMBIO_DOCENTE]
+
+export const ESTADO_CAMBIO = {
+  PROGRAMADO: "PROGRAMADO",
+  VIGENTE: "VIGENTE",
+  FINALIZADO: "FINALIZADO",
+  APLICADO: "APLICADO",
+  CANCELADO: "CANCELADO",
+} as const
+
+export type EstadoCambio = (typeof ESTADO_CAMBIO)[keyof typeof ESTADO_CAMBIO]
+
+export const ESTADO_SUSPENSION = {
+  PROGRAMADA: "PROGRAMADA",
+  VIGENTE: "VIGENTE",
+  FINALIZADA: "FINALIZADA",
+  CANCELADA: "CANCELADA",
+} as const
+
+export type EstadoSuspension = (typeof ESTADO_SUSPENSION)[keyof typeof ESTADO_SUSPENSION]
+
+export const cambioDocenteSchema = z
+  .object({
+    tipo: z.enum([TIPO_CAMBIO_DOCENTE.TEMPORAL, TIPO_CAMBIO_DOCENTE.DEFINITIVO]),
+    fechaInicio: fecha,
+    fechaFin: z.union([fecha, z.literal("")]).optional(),
+    idMotivo: z.number().int().min(1, "Selecciona un motivo"),
+    motivoDetalle: z.string().trim().max(255).optional(),
+    idsAsignacion: z.array(z.number().int().min(1)).min(1, "Selecciona al menos una asignación"),
+    idDocenteSustituto: z.number().int().min(1, "Selecciona un sustituto"),
+  })
+  .superRefine((val, ctx) => {
+    if (val.tipo === TIPO_CAMBIO_DOCENTE.DEFINITIVO && val.fechaFin) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["fechaFin"],
+        message: "El cambio definitivo no admite fecha de fin",
+      })
+    }
+    if (
+      val.tipo === TIPO_CAMBIO_DOCENTE.TEMPORAL &&
+      val.fechaFin &&
+      val.fechaFin < val.fechaInicio
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["fechaFin"],
+        message: "La fecha de fin no puede ser anterior a la fecha de inicio",
+      })
+    }
+  })
+export type CambioDocenteValues = z.infer<typeof cambioDocenteSchema>

@@ -18,21 +18,26 @@ import {
   gradosAcademicosApi,
   gradosApi,
   gradoSeccionApi,
+  motivosCambioDocenteApi,
   nivelesApi,
   recreosApi,
   suspensionesApi,
   tiposContratoApi,
   turnosApi,
+  type CambioDocenteRequest,
   type ConfiguracionAcademicaRequest,
+  type MotivoCambioDocenteRequest,
   type CursoCopiaRequest,
   type DocenteRequest,
   type RecreoRequest,
   type RecreoUpdateRequest,
+  type ResolverIncidenciaRequest,
   type SeccionRequest,
   type SeccionesBatchRequest,
   type SubcursoRequest,
   type SuspensionRequest,
 } from "@/lib/api/academico"
+import type { TipoCambioDocente } from "@/lib/schemas/academico"
 
 const KEYS = {
   docentes: ["docentes"] as const,
@@ -52,15 +57,17 @@ const KEYS = {
   secciones: ["secciones"] as const,
   suspensiones: ["suspensiones"] as const,
   cambiosDocente: ["cambios-docente"] as const,
+  motivosCambioDocente: ["motivos-cambio-docente"] as const,
   recreos: ["recreos"] as const,
 }
 
 // ── Queries ──────────────────────────────────────────────────────────────
 
-export function useDocentes() {
+export function useDocentes(habilitado = true) {
   return useQuery({
     queryKey: KEYS.docentes,
     queryFn: docentesApi.listar,
+    enabled: habilitado,
     placeholderData: keepPreviousData,
   })
 }
@@ -295,43 +302,171 @@ export function useHorasDocente(idDocente: number | null) {
 
 // ── Suspensiones ─────────────────────────────────────────────────────────
 
-export function useSuspensiones() {
+export function useSuspensiones(habilitado = true) {
   return useQuery({
     queryKey: KEYS.suspensiones,
     queryFn: suspensionesApi.listar,
+    enabled: habilitado,
   })
 }
 
 export function useCrearSuspension() {
-  const invalidar = useInvalidarMutacion(KEYS.suspensiones, KEYS.cambiosDocente)
+  const invalidar = useInvalidarMutacion(
+    KEYS.suspensiones,
+    KEYS.asignaciones,
+    KEYS.docentes
+  )
   return useMutation({
     mutationFn: (data: SuspensionRequest) => suspensionesApi.crear(data),
     onSuccess: invalidar,
   })
 }
 
-export function useFinalizarSuspension() {
-  const invalidar = useInvalidarMutacion(KEYS.suspensiones, KEYS.cambiosDocente)
+export function useActualizarSuspension() {
+  const invalidar = useInvalidarMutacion(
+    KEYS.suspensiones,
+    KEYS.asignaciones,
+    KEYS.docentes
+  )
   return useMutation({
-    mutationFn: (id: number) => suspensionesApi.finalizar(id),
+    mutationFn: ({ id, data, vigente }: { id: number; data: SuspensionRequest; vigente?: boolean }) =>
+      vigente ? suspensionesApi.editarVigente(id, data) : suspensionesApi.actualizar(id, data),
     onSuccess: invalidar,
   })
 }
 
-export function useEliminarSuspension() {
-  const invalidar = useInvalidarMutacion(KEYS.suspensiones)
+export function useFinalizarSuspension() {
+  const invalidar = useInvalidarMutacion(
+    KEYS.suspensiones,
+    KEYS.asignaciones,
+    KEYS.docentes
+  )
   return useMutation({
-    mutationFn: (id: number) => suspensionesApi.eliminar(id),
+    mutationFn: ({ id, motivo }: { id: number; motivo?: string }) =>
+      suspensionesApi.finalizar(id, motivo),
+    onSuccess: invalidar,
+  })
+}
+
+export function useCancelarSuspension() {
+  const invalidar = useInvalidarMutacion(
+    KEYS.suspensiones,
+    KEYS.asignaciones,
+    KEYS.docentes
+  )
+  return useMutation({
+    mutationFn: ({ id, motivo }: { id: number; motivo?: string }) =>
+      suspensionesApi.cancelar(id, motivo),
     onSuccess: invalidar,
   })
 }
 
 // ── Cambios de Docente ───────────────────────────────────────────────────
 
-export function useCambiosDocente() {
+export function useAsignacionesParaCambio(idDocente: number | null) {
+  return useQuery({
+    queryKey: [...KEYS.asignaciones, "para-cambio", idDocente],
+    queryFn: () => cambiosDocenteApi.asignacionesParaCambio(idDocente!),
+    enabled: idDocente != null,
+  })
+}
+
+export function useCambiosDocente(habilitado = true) {
   return useQuery({
     queryKey: KEYS.cambiosDocente,
     queryFn: cambiosDocenteApi.listar,
+    enabled: habilitado,
+  })
+}
+
+export function useCrearCambioDocente() {
+  const invalidar = useInvalidarMutacion(
+    KEYS.cambiosDocente,
+    KEYS.asignaciones,
+    KEYS.docentes
+  )
+  return useMutation({
+    mutationFn: (data: CambioDocenteRequest) => cambiosDocenteApi.crear(data),
+    onSuccess: invalidar,
+  })
+}
+
+export function useActualizarCambioDocente() {
+  const invalidarCambio = useInvalidarMutacion(KEYS.cambiosDocente)
+  const invalidarTransferencia = useInvalidarMutacion(KEYS.asignaciones, KEYS.docentes)
+  return useMutation({
+    mutationFn: ({ id, data, vigente }: { id: number; data: CambioDocenteRequest; vigente?: boolean }) =>
+      vigente ? cambiosDocenteApi.editarVigente(id, data) : cambiosDocenteApi.actualizar(id, data),
+    onSuccess: (_data, variables) => {
+      invalidarCambio()
+      if (!variables.vigente) invalidarTransferencia()
+    },
+  })
+}
+
+export function useResolverIncidencia() {
+  const invalidar = useInvalidarMutacion(KEYS.cambiosDocente)
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: ResolverIncidenciaRequest }) =>
+      cambiosDocenteApi.resolverIncidencia(id, data),
+    onSuccess: invalidar,
+  })
+}
+
+export function useFinalizarCambio() {
+  const invalidar = useInvalidarMutacion(
+    KEYS.cambiosDocente,
+    KEYS.asignaciones,
+    KEYS.docentes
+  )
+  return useMutation({
+    mutationFn: (id: number) => cambiosDocenteApi.finalizar(id),
+    onSuccess: invalidar,
+  })
+}
+
+export function useCancelarCambio() {
+  const invalidar = useInvalidarMutacion(KEYS.cambiosDocente)
+  return useMutation({
+    mutationFn: ({ id, motivo }: { id: number; motivo: string }) =>
+      cambiosDocenteApi.cancelar(id, motivo),
+    onSuccess: invalidar,
+  })
+}
+
+export function useMotivosCambioDocente(
+  tipo?: TipoCambioDocente,
+  habilitado = true
+) {
+  return useQuery({
+    queryKey: [...KEYS.motivosCambioDocente, tipo ?? null],
+    queryFn: () => motivosCambioDocenteApi.listar(tipo),
+    enabled: habilitado,
+  })
+}
+
+export function useCrearMotivoCambioDocente() {
+  const invalidar = useInvalidarMutacion(KEYS.motivosCambioDocente)
+  return useMutation({
+    mutationFn: (data: MotivoCambioDocenteRequest) => motivosCambioDocenteApi.crear(data),
+    onSuccess: invalidar,
+  })
+}
+
+export function useActualizarMotivoCambioDocente() {
+  const invalidar = useInvalidarMutacion(KEYS.motivosCambioDocente)
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: MotivoCambioDocenteRequest }) =>
+      motivosCambioDocenteApi.actualizar(id, data),
+    onSuccess: invalidar,
+  })
+}
+
+export function useEliminarMotivoCambioDocente() {
+  const invalidar = useInvalidarMutacion(KEYS.motivosCambioDocente)
+  return useMutation({
+    mutationFn: (id: number) => motivosCambioDocenteApi.eliminar(id),
+    onSuccess: invalidar,
   })
 }
 
