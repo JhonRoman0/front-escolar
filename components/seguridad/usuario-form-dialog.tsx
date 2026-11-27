@@ -67,6 +67,8 @@ import { CamposNombres } from "@/components/shared/campos-nombres"
 import { TarjetaSeccion } from "@/components/shared/tarjeta-seccion"
 import { CampoAcceso } from "./shared"
 import { ConfirmarEliminar } from "./confirmar-eliminar"
+import { useAuth } from "@/components/auth-provider"
+import { esRolAdmin } from "@/lib/roles"
 
 interface ReactivacionPendiente {
   idUsuario: number
@@ -125,7 +127,13 @@ export default function UsuarioFormDialog({
   const rolApoderado = roles.find((r) => r.nombre === "Apoderado")
   // El apoderado se crea desde el módulo de Alumnos; aquí solo se muestra (si el
   // usuario ya lo tiene) como fijo, sin permitir quitarlo ni asignarlo.
-  const rolesVisibles = roles.filter((r) => r.nombre !== "Apoderado")
+  const { esAdmin, usuario: usuarioActual } = useAuth()
+  const rolesVisibles = roles.filter(
+    (r) => r.nombre !== "Apoderado" && (esAdmin || !esRolAdmin(r.nombre))
+  )
+  // El backend lo rechaza igual: aquí solo se evita intentarlo.
+  const rolesPropiosBloqueados =
+    !esAdmin && esEdicion && usuarioActual?.idUsuario === usuario?.idUsuario
   const esApoderado = !!usuario?.roles.some((r) => r.nombre === "Apoderado")
 
   const hoyVigencia = inicioVigenciaPorDefecto()
@@ -677,6 +685,7 @@ export default function UsuarioFormDialog({
                               <CampoChip
                                 key={rol.idRol}
                                 checked={checked}
+                                disabled={rolesPropiosBloqueados}
                                 onCheckedChange={(v) => field.onChange(v ? [...field.value, rol.idRol] : field.value.filter((id: number) => id !== rol.idRol))}
                               >
                                 {rol.nombre}
@@ -694,6 +703,9 @@ export default function UsuarioFormDialog({
                     </div>
                   )}
                 />
+                {rolesPropiosBloqueados && (
+                  <p className="text-xs text-muted-foreground">No puedes cambiar tus propios roles. Pídeselo a un administrador.</p>
+                )}
                 <FieldError errors={[form.formState.errors.rolIds]} />
               </FieldContent>
               </FieldSet>

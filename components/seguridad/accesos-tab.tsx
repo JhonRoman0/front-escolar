@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react"
 import { toast } from "sonner"
-import { ChevronDown, Loader2 } from "lucide-react"
+import { ChevronDown, Loader2, TriangleAlert } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
@@ -22,7 +23,10 @@ import {
 } from "@/components/ui/select"
 
 import { iconoModulo } from "@/lib/modulos"
-import { usePuedeEscritura } from "@/hooks/use-permisos"
+import { esRolAdmin } from "@/lib/roles"
+import { usePuede } from "@/hooks/use-permisos"
+import { useAuth } from "@/components/auth-provider"
+import { ConfirmarEliminar } from "./confirmar-eliminar"
 import {
   useAcciones,
   useActualizarRolPermiso,
@@ -39,7 +43,11 @@ export default function AccesosTab() {
   const { data: modulos = [], isLoading: modulosCargando } = useModulos()
   const { data: todos, isLoading: rpCargando } = useRolesPermiso()
   const { data: acciones = [] } = useAcciones()
-  const puedeEscribir = usePuedeEscritura("ROLES_PERMISOS")
+  const puedeEscribir = usePuede("ROLES_PERMISOS", "ACTUALIZAR")
+  const { esAdmin, usuario, permisos } = useAuth()
+  // Apoderado: confirmar una vez antes de editar (afecta a todas sus cuentas).
+  const [apoderadoDesbloqueado, setApoderadoDesbloqueado] = useState<number | null>(null)
+  const [confirmarApoderado, setConfirmarApoderado] = useState(false)
 
   const crear = useCrearRolPermiso()
   const actualizar = useActualizarRolPermiso()
@@ -50,7 +58,7 @@ export default function AccesosTab() {
   const [abiertos, setAbiertos] = useState<string[]>([])
 
   const rolesActivos = useMemo(
-    () => roles.filter((r) => r.accesoId === 1),
+    () => roles.filter((r) => r.accesoId === 1 && !esRolAdmin(r.nombre)),
     [roles]
   )
   const rolEfectivo =
@@ -147,6 +155,22 @@ export default function AccesosTab() {
 
   const rolSeleccionado = roles.find((r) => r.idRol === rolIdNum)
 
+  // Reglas del backend, reflejadas en pantalla (el ADMIN no las tiene):
+  // no se tocan los propios roles y solo se da o quita lo que uno mismo tiene.
+  const esPropio = !esAdmin && !!rolIdNum && !!usuario?.roles.some((r) => r.idRol === rolIdNum)
+  const misAcciones = useMemo(() => {
+    const mapa = new Map<string, Set<string>>()
+    permisos?.modulos.forEach((m) =>
+      m.permisos.forEach((p) => mapa.set(p.codigo, new Set(p.accionesConcedidas)))
+    )
+    return mapa
+  }, [permisos])
+  const tengoPermiso = (codigo: string) => esAdmin || misAcciones.has(codigo)
+  const tengoAccion = (codigo: string, accion: string) =>
+    esAdmin || !!misAcciones.get(codigo)?.has(accion)
+  const esApoderado = rolSeleccionado?.nombre.trim().toLowerCase() === "apoderado"
+  const apoderadoBloqueado = esApoderado && apoderadoDesbloqueado !== rolIdNum
+
   return (
     <Card>
       <CardContent className="flex flex-col gap-4 p-4">
@@ -162,6 +186,11 @@ export default function AccesosTab() {
             Estás en modo de solo lectura: tu usuario no puede modificar los
             accesos. Contacta al administrador para cambios.
           </div>
+        )}
+        {puedeEscribir && !esAdmin && (
+          <p className="text-pequeno text-muted-foreground">
+            Solo puedes dar o quitar permisos y acciones que tú tienes.
+          </p>
         )}
 
         <Field>
@@ -192,6 +221,34 @@ export default function AccesosTab() {
             </span>
           </p>
         )}
+
+        {puedeEscribir && esPropio && (
+          <div className="rounded-md border border-dashed bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+            Es uno de tus roles: no puedes modificar sus permisos.
+          </div>
+        )}
+
+        {puedeEscribir && !esPropio && apoderadoBloqueado && (
+          <div className="flex flex-col gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 sm:flex-row dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-200 sm:items-center sm:justify-between">
+            <span className="flex items-start gap-2">
+              <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+              Los cambios en este rol afectan a todas las cuentas de apoderados.
+            </span>
+            <Button variant="outline" size="sm" onClick={() => setConfirmarApoderado(true)}>
+              Editar permisos
+            </Button>
+          </div>
+        )}
+        <ConfirmarEliminar
+          open={confirmarApoderado}
+          onOpenChange={setConfirmarApoderado}
+          titulo="Editar permisos del Apoderado"
+          descripcion="Lo que concedas o quites se aplicará al momento a todas las cuentas de apoderados. ¿Continuar?"
+          textoBoton="Continuar"
+          icono={<TriangleAlert />}
+          variantConfirmar="brand"
+          onConfirm={async () => setApoderadoDesbloqueado(rolIdNum)}
+        />
 
         {!rolIdNum ? (
           <p className="py-8 text-center text-sm text-muted-foreground">
@@ -238,7 +295,11 @@ export default function AccesosTab() {
                           const actual = concedido.get(permiso.idPermiso)
                           const asignado = !!actual
                           const bloqueado =
-                            pendiente !== null || !puedeEscribir
+                            pendiente !== null || !puedeEscribir || esPropio || apoderadoBloqueado
+                          // Quitar el permiso quita también sus acciones: todas deben ser tuyas.
+                          const puedeMarcarPermiso =
+                            tengoPermiso(permiso.codigo) &&
+                            (!actual || [...actual.acciones].every((a) => tengoAccion(permiso.codigo, a)))
                           return (
                             <div
                               key={permiso.idPermiso}
@@ -248,7 +309,7 @@ export default function AccesosTab() {
                                 <label className="flex items-center gap-2">
                                   <Checkbox
                                     checked={asignado}
-                                    disabled={bloqueado}
+                                    disabled={bloqueado || !puedeMarcarPermiso}
                                     onCheckedChange={() =>
                                       asignado
                                         ? quitarPermiso(
@@ -277,7 +338,7 @@ export default function AccesosTab() {
                                       >
                                         <Checkbox
                                           checked={marcado}
-                                          disabled={bloqueado}
+                                          disabled={bloqueado || !tengoAccion(permiso.codigo, accion)}
                                           onCheckedChange={() =>
                                             toggleAccion(
                                               permiso.idPermiso,
